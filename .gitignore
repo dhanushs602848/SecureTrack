@@ -1,0 +1,30 @@
+# Gradle and Android
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build/
+/app/build/
+/captures/
+.externalNativeBuild
+.cxx
+
+# Spring Boot
+/backend/target/
+/backend/.mvn/
+/backend/mvnw
+/backend/mvnw.cmd
+
+# Node & React
+/web-dashboard/node_modules/
+/web-dashboard/dist/
+/web-dashboard/.vite/
+
+# Environment Secrets & Credentials
+.env
+.env.local
+.env.*.local
+*.keystore
+*.jks
+google-services.json
