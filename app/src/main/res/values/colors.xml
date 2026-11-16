@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Figma Color Specifications -->
+    <color name="bg_app">#F8F9FB</color>
+    <color name="primary_navy">#152C4F</color>
+    <color name="primary_blue">#255DA8</color>
+    <color name="light_blue">#D8E6FF</color>
+    <color name="card_bg">#FFFFFF</color>
+    <color name="secondary_surface">#F0F2F5</color>
+    <color name="border_color">#DFE2E7</color>
+    <color name="text_primary">#1A1C1E</color>
+    <color name="text_secondary">#62666D</color>
+    <color name="status_success">#2E7456</color>
+    <color name="status_error">#BA1A1A</color>
+    <color name="status_warning">#8A5800</color>
+    <color name="status_info_bg">#E8F0FE</color>
+
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="transparent">#00000000</color>
+
+    <!-- Navigation States -->
+    <color name="nav_selected">#152C4F</color>
+    <color name="nav_unselected">#62666D</color>
+</resources>

@@ -1,0 +1,44 @@
+package com.example.securetrack.api;
+
+import android.content.Context;
+import com.example.securetrack.utils.SessionManager;
+import java.util.concurrent.TimeUnit;
+import okhttp3.OkHttpClient;
+import okhttp3.logging.HttpLoggingInterceptor;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
+
+public class ApiClient {
+
+    private static ApiService apiService;
+
+    public static synchronized ApiService getApiService(Context context) {
+        if (apiService == null) {
+            SessionManager sessionManager = new SessionManager(context.getApplicationContext());
+
+            HttpLoggingInterceptor logging = new HttpLoggingInterceptor();
+            logging.setLevel(HttpLoggingInterceptor.Level.BODY);
+
+            OkHttpClient client = new OkHttpClient.Builder()
+                    .addInterceptor(new AuthInterceptor(sessionManager))
+                    .addInterceptor(logging)
+                    .connectTimeout(15, TimeUnit.SECONDS)
+                    .readTimeout(15, TimeUnit.SECONDS)
+                    .writeTimeout(15, TimeUnit.SECONDS)
+                    .build();
+
+            Retrofit retrofit = new Retrofit.Builder()
+                    .baseUrl(sessionManager.getBaseUrl())
+                    .client(client)
+                    .addConverterFactory(GsonConverterFactory.create())
+                    .build();
+
+            apiService = retrofit.create(ApiService.class);
+        }
+        return apiService;
+    }
+
+    public static synchronized void resetClient() {
+        apiService = null;
+    }
+}

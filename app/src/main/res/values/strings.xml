@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SecureTrack</string>
+    <string name="app_tagline">Track smart. Stay secure.</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_devices">Devices</string>
+    <string name="nav_tracking">Tracking</string>
+    <string name="nav_security">Security</string>
+    <string name="nav_profile">Profile</string>
+
+    <!-- Authentication -->
+    <string name="welcome_back">Welcome Back</string>
+    <string name="sign_in_to_continue">Sign in to monitor and protect your devices.</string>
+    <string name="email">Email Address</string>
+    <string name="password">Password</string>
+    <string name="full_name">Full Name</string>
+    <string name="phone_number">Phone Number</string>
+    <string name="login">Sign In</string>
+    <string name="register">Create Account</string>
+    <string name="dont_have_account">Don\'t have an account? Sign Up</string>
+    <string name="already_have_account">Already have an account? Sign In</string>
+    <string name="forgot_password">Forgot Password?</string>
+    <string name="reset_password">Reset Password</string>
+    <string name="enter_registered_email">Enter your registered email address to receive reset instructions.</string>
+
+    <!-- Dashboard -->
+    <string name="device_protection_status">Device Protection</string>
+    <string name="protection_active">Active &amp; Protected</string>
+    <string name="protection_inactive">Protection Paused</string>
+    <string name="total_devices">Total Devices</string>
+    <string name="online_devices">Online Devices</string>
+    <string name="security_alerts">Security Alerts</string>
+    <string name="primary_device">Primary Device</string>
+    <string name="track_live">Track Live</string>
+    <string name="secure_device">Secure Device</string>
+    <string name="recent_activity">Recent Activity</string>
+    <string name="view_all">View All</string>
+
+    <!-- Devices -->
+    <string name="my_devices">My Devices</string>
+    <string name="register_new_device">Register New Device</string>
+    <string name="device_details">Device Details</string>
+    <string name="setup_method">Choose Setup Method</string>
+    <string name="this_phone">This Android Phone</string>
+    <string name="another_device">Another Device (Pairing Code)</string>
+    <string name="device_name">Device Name</string>
+    <string name="enter_device_name">e.g., John\'s Pixel 8</string>
+    <string name="pairing_code">Pairing Code</string>
+    <string name="generate_pairing_code">Generate Pairing Code</string>
+    <string name="enter_pairing_code">Enter 6-digit code shown on the other device</string>
+    <string name="grant_permissions">Grant Required Permissions</string>
+    <string name="complete_registration">Complete Registration</string>
+
+    <!-- Tracking -->
+    <string name="live_tracking">Live Location Tracking</string>
+    <string name="location_history">Location History</string>
+    <string name="latitude">Latitude</string>
+    <string name="longitude">Longitude</string>
+    <string name="accuracy">Accuracy</string>
+    <string name="last_updated">Last Updated</string>
+    <string name="start_tracking">Start Tracking</string>
+    <string name="stop_tracking">Stop Tracking</string>
+    <string name="background_tracking_toggle">Continuous Background Tracking</string>
+    <string name="osm_attribution">© OpenStreetMap contributors</string>
+
+    <!-- Security & Anti-Theft -->
+    <string name="security_center">Security Center</string>
+    <string name="device_security">Device Security &amp; Admin</string>
+    <string name="device_admin_status">Device Admin Privilege</string>
+    <string name="remote_lock">Remote Lock Device</string>
+    <string name="sim_monitoring">SIM Card Change Monitoring</string>
+    <string name="command_history">Command History</string>
+    <string name="send_command">Send Command</string>
+
+    <!-- Profile & Settings -->
+    <string name="profile">User Profile</string>
+    <string name="settings">Settings</string>
+    <string name="server_url">Backend API Endpoint</string>
+    <string name="logout">Sign Out</string>
+
+    <!-- Statuses & Badges -->
+    <string name="status_online">Online</string>
+    <string name="status_offline">Offline</string>
+    <string name="status_queued">Queued</string>
+    <string name="status_delivered">Delivered</string>
+    <string name="status_received">Received</string>
+    <string name="status_executed">Executed</string>
+    <string name="status_failed">Failed</string>
+
+    <!-- Service Notification -->
+    <string name="notification_channel_name">SecureTrack Location Service</string>
+    <string name="notification_title">SecureTrack Monitoring Active</string>
+    <string name="notification_text">Protecting your device and recording location securely.</string>
+</resources>
