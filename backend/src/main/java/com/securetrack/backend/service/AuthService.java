@@ -92,34 +92,43 @@ public class AuthService {
 
     @Transactional
     public AuthResponse authenticateGoogleUser(GoogleAuthRequest request) {
+        if (googleClientId == null || googleClientId.trim().isEmpty() || googleClientId.contains("unconfigured")) {
+            throw new BadRequestException("Google authentication is not configured on the server");
+        }
+
         String googleSub;
         String email;
         String name;
 
         try {
-            GoogleIdTokenVerifier.Builder verifierBuilder = new GoogleIdTokenVerifier.Builder(
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
                     new NetHttpTransport(),
                     new GsonFactory()
-            );
+            )
+            .setAudience(Collections.singletonList(googleClientId.trim()))
+            .build();
 
-            if (googleClientId != null && !googleClientId.contains("unconfigured")) {
-                verifierBuilder.setAudience(Collections.singletonList(googleClientId));
-            }
-
-            GoogleIdTokenVerifier verifier = verifierBuilder.build();
             GoogleIdToken idToken = verifier.verify(request.getIdToken());
 
             if (idToken != null) {
                 GoogleIdToken.Payload payload = idToken.getPayload();
+
+                Boolean emailVerified = payload.getEmailVerified();
+                if (emailVerified == null || !emailVerified) {
+                    throw new BadRequestException("Unverified Google email address");
+                }
+
                 googleSub = payload.getSubject();
                 email = payload.getEmail();
                 name = (String) payload.get("name");
-                if (name == null || name.isEmpty()) {
+                if (name == null || name.trim().isEmpty()) {
                     name = email;
                 }
             } else {
                 throw new BadRequestException("Invalid or expired Google ID token");
             }
+        } catch (BadRequestException e) {
+            throw e;
         } catch (Exception e) {
             throw new BadRequestException("Failed to verify Google ID token: " + e.getMessage());
         }

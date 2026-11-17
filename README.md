@@ -49,7 +49,7 @@ SecureTrack is a production-grade, multi-platform mobile tracking and anti-theft
 
 ### 2. Spring Boot REST Backend (`backend/`)
 * **Framework:** Spring Boot 3.2.5, Java 17/21, Maven (`mvnw` / `mvnw.cmd`).
-* **Google OAuth Verification:** `GoogleIdTokenVerifier` verifies token signature, audience, issuer, and expiry. Creates or links corresponding SecureTrack accounts via `google_sub_id`.
+* **Google OAuth Verification:** `GoogleIdTokenVerifier` verifies token signature, audience, `email_verified` claim, and expiry. Creates or links corresponding SecureTrack accounts via `google_sub_id`.
 * **Security & JWT:** Spring Security, JWT (JJWT 0.12), BCrypt password hashing, and ownership authorization filters.
 * **Documentation:** OpenAPI / Swagger UI (`http://localhost:8080/swagger-ui.html`).
 
@@ -84,10 +84,10 @@ To enable live Google Sign-In authentication on Android:
 
 ### 1. Database & Backend
 ```bash
-# Set environment variables
+# Set environment variables (Use your actual local credentials in your environment)
 export SPRING_DATASOURCE_URL="jdbc:mysql://localhost:3306/securetrack_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
-export SPRING_DATASOURCE_USERNAME="securetrack_app"
-export SPRING_DATASOURCE_PASSWORD="securetrack_pass"
+export SPRING_DATASOURCE_USERNAME="YOUR_DATABASE_USERNAME"
+export SPRING_DATASOURCE_PASSWORD="YOUR_DATABASE_PASSWORD"
 export JWT_SECRET="YOUR_256_BIT_SECRET_KEY"
 export GOOGLE_CLIENT_ID="YOUR_WEB_CLIENT_ID.apps.googleusercontent.com"
 
