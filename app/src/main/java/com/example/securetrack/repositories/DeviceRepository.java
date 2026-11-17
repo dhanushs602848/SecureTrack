@@ -14,7 +14,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 
 public class DeviceRepository {
 
@@ -172,75 +171,11 @@ public class DeviceRepository {
     }
 
     public void createPairingCode(ApiCallback<PairingResponse> callback) {
-        String uid = getUid();
-        if (uid == null) {
-            callback.onError("User not authenticated");
-            return;
-        }
-
-        String code = String.format("%06d", new Random().nextInt(1000000));
-        Map<String, Object> map = new HashMap<>();
-        map.put("code", code);
-        map.put("ownerUid", uid);
-        map.put("used", false);
-        map.put("createdAt", FieldValue.serverTimestamp());
-
-        db.collection("pairing_codes").document(code)
-                .set(map)
-                .addOnSuccessListener(aVoid -> callback.onSuccess(new PairingResponse(code, 600)))
-                .addOnFailureListener(e -> callback.onError("Pairing code creation failed: " + e.getMessage()));
+        // Safe pairing requires a backend / Firebase Cloud Function to issue short-lived codes.
+        callback.onError("Server-side pairing functions not deployed. Firebase Cloud Functions with billing enabled is required.");
     }
 
     public void completePairing(PairingRequest request, ApiCallback<Device> callback) {
-        String uid = getUid();
-        if (uid == null) {
-            callback.onError("User not authenticated");
-            return;
-        }
-
-        String code = request.getCode();
-        if (code == null || code.trim().isEmpty()) {
-            callback.onError("Pairing code is required");
-            return;
-        }
-
-        db.collection("pairing_codes").document(code.trim())
-                .get()
-                .addOnSuccessListener(doc -> {
-                    if (!doc.exists()) {
-                        callback.onError("Invalid or expired pairing code");
-                        return;
-                    }
-                    Boolean used = doc.getBoolean("used");
-                    if (used != null && used) {
-                        callback.onError("Pairing code already used");
-                        return;
-                    }
-
-                    String ownerUid = doc.getString("ownerUid");
-                    if (ownerUid == null) ownerUid = uid;
-
-                    String devId = request.getInstallationId() != null ? request.getInstallationId() : String.valueOf(System.currentTimeMillis());
-                    Device pairedDevice = new Device(
-                            devId,
-                            request.getDeviceName() != null ? request.getDeviceName() : "Paired Device",
-                            request.getModel() != null ? request.getModel() : "Android",
-                            request.getAndroidVersion() != null ? request.getAndroidVersion() : "14",
-                            100,
-                            "ONLINE",
-                            true,
-                            devId
-                    );
-
-                    db.collection("pairing_codes").document(code.trim())
-                            .update("used", true);
-
-                    db.collection("users").document(ownerUid)
-                            .collection("devices").document(pairedDevice.getInstallationId())
-                            .set(pairedDevice)
-                            .addOnSuccessListener(aVoid -> callback.onSuccess(pairedDevice))
-                            .addOnFailureListener(e -> callback.onError("Failed to save paired device: " + e.getMessage()));
-                })
-                .addOnFailureListener(e -> callback.onError("Pairing validation error: " + e.getMessage()));
+        callback.onError("Server-side pairing functions not deployed.");
     }
 }

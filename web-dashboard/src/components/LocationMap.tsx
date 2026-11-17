@@ -18,12 +18,14 @@ interface LocationMapProps {
   locations: { latitude: number; longitude: number; label?: string; timestamp?: string }[];
   center?: [number, number];
   zoom?: number;
+  showPath?: boolean;
 }
 
 export const LocationMap: React.FC<LocationMapProps> = ({
   locations,
   center = [37.7749, -122.4194],
   zoom = 13,
+  showPath = false
 }) => {
   const mapCenter: [number, number] = locations.length > 0
     ? [locations[0].latitude, locations[0].longitude]
@@ -57,7 +59,7 @@ export const LocationMap: React.FC<LocationMapProps> = ({
           </Marker>
         ))}
 
-        {polylinePositions.length > 1 && (
+        {showPath && polylinePositions.length > 1 && (
           <Polyline positions={polylinePositions} color="#255DA8" weight={4} opacity={0.7} />
         )}
       </MapContainer>

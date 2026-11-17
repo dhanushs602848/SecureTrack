@@ -111,7 +111,7 @@ public class LocationTrackingService extends Service {
         String clientUuid = UUID.randomUUID().toString();
 
         LocationRecord record = new LocationRecord(
-                1L,
+                deviceIdStr,
                 clientUuid,
                 location.getLatitude(),
                 location.getLongitude(),

@@ -51,7 +51,7 @@ public class LocationRepository {
 
     public void recordLocation(LocationRecord record, ApiCallback<LocationRecord> callback) {
         String uid = getUid();
-        String deviceId = record.getDeviceId() != null ? String.valueOf(record.getDeviceId()) : sessionManager.getPrimaryDeviceIdStr();
+        String deviceId = record.getDeviceId() != null ? record.getDeviceId() : sessionManager.getPrimaryDeviceIdStr();
 
         if (uid == null || deviceId == null) {
             cacheLocally(record);
@@ -120,7 +120,7 @@ public class LocationRepository {
 
                         if (lat != null && lng != null) {
                             LocationRecord lr = new LocationRecord(
-                                    1L,
+                                    deviceId,
                                     clientUuid != null ? clientUuid : doc.getId(),
                                     lat,
                                     lng,
@@ -137,8 +137,8 @@ public class LocationRepository {
                 .addOnFailureListener(e -> callback.onError("Firestore location history error: " + e.getMessage()));
     }
 
-    public void getLocationHistory(Long deviceId, ApiCallback<List<LocationRecord>> callback) {
-        String devIdStr = deviceId != null ? String.valueOf(deviceId) : sessionManager.getPrimaryDeviceIdStr();
+    public void getLocationHistory(String deviceId, ApiCallback<List<LocationRecord>> callback) {
+        String devIdStr = deviceId != null ? deviceId : sessionManager.getPrimaryDeviceIdStr();
         getLocationHistoryStr(devIdStr, callback);
     }
 

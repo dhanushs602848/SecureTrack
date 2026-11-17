@@ -18,8 +18,16 @@ public class DeviceUtils {
         }
     }
 
+    public static String getDeviceName() {
+        return getDeviceModel();
+    }
+
     public static String getAndroidVersion() {
         return "Android " + Build.VERSION.RELEASE + " (API " + Build.VERSION.SDK_INT + ")";
+    }
+
+    public static int getBatteryPercentage(Context context) {
+        return getBatteryLevel(context);
     }
 
     public static int getBatteryLevel(Context context) {

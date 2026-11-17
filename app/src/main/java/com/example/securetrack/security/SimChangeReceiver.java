@@ -19,7 +19,7 @@ public class SimChangeReceiver extends BroadcastReceiver {
 
             SecurityRepository repo = new SecurityRepository(context.getApplicationContext());
             SecurityEvent event = new SecurityEvent(
-                    1L,
+                    deviceIdStr,
                     "SIM_CARD_EVENT",
                     "WARNING",
                     "SIM state change detected on device"

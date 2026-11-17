@@ -8,7 +8,7 @@ const firebaseConfig = {
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "track-99c90",
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "track-99c90.firebasestorage.app",
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "302801589438",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:302801589438:web:securetrack"
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:302801589438:web:9b8fd9ae41f07f913dfaef"
 };
 
 export const app = initializeApp(firebaseConfig);

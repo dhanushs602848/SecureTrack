@@ -1,10 +1,8 @@
 package com.example.securetrack.models;
 
 public class DeviceCommand {
-    private Long id;
-    private String idStr;
-    private Long deviceId;
-    private String deviceIdStr;
+    private String id;
+    private String deviceId;
     private String commandType;
     private String payload;
     private String status;
@@ -14,7 +12,7 @@ public class DeviceCommand {
 
     public DeviceCommand() {}
 
-    public DeviceCommand(Long deviceId, String commandType, String payload) {
+    public DeviceCommand(String deviceId, String commandType, String payload) {
         this.deviceId = deviceId;
         this.commandType = commandType;
         this.payload = payload;
@@ -28,27 +26,11 @@ public class DeviceCommand {
         this.result = result;
     }
 
-    public DeviceCommand(String idStr, String deviceIdStr, String commandType, String status, String payload, String result) {
-        this.idStr = idStr;
-        try { this.id = Long.parseLong(idStr); } catch (Exception ignored) {}
-        this.deviceIdStr = deviceIdStr;
-        this.commandType = commandType;
-        this.status = status;
-        this.payload = payload;
-        this.result = result;
-    }
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-
-    public String getIdStr() { return idStr != null ? idStr : (id != null ? String.valueOf(id) : null); }
-    public void setIdStr(String idStr) { this.idStr = idStr; }
-
-    public Long getDeviceId() { return deviceId; }
-    public void setDeviceId(Long deviceId) { this.deviceId = deviceId; }
-
-    public String getDeviceIdStr() { return deviceIdStr != null ? deviceIdStr : (deviceId != null ? String.valueOf(deviceId) : null); }
-    public void setDeviceIdStr(String deviceIdStr) { this.deviceIdStr = deviceIdStr; }
+    public String getDeviceId() { return deviceId; }
+    public void setDeviceId(String deviceId) { this.deviceId = deviceId; }
 
     public String getCommandType() { return commandType; }
     public void setCommandType(String commandType) { this.commandType = commandType; }

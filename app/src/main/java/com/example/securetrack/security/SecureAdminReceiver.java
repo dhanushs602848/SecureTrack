@@ -1,8 +1,6 @@
 package com.example.securetrack.security;
 
 import android.app.admin.DeviceAdminReceiver;
-import android.app.admin.DevicePolicyManager;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.widget.Toast;
@@ -13,36 +11,35 @@ import com.example.securetrack.utils.SessionManager;
 
 public class SecureAdminReceiver extends DeviceAdminReceiver {
 
-    public static ComponentName getComponentName(Context context) {
-        return new ComponentName(context.getApplicationContext(), SecureAdminReceiver.class);
-    }
-
     public static boolean isAdminActive(Context context) {
-        DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
-        return dpm != null && dpm.isAdminActive(getComponentName(context));
+        android.app.admin.DevicePolicyManager dpm = (android.app.admin.DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
+        android.content.ComponentName adminComponent = new android.content.ComponentName(context, SecureAdminReceiver.class);
+        return dpm != null && dpm.isAdminActive(adminComponent);
     }
 
     @Override
     public void onEnabled(@NonNull Context context, @NonNull Intent intent) {
         super.onEnabled(context, intent);
-        Toast.makeText(context, "SecureTrack Device Admin Activated", Toast.LENGTH_SHORT).show();
-        recordAdminEvent(context, "DEVICE_ADMIN_ENABLED", "HIGH", "Device Administrator privileges granted by user");
+        logSecurityEvent(context, "DEVICE_ADMIN_ENABLED", "INFO", "Device Administrator privileges granted");
+        Toast.makeText(context, "Device Admin Enabled", Toast.LENGTH_SHORT).show();
     }
 
     @Override
     public void onDisabled(@NonNull Context context, @NonNull Intent intent) {
         super.onDisabled(context, intent);
-        Toast.makeText(context, "SecureTrack Device Admin Deactivated", Toast.LENGTH_SHORT).show();
-        recordAdminEvent(context, "DEVICE_ADMIN_DISABLED", "CRITICAL", "Device Administrator privileges deactivated!");
+        logSecurityEvent(context, "DEVICE_ADMIN_DISABLED", "WARNING", "Device Administrator privileges revoked");
+        Toast.makeText(context, "Device Admin Disabled", Toast.LENGTH_SHORT).show();
     }
 
-    private void recordAdminEvent(Context context, String eventType, String severity, String desc) {
+    private void logSecurityEvent(Context context, String eventType, String severity, String desc) {
         SessionManager sessionManager = new SessionManager(context.getApplicationContext());
-        long deviceId = sessionManager.getPrimaryDeviceId();
-        if (deviceId == -1) return;
+        String deviceId = sessionManager.getPrimaryDeviceIdStr();
+
+        if (deviceId == null) return;
 
         SecurityRepository repo = new SecurityRepository(context.getApplicationContext());
         SecurityEvent event = new SecurityEvent(deviceId, eventType, severity, desc);
+
         repo.recordSecurityEvent(event, new SecurityRepository.ApiCallback<SecurityEvent>() {
             @Override
             public void onSuccess(SecurityEvent result) {}

@@ -9,26 +9,18 @@ import com.example.securetrack.databinding.ActivityLocationHistoryBinding;
 import com.example.securetrack.models.LocationRecord;
 import com.example.securetrack.repositories.LocationRepository;
 import com.example.securetrack.utils.SessionManager;
-import org.osmdroid.config.Configuration;
-import org.osmdroid.util.GeoPoint;
-import org.osmdroid.views.overlay.Marker;
-import org.osmdroid.views.overlay.Polyline;
-import java.util.ArrayList;
 import java.util.List;
 
 public class LocationHistoryActivity extends AppCompatActivity {
 
     private ActivityLocationHistoryBinding binding;
     private LocationRepository locationRepository;
-    private LocationHistoryAdapter adapter;
     private SessionManager sessionManager;
+    private LocationHistoryAdapter adapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        Configuration.getInstance().setUserAgentValue(getPackageName());
-
         binding = ActivityLocationHistoryBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
@@ -36,72 +28,36 @@ public class LocationHistoryActivity extends AppCompatActivity {
         sessionManager = new SessionManager(this);
 
         adapter = new LocationHistoryAdapter();
-        binding.rvLocationHistory.setLayoutManager(new LinearLayoutManager(this));
-        binding.rvLocationHistory.setAdapter(adapter);
+        binding.rvHistory.setLayoutManager(new LinearLayoutManager(this));
+        binding.rvHistory.setAdapter(adapter);
 
-        binding.historyMapView.setMultiTouchControls(true);
+        binding.btnBack.setOnClickListener(v -> finish());
+        binding.swipeRefresh.setOnRefreshListener(this::loadHistory);
 
         loadHistory();
     }
 
     private void loadHistory() {
-        long deviceId = sessionManager.getPrimaryDeviceId();
-        if (deviceId == -1) {
-            Toast.makeText(this, "No primary device selected", Toast.LENGTH_SHORT).show();
+        binding.swipeRefresh.setRefreshing(true);
+        String deviceId = sessionManager.getPrimaryDeviceIdStr();
+        if (deviceId == null) {
+            binding.swipeRefresh.setRefreshing(false);
+            Toast.makeText(this, "No device registered", Toast.LENGTH_SHORT).show();
             return;
         }
 
         locationRepository.getLocationHistory(deviceId, new LocationRepository.ApiCallback<List<LocationRecord>>() {
             @Override
             public void onSuccess(List<LocationRecord> result) {
+                binding.swipeRefresh.setRefreshing(false);
                 adapter.setLocations(result);
-                displayRouteOnMap(result);
             }
 
             @Override
             public void onError(String errorMessage) {
+                binding.swipeRefresh.setRefreshing(false);
                 Toast.makeText(LocationHistoryActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
             }
         });
-    }
-
-    private void displayRouteOnMap(List<LocationRecord> result) {
-        if (result == null || result.isEmpty()) return;
-
-        binding.historyMapView.getOverlays().clear();
-
-        List<GeoPoint> points = new ArrayList<>();
-        for (LocationRecord loc : result) {
-            GeoPoint point = new GeoPoint(loc.getLatitude(), loc.getLongitude());
-            points.add(point);
-
-            Marker marker = new Marker(binding.historyMapView);
-            marker.setPosition(point);
-            marker.setTitle("Time: " + loc.getTimestamp());
-            binding.historyMapView.getOverlays().add(marker);
-        }
-
-        if (!points.isEmpty()) {
-            Polyline polyline = new Polyline();
-            polyline.setPoints(points);
-            binding.historyMapView.getOverlays().add(polyline);
-
-            binding.historyMapView.getController().setZoom(15.0);
-            binding.historyMapView.getController().setCenter(points.get(0));
-        }
-
-        binding.historyMapView.invalidate();
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        binding.historyMapView.onResume();
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        binding.historyMapView.onPause();
     }
 }

@@ -3,18 +3,14 @@ package com.example.securetrack.fragments;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.location.Location;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import com.example.securetrack.activities.LocationHistoryActivity;
@@ -22,53 +18,23 @@ import com.example.securetrack.databinding.FragmentTrackingBinding;
 import com.example.securetrack.location.LocationTrackingService;
 import com.example.securetrack.models.LocationRecord;
 import com.example.securetrack.repositories.LocationRepository;
-import com.example.securetrack.utils.PermissionUtils;
 import com.example.securetrack.utils.SessionManager;
-import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationCallback;
-import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.location.LocationResult;
-import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.location.Priority;
 import org.osmdroid.config.Configuration;
 import org.osmdroid.util.GeoPoint;
+import org.osmdroid.views.MapView;
 import org.osmdroid.views.overlay.Marker;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
-import java.util.TimeZone;
-import java.util.UUID;
+import java.util.List;
 
 public class TrackingFragment extends Fragment {
 
+    private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
+    private static final int BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE = 2;
+
     private FragmentTrackingBinding binding;
-    private SessionManager sessionManager;
+    private MapView map;
     private LocationRepository locationRepository;
-    private FusedLocationProviderClient fusedLocationClient;
-    private Marker currentMarker;
-
-    private final ActivityResultLauncher<String[]> locationPermissionLauncher =
-            registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), permissions -> {
-                Boolean fineGranted = permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false);
-                Boolean coarseGranted = permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false);
-                if (Boolean.TRUE.equals(fineGranted) || Boolean.TRUE.equals(coarseGranted)) {
-                    getCurrentLocation();
-                } else {
-                    Toast.makeText(requireContext(), "Location permission denied", Toast.LENGTH_SHORT).show();
-                }
-            });
-
-    private final ActivityResultLauncher<String> bgLocationPermissionLauncher =
-            registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
-                if (isGranted) {
-                    sessionManager.setBackgroundTrackingEnabled(true);
-                    startBackgroundTrackingService();
-                } else {
-                    binding.switchBackgroundTracking.setChecked(false);
-                    sessionManager.setBackgroundTrackingEnabled(false);
-                    Toast.makeText(requireContext(), "Background location permission denied", Toast.LENGTH_SHORT).show();
-                }
-            });
+    private SessionManager sessionManager;
+    private Marker currentLocationMarker;
 
     @Nullable
     @Override
@@ -82,142 +48,169 @@ public class TrackingFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        sessionManager = new SessionManager(requireContext());
         locationRepository = new LocationRepository(requireContext());
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireContext());
+        sessionManager = new SessionManager(requireContext());
 
-        binding.mapView.setMultiTouchControls(true);
-        binding.mapView.getController().setZoom(15.0);
+        map = binding.mapView;
+        map.setMultiTouchControls(true);
+        map.getController().setZoom(15.0);
 
         binding.switchBackgroundTracking.setChecked(sessionManager.isBackgroundTrackingEnabled());
-
         binding.switchBackgroundTracking.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (isChecked) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !PermissionUtils.hasBackgroundLocationPermission(requireContext())) {
-                    bgLocationPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION);
-                } else {
-                    sessionManager.setBackgroundTrackingEnabled(true);
-                    startBackgroundTrackingService();
-                }
+                checkAndRequestLocationPermissions();
             } else {
                 sessionManager.setBackgroundTrackingEnabled(false);
-                stopBackgroundTrackingService();
+                stopLocationService();
             }
         });
 
-        binding.btnRefreshLocation.setOnClickListener(v -> requestForegroundLocation());
-        binding.btnViewHistory.setOnClickListener(v -> startActivity(new Intent(requireContext(), LocationHistoryActivity.class)));
+        binding.btnRefreshLocation.setOnClickListener(v -> fetchLatestLocation());
+        binding.btnLocationHistory.setOnClickListener(v -> startActivity(new Intent(requireContext(), LocationHistoryActivity.class)));
 
-        requestForegroundLocation();
-    }
-
-    private void requestForegroundLocation() {
-        if (!PermissionUtils.hasForegroundLocationPermission(requireContext())) {
-            locationPermissionLauncher.launch(new String[]{
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-            });
-        } else {
-            getCurrentLocation();
+        if (sessionManager.isBackgroundTrackingEnabled()) {
+            checkAndRequestLocationPermissions();
         }
+
+        fetchLatestLocation();
     }
 
-    private void getCurrentLocation() {
+    private void checkAndRequestLocationPermissions() {
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            return;
+            requestPermissions(
+                    new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION},
+                    LOCATION_PERMISSION_REQUEST_CODE
+            );
+        } else {
+            checkBackgroundLocationPermission();
         }
+    }
 
-        LocationRequest request = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000)
-                .setMaxUpdates(1)
-                .build();
-
-        fusedLocationClient.requestLocationUpdates(request, new LocationCallback() {
-            @Override
-            public void onLocationResult(LocationResult locationResult) {
-                if (locationResult != null && locationResult.getLastLocation() != null) {
-                    updateMapAndUpload(locationResult.getLastLocation());
-                }
+    private void checkBackgroundLocationPermission() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(
+                        new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION},
+                        BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE
+                );
+            } else {
+                startTracking();
             }
-        }, Looper.getMainLooper());
-    }
-
-    private void updateMapAndUpload(Location location) {
-        GeoPoint point = new GeoPoint(location.getLatitude(), location.getLongitude());
-
-        if (currentMarker == null) {
-            currentMarker = new Marker(binding.mapView);
-            currentMarker.setTitle("Current Location");
-            binding.mapView.getOverlays().add(currentMarker);
+        } else {
+            startTracking();
         }
-        currentMarker.setPosition(point);
-        binding.mapView.getController().setCenter(point);
-        binding.mapView.invalidate();
-
-        binding.tvLatitude.setText(String.format(Locale.US, "Lat: %.6f", location.getLatitude()));
-        binding.tvLongitude.setText(String.format(Locale.US, "Lng: %.6f", location.getLongitude()));
-        binding.tvAccuracy.setText(String.format(Locale.US, "Accuracy: %.1fm", location.getAccuracy()));
-
-        SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss UTC", Locale.US);
-        sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-        binding.tvLastUpdated.setText("Updated: " + sdf.format(new Date(location.getTime())));
-
-        long deviceId = sessionManager.getPrimaryDeviceId();
-        if (deviceId == -1) return;
-
-        SimpleDateFormat isoFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
-        isoFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
-
-        LocationRecord record = new LocationRecord(
-                deviceId,
-                UUID.randomUUID().toString(),
-                location.getLatitude(),
-                location.getLongitude(),
-                location.getAccuracy(),
-                location.getAltitude(),
-                location.getSpeed(),
-                isoFormat.format(new Date(location.getTime()))
-        );
-
-        locationRepository.recordLocation(record, new LocationRepository.ApiCallback<LocationRecord>() {
-            @Override
-            public void onSuccess(LocationRecord result) {}
-
-            @Override
-            public void onError(String errorMessage) {}
-        });
     }
 
-    private void startBackgroundTrackingService() {
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                checkBackgroundLocationPermission();
+            } else {
+                binding.switchBackgroundTracking.setChecked(false);
+                Toast.makeText(requireContext(), "Location permission required", Toast.LENGTH_SHORT).show();
+            }
+        } else if (requestCode == BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                startTracking();
+            } else {
+                binding.switchBackgroundTracking.setChecked(false);
+                Toast.makeText(requireContext(), "Background location permission is needed for continuous tracking", Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    private void startTracking() {
+        sessionManager.setBackgroundTrackingEnabled(true);
         Intent serviceIntent = new Intent(requireContext(), LocationTrackingService.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             requireContext().startForegroundService(serviceIntent);
         } else {
             requireContext().startService(serviceIntent);
         }
-        Toast.makeText(requireContext(), "Continuous Location Service Started", Toast.LENGTH_SHORT).show();
+        Toast.makeText(requireContext(), "Background tracking started", Toast.LENGTH_SHORT).show();
     }
 
-    private void stopBackgroundTrackingService() {
+    private void stopLocationService() {
         Intent serviceIntent = new Intent(requireContext(), LocationTrackingService.class);
         requireContext().stopService(serviceIntent);
-        Toast.makeText(requireContext(), "Continuous Location Service Stopped", Toast.LENGTH_SHORT).show();
+        Toast.makeText(requireContext(), "Background tracking stopped", Toast.LENGTH_SHORT).show();
+    }
+
+    private void fetchLatestLocation() {
+        String deviceId = sessionManager.getPrimaryDeviceIdStr();
+        if (deviceId == null) {
+            Toast.makeText(requireContext(), "No primary device registered", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        binding.progressBar.setVisibility(View.VISIBLE);
+
+        locationRepository.getLocationHistoryStr(
+                deviceId,
+                new LocationRepository.ApiCallback<List<LocationRecord>>() {
+                    @Override
+                    public void onSuccess(List<LocationRecord> result) {
+                        if (binding != null) binding.progressBar.setVisibility(View.GONE);
+                        if (result != null && !result.isEmpty()) {
+                            updateMap(result.get(0));
+                        } else {
+                            Toast.makeText(requireContext(), "No location data found", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+
+                    @Override
+                    public void onError(String errorMessage) {
+                        if (binding != null) binding.progressBar.setVisibility(View.GONE);
+                        Toast.makeText(requireContext(), errorMessage, Toast.LENGTH_SHORT).show();
+                    }
+                }
+        );
+    }
+
+    private void updateMap(LocationRecord record) {
+        if (map == null) return;
+
+        GeoPoint point = new GeoPoint(record.getLatitude(), record.getLongitude());
+        map.getController().setCenter(point);
+
+        if (currentLocationMarker == null) {
+            currentLocationMarker = new Marker(map);
+            currentLocationMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
+            map.getOverlays().add(currentLocationMarker);
+        }
+
+        currentLocationMarker.setPosition(point);
+        currentLocationMarker.setTitle("Last Location");
+        currentLocationMarker.setSnippet("Accuracy: " + record.getAccuracy() + "m");
+        map.invalidate();
+
+        binding.tvLastUpdated.setText("Last Updated: " + record.getTimestamp());
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        binding.mapView.onResume();
+        if (map != null) {
+            map.onResume();
+        }
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        binding.mapView.onPause();
+        if (map != null) {
+            map.onPause();
+        }
     }
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        if (map != null) {
+            map.onDetach();
+        }
         binding = null;
     }
 }

@@ -1,7 +1,6 @@
 package com.example.securetrack.repositories;
 
 import android.content.Context;
-import android.util.Log;
 import com.example.securetrack.models.*;
 import com.example.securetrack.utils.SessionManager;
 import com.google.firebase.auth.FirebaseAuth;
@@ -18,8 +17,6 @@ import java.util.Map;
 import java.util.UUID;
 
 public class SecurityRepository {
-
-    private static final String TAG = "SecurityRepository";
 
     private final FirebaseFirestore db;
     private final SessionManager sessionManager;
@@ -52,7 +49,7 @@ public class SecurityRepository {
         String eventId = UUID.randomUUID().toString();
         Map<String, Object> map = new HashMap<>();
         map.put("id", eventId);
-        map.put("deviceId", event.getDeviceId() != null ? String.valueOf(event.getDeviceId()) : sessionManager.getPrimaryDeviceIdStr());
+        map.put("deviceId", event.getDeviceId() != null ? event.getDeviceId() : sessionManager.getPrimaryDeviceIdStr());
         map.put("eventType", event.getEventType());
         map.put("severity", event.getSeverity());
         map.put("description", event.getDescription());
@@ -83,7 +80,7 @@ public class SecurityRepository {
                         String type = doc.getString("eventType");
                         String severity = doc.getString("severity");
                         String desc = doc.getString("description");
-                        Long devId = 1L;
+                        String devId = doc.getString("deviceId");
 
                         SecurityEvent se = new SecurityEvent(
                                 devId,
@@ -98,13 +95,10 @@ public class SecurityRepository {
                 .addOnFailureListener(e -> callback.onError("Firestore alert error: " + e.getMessage()));
     }
 
-    public void createCommand(Long deviceId, DeviceCommand command, ApiCallback<DeviceCommand> callback) {
-        createCommandStr(deviceId != null ? String.valueOf(deviceId) : sessionManager.getPrimaryDeviceIdStr(), command, callback);
-    }
-
-    public void createCommandStr(String deviceId, DeviceCommand command, ApiCallback<DeviceCommand> callback) {
+    public void createCommand(String deviceId, DeviceCommand command, ApiCallback<DeviceCommand> callback) {
         String uid = getUid();
-        if (uid == null || deviceId == null) {
+        String targetDeviceId = deviceId != null ? deviceId : sessionManager.getPrimaryDeviceIdStr();
+        if (uid == null || targetDeviceId == null) {
             callback.onError("User or device not identified");
             return;
         }
@@ -119,7 +113,7 @@ public class SecurityRepository {
         map.put("createdAt", FieldValue.serverTimestamp());
 
         db.collection("users").document(uid)
-                .collection("devices").document(deviceId)
+                .collection("devices").document(targetDeviceId)
                 .collection("commands").document(commandId)
                 .set(map, SetOptions.merge())
                 .addOnSuccessListener(aVoid -> {
@@ -134,19 +128,16 @@ public class SecurityRepository {
                 .addOnFailureListener(e -> callback.onError("Firestore command dispatch error: " + e.getMessage()));
     }
 
-    public void getDeviceCommands(Long deviceId, ApiCallback<List<DeviceCommand>> callback) {
-        getDeviceCommandsStr(deviceId != null ? String.valueOf(deviceId) : sessionManager.getPrimaryDeviceIdStr(), callback);
-    }
-
-    public void getDeviceCommandsStr(String deviceId, ApiCallback<List<DeviceCommand>> callback) {
+    public void getDeviceCommands(String deviceId, ApiCallback<List<DeviceCommand>> callback) {
         String uid = getUid();
-        if (uid == null || deviceId == null) {
+        String targetDeviceId = deviceId != null ? deviceId : sessionManager.getPrimaryDeviceIdStr();
+        if (uid == null || targetDeviceId == null) {
             callback.onError("User or device not identified");
             return;
         }
 
         db.collection("users").document(uid)
-                .collection("devices").document(deviceId)
+                .collection("devices").document(targetDeviceId)
                 .collection("commands")
                 .orderBy("createdAt", Query.Direction.DESCENDING)
                 .limit(50)
@@ -174,10 +165,11 @@ public class SecurityRepository {
 
     public ListenerRegistration listenToPendingCommands(String deviceId, ApiCallback<List<DeviceCommand>> callback) {
         String uid = getUid();
-        if (uid == null || deviceId == null) return null;
+        String targetDeviceId = deviceId != null ? deviceId : sessionManager.getPrimaryDeviceIdStr();
+        if (uid == null || targetDeviceId == null) return null;
 
         return db.collection("users").document(uid)
-                .collection("devices").document(deviceId)
+                .collection("devices").document(targetDeviceId)
                 .collection("commands")
                 .whereEqualTo("status", "QUEUED")
                 .addSnapshotListener((querySnapshot, error) -> {
@@ -199,6 +191,7 @@ public class SecurityRepository {
                                     payload,
                                     result
                             );
+                            cmd.setId(doc.getId());
                             list.add(cmd);
                         }
                         callback.onSuccess(list);

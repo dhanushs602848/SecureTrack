@@ -23,8 +23,8 @@ public class SecurityFragment extends Fragment {
 
     private FragmentSecurityBinding binding;
     private SecurityRepository securityRepository;
-    private SecurityAlertAdapter adapter;
     private SessionManager sessionManager;
+    private SecurityAlertAdapter adapter;
 
     @Nullable
     @Override
@@ -44,57 +44,62 @@ public class SecurityFragment extends Fragment {
         binding.rvSecurityAlerts.setLayoutManager(new LinearLayoutManager(requireContext()));
         binding.rvSecurityAlerts.setAdapter(adapter);
 
-        binding.btnDeviceSecurityAdmin.setOnClickListener(v -> {
-            startActivity(new Intent(requireContext(), DeviceSecurityActivity.class));
-        });
+        binding.swipeRefresh.setOnRefreshListener(this::loadAlerts);
 
-        binding.btnRemoteLockDialog.setOnClickListener(v -> dispatchRemoteCommand("LOCK_DEVICE"));
-        binding.btnTriggerAlarm.setOnClickListener(v -> dispatchRemoteCommand("ALARM_ALERT"));
+        binding.btnLockDevice.setOnClickListener(v -> dispatchCommand("LOCK_DEVICE"));
+        binding.btnTriggerAlarm.setOnClickListener(v -> dispatchCommand("ALARM_ALERT"));
+        binding.btnDeviceAdmin.setOnClickListener(v -> startActivity(new Intent(requireContext(), DeviceSecurityActivity.class)));
 
-        loadSecurityAlerts();
+        loadAlerts();
     }
 
-    private void dispatchRemoteCommand(String commandType) {
-        long deviceId = sessionManager.getPrimaryDeviceId();
-        if (deviceId == -1) {
-            Toast.makeText(requireContext(), "No primary device registered", Toast.LENGTH_SHORT).show();
+    private void dispatchCommand(String commandType) {
+        String deviceId = sessionManager.getPrimaryDeviceIdStr();
+        if (deviceId == null) {
+            Toast.makeText(requireContext(), "No primary device selected", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        DeviceCommand cmd = new DeviceCommand(deviceId, commandType, "Manual user trigger from app");
+        DeviceCommand cmd = new DeviceCommand(commandType, "QUEUED", "Manual user trigger from app", "");
         securityRepository.createCommand(deviceId, cmd, new SecurityRepository.ApiCallback<DeviceCommand>() {
             @Override
             public void onSuccess(DeviceCommand result) {
-                Toast.makeText(requireContext(), "Command '" + commandType + "' queued with status: " + result.getStatus(), Toast.LENGTH_LONG).show();
+                Toast.makeText(requireContext(), "Command " + commandType + " dispatched successfully", Toast.LENGTH_SHORT).show();
             }
 
             @Override
             public void onError(String errorMessage) {
-                Toast.makeText(requireContext(), "Error: " + errorMessage, Toast.LENGTH_SHORT).show();
+                Toast.makeText(requireContext(), "Failed to dispatch: " + errorMessage, Toast.LENGTH_LONG).show();
             }
         });
     }
 
-    private void loadSecurityAlerts() {
+    private void loadAlerts() {
+        binding.swipeRefresh.setRefreshing(true);
         securityRepository.getUserSecurityEvents(new SecurityRepository.ApiCallback<List<SecurityEvent>>() {
             @Override
             public void onSuccess(List<SecurityEvent> result) {
-                if (getContext() == null) return;
-                adapter.setEvents(result);
+                if (binding != null) {
+                    binding.swipeRefresh.setRefreshing(false);
+                    adapter.setEvents(result);
+                    if (result.isEmpty()) {
+                        binding.tvEmptyState.setVisibility(View.VISIBLE);
+                        binding.rvSecurityAlerts.setVisibility(View.GONE);
+                    } else {
+                        binding.tvEmptyState.setVisibility(View.GONE);
+                        binding.rvSecurityAlerts.setVisibility(View.VISIBLE);
+                    }
+                }
             }
 
             @Override
             public void onError(String errorMessage) {
-                if (getContext() == null) return;
-                Toast.makeText(getContext(), errorMessage, Toast.LENGTH_SHORT).show();
+                if (binding != null) {
+                    binding.swipeRefresh.setRefreshing(false);
+                    Toast.makeText(requireContext(), "Error: " + errorMessage, Toast.LENGTH_SHORT).show();
+                }
             }
         });
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        loadSecurityAlerts();
     }
 
     @Override

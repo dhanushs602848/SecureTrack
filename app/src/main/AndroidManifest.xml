@@ -66,6 +66,20 @@
         </receiver>
 
         <receiver
+            android:name=".location.GeofenceBroadcastReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <receiver
+            android:name=".security.BatteryReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BATTERY_CHANGED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
             android:name=".security.SecureAdminReceiver"
             android:description="@string/app_name"
             android:label="@string/app_name"

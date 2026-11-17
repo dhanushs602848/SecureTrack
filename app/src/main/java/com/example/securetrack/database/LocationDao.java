@@ -2,22 +2,24 @@ package com.example.securetrack.database;
 
 import androidx.room.Dao;
 import androidx.room.Insert;
-import androidx.room.OnConflictStrategy;
 import androidx.room.Query;
 import java.util.List;
 
 @Dao
 public interface LocationDao {
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    long insert(LocationEntity location);
+    @Insert
+    void insert(LocationEntity location);
 
-    @Query("SELECT * FROM offline_locations WHERE synced = 0 ORDER BY id ASC")
+    @Query("SELECT * FROM offline_locations WHERE isSynced = 0 ORDER BY timestamp ASC")
     List<LocationEntity> getUnsyncedLocations();
 
-    @Query("UPDATE offline_locations SET synced = 1 WHERE id = :id")
+    @Query("UPDATE offline_locations SET isSynced = 1 WHERE id = :id")
     void markAsSynced(long id);
 
-    @Query("DELETE FROM offline_locations WHERE synced = 1")
+    @Query("DELETE FROM offline_locations WHERE isSynced = 1")
     void deleteSyncedLocations();
+
+    @Query("DELETE FROM offline_locations")
+    void deleteAll();
 }

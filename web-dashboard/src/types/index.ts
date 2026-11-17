@@ -1,13 +1,13 @@
 export interface User {
-  id: number;
+  id: string;
   email: string;
   fullName: string;
   phoneNumber?: string;
 }
 
 export interface Device {
-  id: number;
-  userId?: number;
+  id: string;
+  userId?: string;
   deviceName: string;
   model: string;
   androidVersion: string;
@@ -20,8 +20,8 @@ export interface Device {
 }
 
 export interface LocationRecord {
-  id: number;
-  deviceId: number;
+  id: string;
+  deviceId: string;
   clientUuid?: string;
   latitude: number;
   longitude: number;
@@ -32,23 +32,38 @@ export interface LocationRecord {
 }
 
 export interface SecurityEvent {
-  id: number;
-  deviceId: number;
+  id: string;
+  deviceId: string;
   eventType: string;
   severity: 'INFO' | 'WARNING' | 'HIGH' | 'CRITICAL';
   description: string;
   timestamp: string;
+  zoneId?: string;
+  zoneName?: string;
 }
 
 export interface DeviceCommand {
-  id: number;
-  deviceId: number;
+  id: string;
+  deviceId: string;
   commandType: string;
   payload?: string;
   status: 'QUEUED' | 'DELIVERED' | 'RECEIVED' | 'EXECUTED' | 'FAILED' | 'EXPIRED';
   result?: string;
   createdAt: string;
   executedAt?: string;
+}
+
+export interface SafeZone {
+  id: string;
+  zoneId: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+  enabled: boolean;
+  deviceId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ApiResponse<T> {

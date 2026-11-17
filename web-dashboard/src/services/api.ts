@@ -10,13 +10,23 @@ import {
   getDocs,
   setDoc,
   addDoc,
+  deleteDoc,
   query,
   orderBy,
   limit,
-  serverTimestamp
+  serverTimestamp,
+  onSnapshot
 } from 'firebase/firestore';
 import { auth, db } from './firebase';
-import { Device, DeviceCommand, LocationRecord, SecurityEvent, User } from '../types';
+import { Device, DeviceCommand, LocationRecord, SecurityEvent, User, SafeZone } from '../types';
+
+const convertTimestamp = (ts: any): string => {
+  if (!ts) return '';
+  if (ts.toDate) return ts.toDate().toISOString();
+  if (typeof ts === 'string') return ts;
+  if (ts instanceof Date) return ts.toISOString();
+  return '';
+};
 
 export const authService = {
   login: async (email: string, password: string) => {
@@ -28,7 +38,7 @@ export const authService = {
     const fullName = userDoc.exists() ? (userDoc.data()?.fullName || user.displayName || email) : (user.displayName || email);
 
     const userObj: User = {
-      id: 1,
+      id: uid,
       email: email,
       fullName: fullName,
     };
@@ -40,11 +50,7 @@ export const authService = {
     return {
       success: true,
       message: 'Login successful',
-      data: {
-        accessToken: uid,
-        refreshToken: uid,
-        user: userObj
-      }
+      data: { accessToken: uid, refreshToken: uid, user: userObj }
     };
   },
 
@@ -62,7 +68,7 @@ export const authService = {
     }, { merge: true });
 
     const userObj: User = {
-      id: 1,
+      id: uid,
       email: email,
       fullName: fullName,
       phoneNumber: phoneNumber
@@ -75,11 +81,7 @@ export const authService = {
     return {
       success: true,
       message: 'Registration successful',
-      data: {
-        accessToken: uid,
-        refreshToken: uid,
-        user: userObj
-      }
+      data: { accessToken: uid, refreshToken: uid, user: userObj }
     };
   },
 
@@ -94,7 +96,7 @@ export const authService = {
       if (userDoc.exists()) {
         const data = userDoc.data();
         return {
-          id: 1,
+          id: uid,
           email: data.email || email,
           fullName: data.fullName || fullName,
           phoneNumber: data.phoneNumber || ''
@@ -102,11 +104,7 @@ export const authService = {
       }
     }
 
-    return {
-      id: 1,
-      email: email,
-      fullName: fullName
-    };
+    return { id: uid || '1', email: email, fullName: fullName };
   },
 
   logout: async () => {
@@ -116,117 +114,84 @@ export const authService = {
 };
 
 export const deviceService = {
-  getDevices: async (): Promise<Device[]> => {
+  subscribeToDevices: (callback: (devices: Device[]) => void) => {
     const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
-    if (!uid) return [];
+    if (!uid) { callback([]); return () => {}; }
 
-    const snapshot = await getDocs(collection(db, 'users', uid, 'devices'));
-    const list: Device[] = [];
-    snapshot.forEach((d) => {
-      const data = d.data();
-      list.push({
-        id: typeof data.id === 'number' ? data.id : 1,
-        deviceName: data.deviceName || 'Android Device',
-        model: data.model || 'Generic Device',
-        androidVersion: data.androidVersion || '14',
-        installationId: data.installationId || d.id,
-        status: data.status || 'ONLINE',
-        protectionEnabled: data.protectionEnabled ?? true,
-        batteryLevel: data.batteryLevel ?? 100,
-        lastSeen: data.lastSeen ? new Date().toISOString() : new Date().toISOString()
+    return onSnapshot(collection(db, 'users', uid, 'devices'), (snapshot) => {
+      const list: Device[] = [];
+      const now = Date.now();
+      snapshot.forEach((d) => {
+        const data = d.data();
+
+        let status = data.status || 'OFFLINE';
+        const lastSeenTs = data.lastSeen ? (data.lastSeen.toMillis ? data.lastSeen.toMillis() : 0) : 0;
+
+        if (lastSeenTs > 0) {
+          if (now - lastSeenTs > 5 * 60 * 1000) {
+            status = 'OFFLINE';
+          }
+        }
+
+        list.push({
+          id: d.id,
+          deviceName: data.deviceName || 'Android Device',
+          model: data.model || 'Generic Device',
+          androidVersion: data.androidVersion || '14',
+          installationId: data.installationId || d.id,
+          status: status as any,
+          protectionEnabled: data.protectionEnabled ?? true,
+          batteryLevel: data.batteryLevel ?? 100,
+          lastSeen: convertTimestamp(data.lastSeen)
+        });
       });
+      callback(list);
     });
-    return list;
   },
 
-  getDevice: async (id: number): Promise<Device> => {
-    const devices = await deviceService.getDevices();
-    return devices.find(d => d.id === id) || devices[0] || {
-      id: id,
-      deviceName: 'Android Device',
-      model: 'Generic Device',
-      androidVersion: '14',
-      installationId: 'dev-1',
-      status: 'ONLINE',
-      protectionEnabled: true,
-      batteryLevel: 100
-    };
-  },
-
-  createPairingCode: async () => {
-    const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-
-    if (uid) {
-      await setDoc(doc(db, 'pairing_codes', code), {
-        code,
-        ownerUid: uid,
-        used: false,
-        createdAt: serverTimestamp()
-      });
-    }
-
-    return {
-      code,
-      expiresAt: new Date(Date.now() + 600000).toISOString()
-    };
+  createPairingCode: async (): Promise<{ code: string; expiresAt: string }> => {
+    throw new Error('Server-side pairing functions not deployed. Firebase Cloud Functions with billing enabled is required.');
   },
 };
 
 export const locationService = {
-  getLatestLocation: async (deviceId: number): Promise<LocationRecord> => {
-    const history = await locationService.getLocationHistory(deviceId);
-    return history[0] || {
-      id: 1,
-      deviceId: deviceId,
-      latitude: 12.9716,
-      longitude: 77.5946,
-      accuracy: 5.0,
-      altitude: 920.0,
-      speed: 0.0,
-      timestamp: new Date().toISOString()
-    };
-  },
-
-  getLocationHistory: async (deviceId: number): Promise<LocationRecord[]> => {
+  subscribeToLocationHistory: (deviceId: string, callback: (history: LocationRecord[]) => void) => {
     const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
-    if (!uid) return [];
-
-    const devices = await deviceService.getDevices();
-    const targetDev = devices.find(d => d.id === deviceId) || devices[0];
-    const devIdStr = targetDev ? targetDev.installationId : String(deviceId);
+    if (!uid || !deviceId) { callback([]); return () => {}; }
 
     const q = query(
-      collection(db, 'users', uid, 'devices', devIdStr, 'locations'),
+      collection(db, 'users', uid, 'devices', deviceId, 'locations'),
       orderBy('timestamp', 'desc'),
       limit(100)
     );
 
-    const snapshot = await getDocs(q);
-    const history: LocationRecord[] = [];
-    snapshot.forEach((d) => {
-      const data = d.data();
-      history.push({
-        id: 1,
-        deviceId: deviceId,
-        clientUuid: data.clientUuid || d.id,
-        latitude: data.latitude || 12.9716,
-        longitude: data.longitude || 77.5946,
-        accuracy: data.accuracy || 5.0,
-        altitude: data.altitude || 0.0,
-        speed: data.speed || 0.0,
-        timestamp: data.timestamp ? new Date().toISOString() : new Date().toISOString()
+    return onSnapshot(q, (snapshot) => {
+      const history: LocationRecord[] = [];
+      snapshot.forEach((d) => {
+        const data = d.data();
+        if (data.latitude !== undefined && data.longitude !== undefined) {
+          history.push({
+            id: d.id,
+            deviceId: deviceId,
+            clientUuid: data.clientUuid || d.id,
+            latitude: data.latitude,
+            longitude: data.longitude,
+            accuracy: data.accuracy || 0,
+            altitude: data.altitude || 0,
+            speed: data.speed || 0,
+            timestamp: convertTimestamp(data.timestamp)
+          });
+        }
       });
+      callback(history);
     });
-
-    return history;
   },
 };
 
 export const securityService = {
-  getSecurityEvents: async (): Promise<SecurityEvent[]> => {
+  subscribeToSecurityEvents: (callback: (events: SecurityEvent[]) => void, deviceId?: string) => {
     const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
-    if (!uid) return [];
+    if (!uid) { callback([]); return () => {}; }
 
     const q = query(
       collection(db, 'users', uid, 'alerts'),
@@ -234,71 +199,64 @@ export const securityService = {
       limit(50)
     );
 
-    const snapshot = await getDocs(q);
-    const events: SecurityEvent[] = [];
-    snapshot.forEach((d) => {
-      const data = d.data();
-      events.push({
-        id: 1,
-        deviceId: 1,
-        eventType: data.eventType || 'SECURITY_ALERT',
-        severity: data.severity || 'INFO',
-        description: data.description || 'Security notification',
-        timestamp: new Date().toISOString()
+    return onSnapshot(q, (snapshot) => {
+      const events: SecurityEvent[] = [];
+      snapshot.forEach((d) => {
+        const data = d.data();
+        if (!deviceId || data.deviceId === deviceId) {
+          events.push({
+            id: d.id,
+            deviceId: data.deviceId || 'unknown',
+            eventType: data.eventType || 'SECURITY_ALERT',
+            severity: data.severity || 'INFO',
+            description: data.description || 'Security notification',
+            timestamp: convertTimestamp(data.timestamp),
+            zoneId: data.zoneId,
+            zoneName: data.zoneName
+          });
+        }
       });
+      callback(events);
     });
-
-    return events;
-  },
-
-  getDeviceSecurityEvents: async (deviceId: number): Promise<SecurityEvent[]> => {
-    return securityService.getSecurityEvents();
   },
 };
 
 export const commandService = {
-  getDeviceCommands: async (deviceId: number): Promise<DeviceCommand[]> => {
+  subscribeToDeviceCommands: (deviceId: string, callback: (commands: DeviceCommand[]) => void) => {
     const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
-    if (!uid) return [];
-
-    const devices = await deviceService.getDevices();
-    const targetDev = devices.find(d => d.id === deviceId) || devices[0];
-    const devIdStr = targetDev ? targetDev.installationId : String(deviceId);
+    if (!uid || !deviceId) { callback([]); return () => {}; }
 
     const q = query(
-      collection(db, 'users', uid, 'devices', devIdStr, 'commands'),
+      collection(db, 'users', uid, 'devices', deviceId, 'commands'),
       orderBy('createdAt', 'desc'),
       limit(50)
     );
 
-    const snapshot = await getDocs(q);
-    const commands: DeviceCommand[] = [];
-    snapshot.forEach((d) => {
-      const data = d.data();
-      commands.push({
-        id: 1,
-        deviceId: deviceId,
-        commandType: data.commandType || 'COMMAND',
-        payload: data.payload,
-        status: data.status || 'QUEUED',
-        result: data.result,
-        createdAt: new Date().toISOString()
+    return onSnapshot(q, (snapshot) => {
+      const commands: DeviceCommand[] = [];
+      snapshot.forEach((d) => {
+        const data = d.data();
+        commands.push({
+          id: d.id,
+          deviceId: deviceId,
+          commandType: data.commandType || 'COMMAND',
+          payload: data.payload,
+          status: data.status || 'QUEUED',
+          result: data.result,
+          createdAt: convertTimestamp(data.createdAt),
+          executedAt: convertTimestamp(data.executedAt)
+        });
       });
+      callback(commands);
     });
-
-    return commands;
   },
 
-  sendCommand: async (deviceId: number, commandType: string, payload?: string): Promise<DeviceCommand> => {
+  sendCommand: async (deviceId: string, commandType: string, payload?: string): Promise<DeviceCommand> => {
     const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
     if (!uid) throw new Error('User not authenticated');
 
-    const devices = await deviceService.getDevices();
-    const targetDev = devices.find(d => d.id === deviceId) || devices[0];
-    const devIdStr = targetDev ? targetDev.installationId : String(deviceId);
-
-    await addDoc(
-      collection(db, 'users', uid, 'devices', devIdStr, 'commands'),
+    const commandDoc = await addDoc(
+      collection(db, 'users', uid, 'devices', deviceId, 'commands'),
       {
         commandType,
         payload: payload || '',
@@ -309,7 +267,7 @@ export const commandService = {
     );
 
     return {
-      id: 1,
+      id: commandDoc.id,
       deviceId: deviceId,
       commandType: commandType,
       payload: payload,
@@ -317,6 +275,66 @@ export const commandService = {
       createdAt: new Date().toISOString()
     };
   },
+};
+
+export const safeZoneService = {
+  subscribeToSafeZones: (callback: (zones: SafeZone[]) => void) => {
+    const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
+    if (!uid) { callback([]); return () => {}; }
+
+    return onSnapshot(collection(db, 'users', uid, 'safe_zones'), (snapshot) => {
+      const list: SafeZone[] = [];
+      snapshot.forEach((d) => {
+        const data = d.data();
+        list.push({
+          id: d.id,
+          zoneId: data.zoneId || d.id,
+          name: data.name || 'Safe Zone',
+          latitude: data.latitude || 0,
+          longitude: data.longitude || 0,
+          radiusMeters: data.radiusMeters || 100,
+          enabled: data.enabled ?? true,
+          deviceId: data.deviceId,
+          createdAt: convertTimestamp(data.createdAt),
+          updatedAt: convertTimestamp(data.updatedAt)
+        });
+      });
+      callback(list);
+    });
+  },
+
+  createSafeZone: async (zone: Omit<SafeZone, 'id' | 'createdAt' | 'updatedAt' | 'zoneId'>) => {
+    const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
+    if (!uid) throw new Error('User not authenticated');
+
+    const zoneRef = doc(collection(db, 'users', uid, 'safe_zones'));
+    const zoneId = zoneRef.id;
+
+    await setDoc(zoneRef, {
+      ...zone,
+      zoneId,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    return zoneId;
+  },
+
+  updateSafeZone: async (zoneId: string, updates: Partial<SafeZone>) => {
+    const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
+    if (!uid) throw new Error('User not authenticated');
+
+    await setDoc(doc(db, 'users', uid, 'safe_zones', zoneId), {
+      ...updates,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  },
+
+  deleteSafeZone: async (zoneId: string) => {
+    const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
+    if (!uid) throw new Error('User not authenticated');
+
+    await deleteDoc(doc(db, 'users', uid, 'safe_zones', zoneId));
+  }
 };
 
 export default authService;

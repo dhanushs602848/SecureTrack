@@ -1,9 +1,8 @@
 package com.example.securetrack.models;
 
 public class Device {
-    private Long id;
-    private String idStr;
-    private Long userId;
+    private String id;
+    private String userId;
     private String deviceName;
     private String model;
     private String androidVersion;
@@ -25,11 +24,8 @@ public class Device {
         this.status = "ONLINE";
     }
 
-    public Device(String idStr, String deviceName, String model, String androidVersion, Integer batteryLevel, String status, Boolean protectionEnabled, String installationId) {
-        this.idStr = idStr;
-        try {
-            this.id = Long.parseLong(idStr);
-        } catch (Exception ignored) {}
+    public Device(String id, String deviceName, String model, String androidVersion, Integer batteryLevel, String status, Boolean protectionEnabled, String installationId) {
+        this.id = id;
         this.deviceName = deviceName;
         this.model = model;
         this.androidVersion = androidVersion;
@@ -39,14 +35,11 @@ public class Device {
         this.installationId = installationId;
     }
 
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    public String getId() { return id != null ? id : installationId; }
+    public void setId(String id) { this.id = id; }
 
-    public String getIdStr() { return idStr != null ? idStr : (id != null ? String.valueOf(id) : installationId); }
-    public void setIdStr(String idStr) { this.idStr = idStr; }
-
-    public Long getUserId() { return userId; }
-    public void setUserId(Long userId) { this.userId = userId; }
+    public String getUserId() { return userId; }
+    public void setUserId(String userId) { this.userId = userId; }
 
     public String getDeviceName() { return deviceName; }
     public void setDeviceName(String deviceName) { this.deviceName = deviceName; }

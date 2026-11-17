@@ -8,27 +8,20 @@ export const Devices: React.FC = () => {
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchDevices = async () => {
-    try {
-      const data = await deviceService.getDevices();
-      setDevices(data);
-    } catch (e) {
-      console.error('Failed to load devices:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchDevices();
+    const unsubscribe = deviceService.subscribeToDevices((data) => {
+      setDevices(data);
+      setLoading(false);
+    });
+    return () => unsubscribe();
   }, []);
 
   const handleGeneratePairingCode = async () => {
     try {
       const res = await deviceService.createPairingCode();
       setPairingCode(res.code);
-    } catch (e) {
-      alert('Failed to generate pairing code');
+    } catch (e: any) {
+      alert(e.message || 'Failed to generate pairing code');
     }
   };
 
@@ -53,7 +46,7 @@ export const Devices: React.FC = () => {
           <div className="flex items-center gap-3">
             <Key className="w-6 h-6 text-[#255DA8]" />
             <div>
-              <p className="font-bold text-sm">6-Digit Device Pairing Code</p>
+              <p className="font-bold text-sm">Secure Device Pairing Code</p>
               <p className="text-xs">Enter this code on target phone within 10 minutes</p>
             </div>
           </div>
@@ -102,7 +95,7 @@ export const Devices: React.FC = () => {
                     <Clock className="w-4 h-4 text-blue-600" />
                     Last Updated
                   </span>
-                  <span className="font-semibold">{device.lastSeen}</span>
+                  <span className="font-semibold">{new Date(device.lastSeen || Date.now()).toLocaleString()}</span>
                 </div>
               </div>
             </div>
