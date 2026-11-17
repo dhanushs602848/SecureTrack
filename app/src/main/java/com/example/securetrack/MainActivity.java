@@ -1,10 +1,12 @@
 package com.example.securetrack;
 
+import android.content.Context;
 import android.os.Bundle;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 import com.example.securetrack.databinding.ActivityMainBinding;
 import com.example.securetrack.fragments.*;
+import org.osmdroid.config.Configuration;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -13,6 +15,12 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Initialize osmdroid configuration before inflating layouts containing MapView
+        Context ctx = getApplicationContext();
+        Configuration.getInstance().load(ctx, ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE));
+        Configuration.getInstance().setUserAgentValue("com.example.securetrack/1.0 (dhanushs602848@gmail.com)");
+
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 

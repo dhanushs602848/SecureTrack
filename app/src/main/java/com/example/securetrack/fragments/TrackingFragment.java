@@ -18,7 +18,6 @@ import com.example.securetrack.location.LocationTrackingService;
 import com.example.securetrack.models.LocationRecord;
 import com.example.securetrack.repositories.LocationRepository;
 import com.example.securetrack.utils.SessionManager;
-import org.osmdroid.config.Configuration;
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
 import org.osmdroid.util.GeoPoint;
 import org.osmdroid.views.MapView;
@@ -39,11 +38,6 @@ public class TrackingFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        // Initialize osmdroid configuration
-        android.content.Context ctx = requireContext().getApplicationContext();
-        Configuration.getInstance().load(ctx, ctx.getSharedPreferences("osmdroid", android.content.Context.MODE_PRIVATE));
-        Configuration.getInstance().setUserAgentValue("SecureTrack/1.0 (" + ctx.getPackageName() + ")");
-
         binding = FragmentTrackingBinding.inflate(inflater, container, false);
         return binding.getRoot();
     }
@@ -56,7 +50,13 @@ public class TrackingFragment extends Fragment {
         sessionManager = new SessionManager(requireContext());
 
         map = binding.mapView;
-        map.setTileSource(TileSourceFactory.MAPNIK);
+
+        if (map.getTileProvider() != null) {
+            map.getTileProvider().clearTileCache();
+        }
+
+        // Use an alternative tile source to avoid OSM 403 blocks
+        map.setTileSource(TileSourceFactory.WIKIMEDIA);
         map.setMultiTouchControls(true);
         map.getController().setZoom(15.0);
 
@@ -150,14 +150,15 @@ public class TrackingFragment extends Fragment {
             return;
         }
 
-        binding.progressBar.setVisibility(View.VISIBLE);
+        if (binding != null) binding.progressBar.setVisibility(View.VISIBLE);
 
         locationRepository.getLocationHistoryStr(
                 deviceId,
                 new LocationRepository.ApiCallback<List<LocationRecord>>() {
                     @Override
                     public void onSuccess(List<LocationRecord> result) {
-                        if (binding != null) binding.progressBar.setVisibility(View.GONE);
+                        if (binding == null) return;
+                        binding.progressBar.setVisibility(View.GONE);
                         if (result != null && !result.isEmpty()) {
                             updateMap(result.get(0));
                         } else {
@@ -167,7 +168,8 @@ public class TrackingFragment extends Fragment {
 
                     @Override
                     public void onError(String errorMessage) {
-                        if (binding != null) binding.progressBar.setVisibility(View.GONE);
+                        if (binding == null) return;
+                        binding.progressBar.setVisibility(View.GONE);
                         Toast.makeText(requireContext(), errorMessage, Toast.LENGTH_SHORT).show();
                     }
                 }
@@ -175,7 +177,7 @@ public class TrackingFragment extends Fragment {
     }
 
     private void updateMap(LocationRecord record) {
-        if (map == null) return;
+        if (map == null || map.getRepository() == null) return;
 
         GeoPoint point = new GeoPoint(record.getLatitude(), record.getLongitude());
         map.getController().setCenter(point);
@@ -191,7 +193,9 @@ public class TrackingFragment extends Fragment {
         currentLocationMarker.setSnippet("Accuracy: " + record.getAccuracy() + "m");
         map.invalidate();
 
-        binding.tvLastUpdated.setText("Last Updated: " + record.getTimestamp());
+        if (binding != null) {
+            binding.tvLastUpdated.setText("Last Updated: " + record.getTimestamp());
+        }
     }
 
     @Override
@@ -215,6 +219,7 @@ public class TrackingFragment extends Fragment {
         super.onDestroyView();
         if (map != null) {
             map.onDetach();
+            map = null;
         }
         binding = null;
     }

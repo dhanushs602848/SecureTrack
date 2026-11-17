@@ -10,10 +10,10 @@ public class PermissionUtilsTest {
     @Test
     public void testLocationRecordUuidGeneration() {
         String uuid = UUID.randomUUID().toString();
-        LocationRecord record = new LocationRecord(1L, uuid, 37.7749, -122.4194, 5.0f, 10.0, 0.0f, "2025-01-01T00:00:00Z");
+        LocationRecord record = new LocationRecord("1", uuid, 37.7749, -122.4194, 5.0f, 10.0, 0.0f, "2025-01-01T00:00:00Z");
 
         assertNotNull(record);
-        assertEquals(1L, (long) record.getDeviceId());
+        assertEquals("1", record.getDeviceId());
         assertEquals(uuid, record.getClientUuid());
         assertEquals(37.7749, record.getLatitude(), 0.0001);
         assertEquals(-122.4194, record.getLongitude(), 0.0001);
