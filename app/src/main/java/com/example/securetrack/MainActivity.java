@@ -19,7 +19,14 @@ public class MainActivity extends AppCompatActivity {
         // Initialize osmdroid configuration before inflating layouts containing MapView
         Context ctx = getApplicationContext();
         Configuration.getInstance().load(ctx, ctx.getSharedPreferences("osmdroid", Context.MODE_PRIVATE));
-        Configuration.getInstance().setUserAgentValue("com.example.securetrack/1.0 (dhanushs602848@gmail.com)");
+        Configuration.getInstance().setUserAgentValue("SecureTrack/1.0 (dhanushs602848@gmail.com; Android Tracker)");
+        java.io.File basePath = new java.io.File(ctx.getCacheDir(), "osmdroid");
+        java.io.File tileCache = new java.io.File(basePath, "tiles");
+        if (!tileCache.exists()) {
+            tileCache.mkdirs();
+        }
+        Configuration.getInstance().setOsmdroidBasePath(basePath);
+        Configuration.getInstance().setOsmdroidTileCache(tileCache);
 
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
