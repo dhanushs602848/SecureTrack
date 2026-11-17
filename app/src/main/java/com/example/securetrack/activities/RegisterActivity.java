@@ -69,7 +69,7 @@ public class RegisterActivity extends AppCompatActivity {
                         saveUserProfileToFirestoreAndNavigate(firebaseUser, name, phone);
                     } else {
                         binding.btnRegister.setEnabled(true);
-                        String errorMsg = task.getException() != null ? task.getException().getLocalizedMessage() : "Registration failed";
+                        String errorMsg = task.getException() != null ? task.getException().getMessage() : "Registration failed";
                         Toast.makeText(RegisterActivity.this, "Registration Error: " + errorMsg, Toast.LENGTH_LONG).show();
                     }
                 });
@@ -124,7 +124,7 @@ public class RegisterActivity extends AppCompatActivity {
                         saveGoogleUserToFirestoreAndNavigate(firebaseUser);
                     } else {
                         binding.btnGoogleRegister.setEnabled(true);
-                        String errorMsg = task.getException() != null ? task.getException().getLocalizedMessage() : "Google registration failed";
+                        String errorMsg = task.getException() != null ? task.getException().getMessage() : "Google registration failed";
                         Toast.makeText(RegisterActivity.this, "Google Registration Error: " + errorMsg, Toast.LENGTH_LONG).show();
                     }
                 });
@@ -152,11 +152,8 @@ public class RegisterActivity extends AppCompatActivity {
                 })
                 .addOnFailureListener(e -> {
                     binding.btnRegister.setEnabled(true);
-                    Log.w(TAG, "Failed to save profile to Firestore: " + e.getMessage());
-                    sessionManager.saveFirebaseAuthSession(uid, email, name);
-                    Toast.makeText(RegisterActivity.this, "Account Created Successfully", Toast.LENGTH_SHORT).show();
-                    startActivity(new Intent(RegisterActivity.this, MainActivity.class));
-                    finish();
+                    Log.e(TAG, "Failed to save profile to Firestore", e);
+                    Toast.makeText(RegisterActivity.this, "Failed to save user profile: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 });
     }
 
@@ -182,11 +179,8 @@ public class RegisterActivity extends AppCompatActivity {
                 })
                 .addOnFailureListener(e -> {
                     binding.btnGoogleRegister.setEnabled(true);
-                    Log.w(TAG, "Failed to save Google profile to Firestore: " + e.getMessage());
-                    sessionManager.saveFirebaseAuthSession(uid, email, fullName);
-                    Toast.makeText(RegisterActivity.this, "Google Registration Successful", Toast.LENGTH_SHORT).show();
-                    startActivity(new Intent(RegisterActivity.this, MainActivity.class));
-                    finish();
+                    Log.e(TAG, "Failed to save Google profile to Firestore", e);
+                    Toast.makeText(RegisterActivity.this, "Failed to save Google user profile: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 });
     }
 }

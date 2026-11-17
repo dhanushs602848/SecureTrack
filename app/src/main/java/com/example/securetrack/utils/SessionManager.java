@@ -2,6 +2,7 @@ package com.example.securetrack.utils;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import com.google.firebase.auth.FirebaseAuth;
 import java.util.UUID;
 
 public class SessionManager {
@@ -36,8 +37,6 @@ public class SessionManager {
 
     public void saveFirebaseAuthSession(String uid, String email, String fullName) {
         prefs.edit()
-                .putString(KEY_TOKEN, uid)
-                .putString(KEY_REFRESH_TOKEN, uid)
                 .putString(KEY_FIREBASE_UID, uid)
                 .putString(KEY_USER_EMAIL, email)
                 .putString(KEY_USER_NAME, fullName)
@@ -49,11 +48,17 @@ public class SessionManager {
     }
 
     public String getFirebaseUid() {
-        return prefs.getString(KEY_FIREBASE_UID, prefs.getString(KEY_TOKEN, null));
+        String uid = prefs.getString(KEY_FIREBASE_UID, null);
+        if (uid == null && FirebaseAuth.getInstance().getCurrentUser() != null) {
+            uid = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        }
+        return uid;
     }
 
     public boolean isLoggedIn() {
-        return getToken() != null && !getToken().isEmpty();
+        boolean hasFirebaseUser = FirebaseAuth.getInstance().getCurrentUser() != null || getFirebaseUid() != null;
+        boolean hasBackendToken = getToken() != null && !getToken().isEmpty();
+        return hasFirebaseUser || hasBackendToken;
     }
 
     public long getUserId() {
@@ -61,11 +66,23 @@ public class SessionManager {
     }
 
     public String getUserEmail() {
-        return prefs.getString(KEY_USER_EMAIL, "");
+        String email = prefs.getString(KEY_USER_EMAIL, "");
+        if (email.isEmpty() && FirebaseAuth.getInstance().getCurrentUser() != null) {
+            email = FirebaseAuth.getInstance().getCurrentUser().getEmail();
+            if (email == null) email = "";
+        }
+        return email;
     }
 
     public String getUserName() {
-        return prefs.getString(KEY_USER_NAME, "");
+        String name = prefs.getString(KEY_USER_NAME, "");
+        if (name.isEmpty() && FirebaseAuth.getInstance().getCurrentUser() != null) {
+            name = FirebaseAuth.getInstance().getCurrentUser().getDisplayName();
+            if (name == null || name.isEmpty()) {
+                name = getUserEmail();
+            }
+        }
+        return name;
     }
 
     public String getInstallationId() {
@@ -105,6 +122,10 @@ public class SessionManager {
     }
 
     public void logout() {
+        try {
+            FirebaseAuth.getInstance().signOut();
+        } catch (Exception ignored) {}
+
         prefs.edit()
                 .remove(KEY_TOKEN)
                 .remove(KEY_REFRESH_TOKEN)
