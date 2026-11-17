@@ -18,6 +18,7 @@ public class SessionManager {
     private static final String KEY_BASE_URL = "base_url";
     private static final String KEY_BACKGROUND_TRACKING = "background_tracking_enabled";
     private static final String KEY_PRIMARY_DEVICE_ID = "primary_device_id";
+    private static final String KEY_PRIMARY_DEVICE_ID_STR = "primary_device_id_str";
 
     private final SharedPreferences prefs;
 
@@ -121,6 +122,23 @@ public class SessionManager {
         prefs.edit().putLong(KEY_PRIMARY_DEVICE_ID, deviceId).apply();
     }
 
+    public String getPrimaryDeviceIdStr() {
+        String id = prefs.getString(KEY_PRIMARY_DEVICE_ID_STR, null);
+        if (id == null) {
+            long oldId = getPrimaryDeviceId();
+            if (oldId != -1) {
+                id = String.valueOf(oldId);
+            } else {
+                id = getInstallationId();
+            }
+        }
+        return id;
+    }
+
+    public void setPrimaryDeviceIdStr(String deviceId) {
+        prefs.edit().putString(KEY_PRIMARY_DEVICE_ID_STR, deviceId).apply();
+    }
+
     public void logout() {
         try {
             FirebaseAuth.getInstance().signOut();
@@ -133,6 +151,7 @@ public class SessionManager {
                 .remove(KEY_FIREBASE_UID)
                 .remove(KEY_USER_EMAIL)
                 .remove(KEY_USER_NAME)
+                .remove(KEY_PRIMARY_DEVICE_ID_STR)
                 .apply();
     }
 }

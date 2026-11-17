@@ -1,28 +1,39 @@
 package com.example.securetrack.repositories;
 
 import android.content.Context;
-import com.example.securetrack.api.ApiClient;
-import com.example.securetrack.api.ApiService;
+import android.util.Log;
 import com.example.securetrack.database.AppDatabase;
 import com.example.securetrack.database.LocationDao;
 import com.example.securetrack.database.LocationEntity;
-import com.example.securetrack.models.*;
+import com.example.securetrack.models.LocationRecord;
+import com.example.securetrack.utils.SessionManager;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.Query;
+import com.google.firebase.firestore.SetOptions;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Response;
 
 public class LocationRepository {
 
-    private final ApiService apiService;
+    private static final String TAG = "LocationRepository";
+
+    private final FirebaseFirestore db;
     private final LocationDao locationDao;
+    private final SessionManager sessionManager;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     public LocationRepository(Context context) {
-        this.apiService = ApiClient.getApiService(context);
+        this.db = FirebaseFirestore.getInstance();
         this.locationDao = AppDatabase.getInstance(context).locationDao();
+        this.sessionManager = new SessionManager(context);
     }
 
     public interface ApiCallback<T> {
@@ -30,43 +41,105 @@ public class LocationRepository {
         void onError(String errorMessage);
     }
 
-    public void recordLocation(LocationRecord record, ApiCallback<LocationRecord> callback) {
-        apiService.recordLocation(record).enqueue(new Callback<ApiResponse<LocationRecord>>() {
-            @Override
-            public void onResponse(Call<ApiResponse<LocationRecord>> call, Response<ApiResponse<LocationRecord>> response) {
-                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    callback.onSuccess(response.body().getData());
-                } else {
-                    // Offline Cache saving
-                    cacheLocally(record);
-                    callback.onError("Server upload failed, cached locally for retry");
-                }
-            }
+    private String getUid() {
+        String uid = sessionManager.getFirebaseUid();
+        if (uid == null && FirebaseAuth.getInstance().getCurrentUser() != null) {
+            uid = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        }
+        return uid;
+    }
 
-            @Override
-            public void onFailure(Call<ApiResponse<LocationRecord>> call, Throwable t) {
-                cacheLocally(record);
-                callback.onError("Offline: Location saved locally to retry queue");
-            }
-        });
+    public void recordLocation(LocationRecord record, ApiCallback<LocationRecord> callback) {
+        String uid = getUid();
+        String deviceId = record.getDeviceId() != null ? String.valueOf(record.getDeviceId()) : sessionManager.getPrimaryDeviceIdStr();
+
+        if (uid == null || deviceId == null) {
+            cacheLocally(record);
+            callback.onError("User or device not identified, cached locally");
+            return;
+        }
+
+        String locationId = record.getClientUuid() != null && !record.getClientUuid().isEmpty()
+                ? record.getClientUuid()
+                : UUID.randomUUID().toString();
+
+        Map<String, Object> map = new HashMap<>();
+        map.put("clientUuid", locationId);
+        map.put("latitude", record.getLatitude());
+        map.put("longitude", record.getLongitude());
+        map.put("accuracy", record.getAccuracy());
+        map.put("altitude", record.getAltitude());
+        map.put("speed", record.getSpeed());
+        map.put("timestamp", FieldValue.serverTimestamp());
+
+        db.collection("users").document(uid)
+                .collection("devices").document(deviceId)
+                .collection("locations").document(locationId)
+                .set(map, SetOptions.merge())
+                .addOnSuccessListener(aVoid -> {
+                    // Update device lastSeen & last location coordinates
+                    Map<String, Object> deviceUpdate = new HashMap<>();
+                    deviceUpdate.put("lastSeen", FieldValue.serverTimestamp());
+                    deviceUpdate.put("lastLatitude", record.getLatitude());
+                    deviceUpdate.put("lastLongitude", record.getLongitude());
+                    db.collection("users").document(uid)
+                            .collection("devices").document(deviceId)
+                            .set(deviceUpdate, SetOptions.merge());
+
+                    callback.onSuccess(record);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Firestore location write error", e);
+                    cacheLocally(record);
+                    callback.onError("Firestore offline, saved locally");
+                });
+    }
+
+    public void getLocationHistoryStr(String deviceId, ApiCallback<List<LocationRecord>> callback) {
+        String uid = getUid();
+        if (uid == null || deviceId == null) {
+            callback.onError("User or device not identified");
+            return;
+        }
+
+        db.collection("users").document(uid)
+                .collection("devices").document(deviceId)
+                .collection("locations")
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .limit(100)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    List<LocationRecord> list = new ArrayList<>();
+                    for (DocumentSnapshot doc : querySnapshot.getDocuments()) {
+                        Double lat = doc.getDouble("latitude");
+                        Double lng = doc.getDouble("longitude");
+                        Double accuracyD = doc.getDouble("accuracy");
+                        Double altitude = doc.getDouble("altitude");
+                        Double speedD = doc.getDouble("speed");
+                        String clientUuid = doc.getString("clientUuid");
+
+                        if (lat != null && lng != null) {
+                            LocationRecord lr = new LocationRecord(
+                                    1L,
+                                    clientUuid != null ? clientUuid : doc.getId(),
+                                    lat,
+                                    lng,
+                                    accuracyD != null ? accuracyD.floatValue() : 0.0f,
+                                    altitude != null ? altitude : 0.0,
+                                    speedD != null ? speedD.floatValue() : 0.0f,
+                                    doc.getTimestamp("timestamp") != null ? doc.getTimestamp("timestamp").toDate().toString() : ""
+                            );
+                            list.add(lr);
+                        }
+                    }
+                    callback.onSuccess(list);
+                })
+                .addOnFailureListener(e -> callback.onError("Firestore location history error: " + e.getMessage()));
     }
 
     public void getLocationHistory(Long deviceId, ApiCallback<List<LocationRecord>> callback) {
-        apiService.getLocationHistory(deviceId).enqueue(new Callback<ApiResponse<List<LocationRecord>>>() {
-            @Override
-            public void onResponse(Call<ApiResponse<List<LocationRecord>>> call, Response<ApiResponse<List<LocationRecord>>> response) {
-                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    callback.onSuccess(response.body().getData());
-                } else {
-                    callback.onError("Failed to fetch location history");
-                }
-            }
-
-            @Override
-            public void onFailure(Call<ApiResponse<List<LocationRecord>>> call, Throwable t) {
-                callback.onError(t.getMessage() != null ? t.getMessage() : "Network error");
-            }
-        });
+        String devIdStr = deviceId != null ? String.valueOf(deviceId) : sessionManager.getPrimaryDeviceIdStr();
+        getLocationHistoryStr(devIdStr, callback);
     }
 
     private void cacheLocally(LocationRecord record) {
@@ -74,7 +147,7 @@ public class LocationRepository {
             if (record.getDeviceId() != null) {
                 LocationEntity entity = new LocationEntity(
                         record.getDeviceId(),
-                        record.getClientUuid(),
+                        record.getClientUuid() != null ? record.getClientUuid() : UUID.randomUUID().toString(),
                         record.getLatitude(),
                         record.getLongitude(),
                         record.getAccuracy() != null ? record.getAccuracy() : 0.0f,

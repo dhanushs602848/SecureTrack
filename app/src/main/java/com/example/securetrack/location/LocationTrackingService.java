@@ -18,6 +18,7 @@ import com.example.securetrack.MainActivity;
 import com.example.securetrack.R;
 import com.example.securetrack.models.LocationRecord;
 import com.example.securetrack.repositories.LocationRepository;
+import com.example.securetrack.security.CommandExecutionManager;
 import com.example.securetrack.utils.PermissionUtils;
 import com.example.securetrack.utils.SessionManager;
 import com.google.android.gms.location.FusedLocationProviderClient;
@@ -41,6 +42,7 @@ public class LocationTrackingService extends Service {
     private LocationCallback locationCallback;
     private LocationRepository locationRepository;
     private SessionManager sessionManager;
+    private CommandExecutionManager commandExecutionManager;
 
     @Override
     public void onCreate() {
@@ -48,6 +50,7 @@ public class LocationTrackingService extends Service {
         Context context = getApplicationContext();
         sessionManager = new SessionManager(context);
         locationRepository = new LocationRepository(context);
+        commandExecutionManager = new CommandExecutionManager(context);
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(context);
 
         createNotificationChannel();
@@ -61,6 +64,9 @@ public class LocationTrackingService extends Service {
                 }
             }
         };
+
+        // Listen to Firestore real-time commands while tracking service is running
+        commandExecutionManager.startListeningToCommands();
     }
 
     @Override
@@ -95,8 +101,8 @@ public class LocationTrackingService extends Service {
     }
 
     private void handleNewLocation(Location location) {
-        long deviceId = sessionManager.getPrimaryDeviceId();
-        if (deviceId == -1) return;
+        String deviceIdStr = sessionManager.getPrimaryDeviceIdStr();
+        if (deviceIdStr == null) return;
 
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
         sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
@@ -105,7 +111,7 @@ public class LocationTrackingService extends Service {
         String clientUuid = UUID.randomUUID().toString();
 
         LocationRecord record = new LocationRecord(
-                deviceId,
+                1L,
                 clientUuid,
                 location.getLatitude(),
                 location.getLongitude(),
@@ -158,6 +164,9 @@ public class LocationTrackingService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        if (commandExecutionManager != null) {
+            commandExecutionManager.stopListeningToCommands();
+        }
         if (fusedLocationClient != null && locationCallback != null) {
             fusedLocationClient.removeLocationUpdates(locationCallback);
         }

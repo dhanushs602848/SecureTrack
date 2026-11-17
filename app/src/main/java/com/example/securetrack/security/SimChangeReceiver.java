@@ -14,12 +14,12 @@ public class SimChangeReceiver extends BroadcastReceiver {
         String action = intent.getAction();
         if ("android.intent.action.SIM_STATE_CHANGED".equals(action)) {
             SessionManager sessionManager = new SessionManager(context.getApplicationContext());
-            long deviceId = sessionManager.getPrimaryDeviceId();
-            if (deviceId == -1) return;
+            String deviceIdStr = sessionManager.getPrimaryDeviceIdStr();
+            if (deviceIdStr == null) return;
 
             SecurityRepository repo = new SecurityRepository(context.getApplicationContext());
             SecurityEvent event = new SecurityEvent(
-                    deviceId,
+                    1L,
                     "SIM_CARD_EVENT",
                     "WARNING",
                     "SIM state change detected on device"

@@ -5,68 +5,95 @@ import android.content.Context;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
-import com.example.securetrack.api.ApiClient;
-import com.example.securetrack.api.ApiService;
-import com.example.securetrack.models.ApiResponse;
-import com.example.securetrack.models.CommandStatusUpdateRequest;
-import com.example.securetrack.models.DeviceCommand;
+import android.util.Log;
 import com.example.securetrack.utils.SessionManager;
-import java.util.List;
-import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Response;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
+import java.util.HashMap;
+import java.util.Map;
 
 public class CommandExecutionManager {
 
+    private static final String TAG = "CommandExecutionMgr";
+
     private final Context context;
-    private final ApiService apiService;
+    private final FirebaseFirestore db;
     private final SessionManager sessionManager;
+    private ListenerRegistration commandListener;
 
     public CommandExecutionManager(Context context) {
         this.context = context.getApplicationContext();
-        this.apiService = ApiClient.getApiService(this.context);
+        this.db = FirebaseFirestore.getInstance();
         this.sessionManager = new SessionManager(this.context);
     }
 
-    public void pollAndExecuteCommands() {
-        long deviceId = sessionManager.getPrimaryDeviceId();
-        if (deviceId == -1) return;
-
-        apiService.pollPendingCommands(deviceId).enqueue(new Callback<ApiResponse<List<DeviceCommand>>>() {
-            @Override
-            public void onResponse(Call<ApiResponse<List<DeviceCommand>>> call, Response<ApiResponse<List<DeviceCommand>>> response) {
-                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    List<DeviceCommand> commands = response.body().getData();
-                    if (commands != null) {
-                        for (DeviceCommand cmd : commands) {
-                            executeSingleCommand(cmd);
-                        }
-                    }
-                }
-            }
-
-            @Override
-            public void onFailure(Call<ApiResponse<List<DeviceCommand>>> call, Throwable t) {}
-        });
+    private String getUid() {
+        String uid = sessionManager.getFirebaseUid();
+        if (uid == null && FirebaseAuth.getInstance().getCurrentUser() != null) {
+            uid = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        }
+        return uid;
     }
 
-    private void executeSingleCommand(DeviceCommand cmd) {
-        String type = cmd.getCommandType();
+    public void startListeningToCommands() {
+        stopListeningToCommands();
+
+        String uid = getUid();
+        String deviceId = sessionManager.getPrimaryDeviceIdStr();
+
+        if (uid == null || deviceId == null) {
+            Log.w(TAG, "Cannot listen to commands: UID or Device ID missing");
+            return;
+        }
+
+        commandListener = db.collection("users").document(uid)
+                .collection("devices").document(deviceId)
+                .collection("commands")
+                .whereEqualTo("status", "QUEUED")
+                .addSnapshotListener((snapshots, error) -> {
+                    if (error != null) {
+                        Log.e(TAG, "Command snapshot listener error", error);
+                        return;
+                    }
+                    if (snapshots != null) {
+                        for (DocumentSnapshot doc : snapshots.getDocuments()) {
+                            executeSingleCommand(uid, deviceId, doc);
+                        }
+                    }
+                });
+    }
+
+    public void pollAndExecuteCommands() {
+        startListeningToCommands();
+    }
+
+    private void executeSingleCommand(String uid, String deviceId, DocumentSnapshot doc) {
+        String commandId = doc.getId();
+        String type = doc.getString("commandType");
+
+        if (type == null) {
+            updateCommandStatus(uid, deviceId, commandId, "FAILED", "Missing command type");
+            return;
+        }
+
         if ("LOCK_DEVICE".equalsIgnoreCase(type)) {
             if (SecureAdminReceiver.isAdminActive(context)) {
                 try {
                     DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
                     if (dpm != null) {
                         dpm.lockNow();
-                        updateCommandStatus(cmd.getId(), "EXECUTED", "Device locked successfully");
+                        updateCommandStatus(uid, deviceId, commandId, "EXECUTED", "Device locked successfully");
                     } else {
-                        updateCommandStatus(cmd.getId(), "FAILED", "DevicePolicyManager unavailable");
+                        updateCommandStatus(uid, deviceId, commandId, "FAILED", "DevicePolicyManager unavailable");
                     }
                 } catch (Exception e) {
-                    updateCommandStatus(cmd.getId(), "FAILED", e.getMessage());
+                    updateCommandStatus(uid, deviceId, commandId, "FAILED", e.getMessage());
                 }
             } else {
-                updateCommandStatus(cmd.getId(), "FAILED", "Device Policy Admin privileges not activated by user");
+                updateCommandStatus(uid, deviceId, commandId, "FAILED", "Device Policy Admin privileges not activated by user");
             }
         } else if ("ALARM_ALERT".equalsIgnoreCase(type)) {
             try {
@@ -78,25 +105,49 @@ public class CommandExecutionManager {
                 if (ringtone != null) {
                     ringtone.play();
                 }
-                updateCommandStatus(cmd.getId(), "EXECUTED", "Alarm alert triggered successfully");
+                updateCommandStatus(uid, deviceId, commandId, "EXECUTED", "Alarm alert triggered successfully");
             } catch (Exception e) {
-                updateCommandStatus(cmd.getId(), "FAILED", "Alarm trigger failed: " + e.getMessage());
+                updateCommandStatus(uid, deviceId, commandId, "FAILED", "Alarm trigger failed: " + e.getMessage());
+            }
+        } else if ("WIPE_DEVICE".equalsIgnoreCase(type)) {
+            if (SecureAdminReceiver.isAdminActive(context)) {
+                try {
+                    DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
+                    if (dpm != null) {
+                        updateCommandStatus(uid, deviceId, commandId, "EXECUTED", "Wipe initiated");
+                        dpm.wipeData(0);
+                    } else {
+                        updateCommandStatus(uid, deviceId, commandId, "FAILED", "DevicePolicyManager unavailable");
+                    }
+                } catch (Exception e) {
+                    updateCommandStatus(uid, deviceId, commandId, "FAILED", "Wipe failed: " + e.getMessage());
+                }
+            } else {
+                updateCommandStatus(uid, deviceId, commandId, "FAILED", "Device Policy Admin privileges not activated");
             }
         } else if ("LOCATE_NOW".equalsIgnoreCase(type)) {
-            updateCommandStatus(cmd.getId(), "EXECUTED", "Instant location request dispatched");
+            updateCommandStatus(uid, deviceId, commandId, "EXECUTED", "Instant location request dispatched");
         } else {
-            updateCommandStatus(cmd.getId(), "FAILED", "Unsupported command type: " + type);
+            updateCommandStatus(uid, deviceId, commandId, "FAILED", "Unsupported command type: " + type);
         }
     }
 
-    private void updateCommandStatus(Long commandId, String status, String result) {
-        apiService.updateCommandStatus(commandId, new CommandStatusUpdateRequest(status, result))
-                .enqueue(new Callback<ApiResponse<DeviceCommand>>() {
-                    @Override
-                    public void onResponse(Call<ApiResponse<DeviceCommand>> call, Response<ApiResponse<DeviceCommand>> response) {}
+    private void updateCommandStatus(String uid, String deviceId, String commandId, String status, String result) {
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("status", status);
+        updates.put("result", result);
+        updates.put("executedAt", FieldValue.serverTimestamp());
 
-                    @Override
-                    public void onFailure(Call<ApiResponse<DeviceCommand>> call, Throwable t) {}
-                });
+        db.collection("users").document(uid)
+                .collection("devices").document(deviceId)
+                .collection("commands").document(commandId)
+                .update(updates);
+    }
+
+    public void stopListeningToCommands() {
+        if (commandListener != null) {
+            commandListener.remove();
+            commandListener = null;
+        }
     }
 }
