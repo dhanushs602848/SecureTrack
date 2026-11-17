@@ -10,7 +10,6 @@ import android.view.ViewGroup;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import com.example.securetrack.activities.LocationHistoryActivity;
@@ -20,6 +19,7 @@ import com.example.securetrack.models.LocationRecord;
 import com.example.securetrack.repositories.LocationRepository;
 import com.example.securetrack.utils.SessionManager;
 import org.osmdroid.config.Configuration;
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
 import org.osmdroid.util.GeoPoint;
 import org.osmdroid.views.MapView;
 import org.osmdroid.views.overlay.Marker;
@@ -39,7 +39,11 @@ public class TrackingFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        Configuration.getInstance().setUserAgentValue(requireContext().getPackageName());
+        // Initialize osmdroid configuration
+        android.content.Context ctx = requireContext().getApplicationContext();
+        Configuration.getInstance().load(ctx, ctx.getSharedPreferences("osmdroid", android.content.Context.MODE_PRIVATE));
+        Configuration.getInstance().setUserAgentValue("SecureTrack/1.0 (" + ctx.getPackageName() + ")");
+
         binding = FragmentTrackingBinding.inflate(inflater, container, false);
         return binding.getRoot();
     }
@@ -52,6 +56,7 @@ public class TrackingFragment extends Fragment {
         sessionManager = new SessionManager(requireContext());
 
         map = binding.mapView;
+        map.setTileSource(TileSourceFactory.MAPNIK);
         map.setMultiTouchControls(true);
         map.getController().setZoom(15.0);
 
