@@ -63,7 +63,7 @@ public class SessionManager {
     }
 
     public String getBaseUrl() {
-        return prefs.getString(KEY_BASE_URL, "http://10.0.2.2:8080/");
+        return prefs.getString(KEY_BASE_URL, "http://127.0.0.1:8080/");
     }
 
     public void setBaseUrl(String url) {

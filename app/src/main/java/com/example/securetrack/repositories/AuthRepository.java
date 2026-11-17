@@ -39,6 +39,24 @@ public class AuthRepository {
         });
     }
 
+    public void googleLogin(String idToken, ApiCallback<AuthResponse> callback) {
+        apiService.googleLogin(new GoogleAuthRequest(idToken)).enqueue(new Callback<ApiResponse<AuthResponse>>() {
+            @Override
+            public void onResponse(Call<ApiResponse<AuthResponse>> call, Response<ApiResponse<AuthResponse>> response) {
+                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                    callback.onSuccess(response.body().getData());
+                } else {
+                    callback.onError(response.body() != null ? response.body().getMessage() : "Google authentication failed");
+                }
+            }
+
+            @Override
+            public void onFailure(Call<ApiResponse<AuthResponse>> call, Throwable t) {
+                callback.onError(t.getLocalizedMessage() != null ? t.getLocalizedMessage() : "Network error during Google authentication");
+            }
+        });
+    }
+
     public void register(String email, String password, String fullName, String phoneNumber, ApiCallback<AuthResponse> callback) {
         apiService.register(new RegisterRequest(email, password, fullName, phoneNumber)).enqueue(new Callback<ApiResponse<AuthResponse>>() {
             @Override

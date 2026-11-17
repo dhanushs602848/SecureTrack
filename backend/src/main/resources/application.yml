@@ -40,6 +40,9 @@ jwt:
   expiration-ms: 86400000 # 24 hours
   refresh-expiration-ms: 604800000 # 7 days
 
+google:
+  client-id: ${GOOGLE_CLIENT_ID:unconfigured-google-client-id}
+
 springdoc:
   api-docs:
     path: /api-docs

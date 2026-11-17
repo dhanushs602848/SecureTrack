@@ -3,17 +3,20 @@ package com.example.securetrack.activities;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
-import android.view.View;
 import android.widget.Toast;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import com.example.securetrack.MainActivity;
 import com.example.securetrack.databinding.ActivityLoginBinding;
 import com.example.securetrack.models.AuthResponse;
 import com.example.securetrack.repositories.AuthRepository;
+import com.example.securetrack.utils.GoogleAuthManager;
 import com.example.securetrack.utils.SessionManager;
 
 public class LoginActivity extends AppCompatActivity {
+
+    private static final int RC_GOOGLE_SIGN_IN = 9001;
 
     private ActivityLoginBinding binding;
     private AuthRepository authRepository;
@@ -29,6 +32,8 @@ public class LoginActivity extends AppCompatActivity {
         sessionManager = new SessionManager(this);
 
         binding.btnLogin.setOnClickListener(v -> performLogin());
+        binding.btnGoogleSignIn.setOnClickListener(v -> performGoogleSignIn());
+
         binding.tvRegister.setOnClickListener(v -> {
             startActivity(new Intent(LoginActivity.this, RegisterActivity.class));
             finish();
@@ -68,6 +73,71 @@ public class LoginActivity extends AppCompatActivity {
             public void onError(String errorMessage) {
                 binding.btnLogin.setEnabled(true);
                 Toast.makeText(LoginActivity.this, "Error: " + errorMessage, Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    private void performGoogleSignIn() {
+        binding.btnGoogleSignIn.setEnabled(false);
+        GoogleAuthManager.signInWithCredentialManager(this, new GoogleAuthManager.GoogleSignInCallback() {
+            @Override
+            public void onSuccess(String idToken) {
+                sendGoogleTokenToBackend(idToken);
+            }
+
+            @Override
+            public void onError(String errorMessage) {
+                try {
+                    Intent signInIntent = GoogleAuthManager.getGoogleSignInClient(LoginActivity.this).getSignInIntent();
+                    startActivityForResult(signInIntent, RC_GOOGLE_SIGN_IN);
+                } catch (Exception e) {
+                    binding.btnGoogleSignIn.setEnabled(true);
+                    Toast.makeText(LoginActivity.this, errorMessage, Toast.LENGTH_LONG).show();
+                }
+            }
+        });
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == RC_GOOGLE_SIGN_IN) {
+            GoogleAuthManager.handleSignInResult(data, new GoogleAuthManager.GoogleSignInCallback() {
+                @Override
+                public void onSuccess(String idToken) {
+                    sendGoogleTokenToBackend(idToken);
+                }
+
+                @Override
+                public void onError(String errorMessage) {
+                    binding.btnGoogleSignIn.setEnabled(true);
+                    Toast.makeText(LoginActivity.this, errorMessage, Toast.LENGTH_LONG).show();
+                }
+            });
+        }
+    }
+
+    private void sendGoogleTokenToBackend(String idToken) {
+        authRepository.googleLogin(idToken, new AuthRepository.ApiCallback<AuthResponse>() {
+            @Override
+            public void onSuccess(AuthResponse result) {
+                binding.btnGoogleSignIn.setEnabled(true);
+                sessionManager.saveAuthSession(
+                        result.getAccessToken(),
+                        result.getRefreshToken(),
+                        result.getUser().getId(),
+                        result.getUser().getEmail(),
+                        result.getUser().getFullName()
+                );
+                Toast.makeText(LoginActivity.this, "Google Sign-In Successful", Toast.LENGTH_SHORT).show();
+                startActivity(new Intent(LoginActivity.this, MainActivity.class));
+                finish();
+            }
+
+            @Override
+            public void onError(String errorMessage) {
+                binding.btnGoogleSignIn.setEnabled(true);
+                Toast.makeText(LoginActivity.this, "Google Authentication Error: " + errorMessage, Toast.LENGTH_LONG).show();
             }
         });
     }

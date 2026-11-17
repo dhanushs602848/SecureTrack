@@ -3,6 +3,9 @@
     <string name="app_name">SecureTrack</string>
     <string name="app_tagline">Track smart. Stay secure.</string>
 
+    <!-- Google OAuth Client ID Placeholder -->
+    <string name="default_web_client_id">YOUR_WEB_CLIENT_ID.apps.googleusercontent.com</string>
+
     <!-- Navigation -->
     <string name="nav_home">Home</string>
     <string name="nav_devices">Devices</string>

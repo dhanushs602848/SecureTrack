@@ -13,6 +13,9 @@ public interface ApiService {
     @POST("api/auth/login")
     Call<ApiResponse<AuthResponse>> login(@Body AuthRequest request);
 
+    @POST("api/auth/google")
+    Call<ApiResponse<AuthResponse>> googleLogin(@Body GoogleAuthRequest request);
+
     @POST("api/auth/forgot-password")
     Call<ApiResponse<String>> forgotPassword(@Body PasswordResetRequest request);
 

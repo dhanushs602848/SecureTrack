@@ -23,6 +23,9 @@ public class UserEntity {
     @Column(name = "phone_number")
     private String phoneNumber;
 
+    @Column(name = "google_sub_id", unique = true)
+    private String googleSubId;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -63,6 +66,9 @@ public class UserEntity {
 
     public String getPhoneNumber() { return phoneNumber; }
     public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
+
+    public String getGoogleSubId() { return googleSubId; }
+    public void setGoogleSubId(String googleSubId) { this.googleSubId = googleSubId; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

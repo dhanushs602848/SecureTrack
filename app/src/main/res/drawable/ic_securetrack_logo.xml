@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+    <!-- Outer Shield Background -->
+    <path
+        android:fillColor="#152C4F"
+        android:pathData="M48,4 L12,20 V44 C12,66.2 27.36,86.96 48,92 C68.64,86.96 84,66.2 84,44 V20 L48,4 Z" />
+
+    <!-- Inner Shield Accent Line -->
+    <path
+        android:strokeColor="#255DA8"
+        android:strokeWidth="3"
+        android:fillColor="#00000000"
+        android:pathData="M48,10 L18,23 V44 C18,62 30.8,78.8 48,83 C65.2,78.8 78,62 78,44 V23 L48,10 Z" />
+
+    <!-- Location Pin Emblem -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M48,24 C38.06,24 30,32.06 30,42 C30,55.5 48,72 48,72 C48,72 66,55.5 66,42 C66,32.06 57.94,24 48,24 Z M48,49.5 C43.86,49.5 40.5,46.14 40.5,42 C40.5,37.86 43.86,34.5 48,34.5 C52.14,34.5 55.5,37.86 55.5,42 C55.5,46.14 52.14,49.5 48,49.5 Z" />
+
+    <!-- Radar Pulse Ring -->
+    <path
+        android:fillColor="#255DA8"
+        android:pathData="M48,38 C45.79,38 44,39.79 44,42 C44,44.21 45.79,46 48,46 C50.21,46 52,44.21 52,42 C52,39.79 50.21,38 48,38 Z" />
+</vector>

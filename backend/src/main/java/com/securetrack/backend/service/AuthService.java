@@ -1,5 +1,9 @@
 package com.securetrack.backend.service;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.gson.GsonFactory;
 import com.securetrack.backend.dto.*;
 import com.securetrack.backend.entity.*;
 import com.securetrack.backend.exception.BadRequestException;
@@ -7,6 +11,7 @@ import com.securetrack.backend.exception.ResourceNotFoundException;
 import com.securetrack.backend.repository.*;
 import com.securetrack.backend.security.JwtTokenProvider;
 import com.securetrack.backend.security.UserPrincipal;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -14,6 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.UUID;
 
 @Service
@@ -26,6 +32,9 @@ public class AuthService {
     private final JwtTokenProvider tokenProvider;
     private final AuthenticationManager authenticationManager;
     private final MailService mailService;
+
+    @Value("${google.client-id:unconfigured-google-client-id}")
+    private String googleClientId;
 
     public AuthService(UserRepository userRepository,
                        RefreshTokenRepository refreshTokenRepository,
@@ -75,6 +84,64 @@ public class AuthService {
         UserEntity user = userRepository.findById(principal.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
+        String accessToken = tokenProvider.generateToken(principal);
+        String refreshToken = createRefreshToken(user);
+
+        return new AuthResponse(accessToken, refreshToken, toUserDto(user));
+    }
+
+    @Transactional
+    public AuthResponse authenticateGoogleUser(GoogleAuthRequest request) {
+        String googleSub;
+        String email;
+        String name;
+
+        try {
+            GoogleIdTokenVerifier.Builder verifierBuilder = new GoogleIdTokenVerifier.Builder(
+                    new NetHttpTransport(),
+                    new GsonFactory()
+            );
+
+            if (googleClientId != null && !googleClientId.contains("unconfigured")) {
+                verifierBuilder.setAudience(Collections.singletonList(googleClientId));
+            }
+
+            GoogleIdTokenVerifier verifier = verifierBuilder.build();
+            GoogleIdToken idToken = verifier.verify(request.getIdToken());
+
+            if (idToken != null) {
+                GoogleIdToken.Payload payload = idToken.getPayload();
+                googleSub = payload.getSubject();
+                email = payload.getEmail();
+                name = (String) payload.get("name");
+                if (name == null || name.isEmpty()) {
+                    name = email;
+                }
+            } else {
+                throw new BadRequestException("Invalid or expired Google ID token");
+            }
+        } catch (Exception e) {
+            throw new BadRequestException("Failed to verify Google ID token: " + e.getMessage());
+        }
+
+        UserEntity user = userRepository.findByGoogleSubId(googleSub)
+                .orElseGet(() -> userRepository.findByEmail(email).orElse(null));
+
+        if (user == null) {
+            user = new UserEntity(
+                    email,
+                    passwordEncoder.encode(UUID.randomUUID().toString()),
+                    name,
+                    ""
+            );
+            user.setGoogleSubId(googleSub);
+            user = userRepository.save(user);
+        } else if (user.getGoogleSubId() == null) {
+            user.setGoogleSubId(googleSub);
+            user = userRepository.save(user);
+        }
+
+        UserPrincipal principal = UserPrincipal.create(user);
         String accessToken = tokenProvider.generateToken(principal);
         String refreshToken = createRefreshToken(user);
 

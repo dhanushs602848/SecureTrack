@@ -1,10 +1,10 @@
 # SecureTrack — Smart Mobile Tracking & Anti-Theft System
 
-![SecureTrack Logo](app/src/main/res/drawable/ic_shield_logo.xml)
+![SecureTrack Logo](app/src/main/res/drawable/ic_securetrack_logo.xml)
 
 **Tagline:** Track smart. Stay secure.
 
-SecureTrack is a production-grade, multi-platform mobile tracking and anti-theft solution designed to protect Android mobile endpoints. The monorepo incorporates a native Android application (Java/XML), a robust Spring Boot REST API (Java 21), an authoritative MySQL database schema managed by Flyway, and a responsive React TypeScript Web Dashboard.
+SecureTrack is a production-grade, multi-platform mobile tracking and anti-theft solution designed to protect Android mobile endpoints. The monorepo incorporates a native Android application (Java/XML), a Spring Boot REST API (Java 17/21), an authoritative MySQL database schema managed by Flyway, and a responsive React TypeScript Web Dashboard.
 
 ---
 
@@ -15,8 +15,8 @@ SecureTrack is a production-grade, multi-platform mobile tracking and anti-theft
 │  Android App (Java / XML)      │         │  React Web Dashboard           │
 │  - FusedLocationProviderClient │         │  - TypeScript + Vite           │
 │  - Foreground Tracking Service │         │  - Tailwind CSS                │
-│  - DeviceAdminReceiver         │         │  - Leaflet OpenStreetMap       │
-│  - Room Offline Sync Queue     │         │  - JWT Session Auth            │
+│  - Credential Manager & Google │         │  - Leaflet OpenStreetMap       │
+│  - DeviceAdminReceiver         │         │  - JWT Session Auth            │
 └───────────────┬────────────────┘         └───────────────┬────────────────┘
                 │                                          │
                 │              HTTPS REST API              │
@@ -24,117 +24,86 @@ SecureTrack is a production-grade, multi-platform mobile tracking and anti-theft
                                      │
                      ┌───────────────▼────────────────┐
                      │  Spring Boot REST Backend      │
-                     │  - Java 21 / Spring Security   │
-                     │  - JWT Authentication          │
+                     │  - Java 17/21 / Spring Security│
+                     │  - JWT Auth + Google OAuth2 ID │
                      │  - Command State Engine        │
                      │  - Flyway Migrations           │
                      └───────────────┬────────────────┘
                                      │
                      ┌───────────────▼────────────────┐
                      │  MySQL 8.4 Database            │
-                     │  - users, devices, locations   │
-                     │  - security_events, commands   │
+                     │  - users (with google_sub_id)  │
+                     │  - devices, locations, etc.    │
                      └────────────────────────────────┘
 ```
 
 ---
 
-## 📱 Tech Stack & Component Overview
+## 📱 Features & Component Overview
 
 ### 1. Native Android Application (`app/`)
-* **Language:** Java 17 / Android 14+ (API 35 target)
-* **UI:** Native XML matching Figma Make palette (`#152C4F` Navy, `#255DA8` Blue, `#F8F9FB` Surface)
-* **Architecture:** ViewBinding, Retrofit 2 + Gson, Room Database, WorkManager, FusedLocationProviderClient
-* **Security & Anti-Theft:** `DeviceAdminReceiver` (remote lock), `LocationTrackingService` (Foreground Service), `SimChangeReceiver`
-* **Maps:** OpenStreetMap Osmdroid with visible copyright attribution
+* **UI & Branding:** Crisp navy (`#152C4F`) and blue (`#255DA8`) palette matching Figma specs. Custom shield & location pin vector logo (`ic_securetrack_logo.xml`).
+* **Authentication:** Traditional Email/Password registration/login + **Sign in with Google** via Credential Manager (`GetGoogleIdOption`) and Play Services Auth API.
+* **Tracking & Location:** `FusedLocationProviderClient`, `LocationTrackingService` (Foreground Service with ongoing notification), `BootReceiver` reboot status handling, and OpenStreetMap Osmdroid with visible copyright attribution.
+* **Anti-Theft & Remote Lock:** `DeviceAdminReceiver` for remote locking, `SimChangeReceiver` for SIM swap monitoring, and `CommandExecutionManager` for processing remote device commands.
 
 ### 2. Spring Boot REST Backend (`backend/`)
-* **Framework:** Spring Boot 3.2.5, Java 21, Maven
-* **Security:** Spring Security, JWT (JJWT 0.12), BCrypt, Ownership Authorization Filters
-* **Database & ORM:** Spring Data JPA, Hibernate, MySQL Connector, Flyway Migrations
-* **Documentation:** OpenAPI / Swagger UI (`/swagger-ui.html`)
+* **Framework:** Spring Boot 3.2.5, Java 17/21, Maven (`mvnw` / `mvnw.cmd`).
+* **Google OAuth Verification:** `GoogleIdTokenVerifier` verifies token signature, audience, issuer, and expiry. Creates or links corresponding SecureTrack accounts via `google_sub_id`.
+* **Security & JWT:** Spring Security, JWT (JJWT 0.12), BCrypt password hashing, and ownership authorization filters.
+* **Documentation:** OpenAPI / Swagger UI (`http://localhost:8080/swagger-ui.html`).
 
 ### 3. Database Schema (`database/` & `backend/src/main/resources/db/migration/`)
-* **Authoritative Schema:** `V1__init_schema.sql` (Flyway)
-* **Tables:** `users`, `devices`, `device_pairing_codes`, `locations` (with unique `client_uuid` for idempotent upload), `security_events`, `device_commands` (`QUEUED`, `DELIVERED`, `RECEIVED`, `EXECUTED`, `FAILED`), `refresh_tokens`, `password_reset_tokens`.
+* **Flyway Migrations:** `V1__init_schema.sql` (core tables) and `V2__add_google_sub_id.sql` (Google account linking).
 
 ### 4. React Web Dashboard (`web-dashboard/`)
-* **Tech Stack:** React 18, TypeScript, Vite, Tailwind CSS, Lucide Icons, React-Leaflet (OpenStreetMap)
-* **Features:** Live tracking, location history timeline, device management, pairing code generation, remote command center, security alert monitor.
+* **Tech Stack:** React 18, TypeScript, Vite, Tailwind CSS, React-Leaflet (OpenStreetMap).
 
 ---
 
-## 🚀 Setup & Execution Guide
+## 🔑 Google Cloud OAuth Setup Guide
 
-### Prerequisites
-* JDK 21 installed
-* Android Studio Ladybug or newer
-* MySQL 8.4 Server running on port 3306
-* Node.js 18+ and npm
+To enable live Google Sign-In authentication on Android:
+
+1. **Open Google Cloud Console:** [Google Cloud Credentials](https://console.cloud.google.com/apis/credentials)
+2. **Create Web Application Client ID:**
+   - Application Type: **Web application**
+   - Name: `SecureTrack Backend Web Client`
+   - Copy the generated **Client ID** (e.g. `123456789-abcdef.apps.googleusercontent.com`).
+3. **Create Android Client ID:**
+   - Application Type: **Android**
+   - Package Name: `com.example.securetrack`
+   - SHA-1 Certificate Fingerprint: `1A:86:27:77:E2:B1:F7:B6:7A:14:AB:60:C8:F5:04:E8:BC:77:D0:F7`
+4. **Configure Credentials:**
+   - **Android App:** Update `default_web_client_id` in `app/src/main/res/values/strings.xml` with your **Web Client ID**.
+   - **Backend Environment:** Set `GOOGLE_CLIENT_ID` environment variable to your **Web Client ID**.
 
 ---
 
-### 1. Database Setup
-Create MySQL database `securetrack_db`:
-```sql
-CREATE DATABASE securetrack_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+## 🚀 Execution Instructions
+
+### 1. Database & Backend
+```bash
+# Set environment variables
+export SPRING_DATASOURCE_URL="jdbc:mysql://localhost:3306/securetrack_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+export SPRING_DATASOURCE_USERNAME="securetrack_app"
+export SPRING_DATASOURCE_PASSWORD="securetrack_pass"
+export JWT_SECRET="YOUR_256_BIT_SECRET_KEY"
+export GOOGLE_CLIENT_ID="YOUR_WEB_CLIENT_ID.apps.googleusercontent.com"
+
+# Run Spring Boot backend via Maven Wrapper
+cd backend
+./mvnw clean spring-boot:run
 ```
 
----
-
-### 2. Backend Setup
-1. Navigate to `backend/`:
-   ```bash
-   cd backend
-   ```
-2. Configure credentials in `src/main/resources/application.yml` or set environment variables:
-   ```bash
-   export SPRING_DATASOURCE_URL="jdbc:mysql://localhost:3306/securetrack_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
-   export SPRING_DATASOURCE_USERNAME="root"
-   export SPRING_DATASOURCE_PASSWORD="root"
-   ```
-3. Run Spring Boot API:
-   ```bash
-   mvn spring-boot:run
-   ```
-   API runs at `http://localhost:8080`. Swagger documentation available at `http://localhost:8080/swagger-ui.html`.
+### 2. Android Debug APK
+```bash
+./gradlew app:assembleDebug
+```
+APK Path: `app/build/outputs/apk/debug/app-debug.apk`
 
 ---
 
-### 3. Android Setup & Networking
-1. Open the root `SecureTrack` folder in Android Studio.
-2. Build the Debug APK:
-   ```bash
-   ./gradlew app:assembleDebug
-   ```
-   APK Output Path: `app/build/outputs/apk/debug/app-debug.apk`
-3. **Emulator Networking:** By default, Android emulator accesses local backend via `http://10.0.2.2:8080/`.
-4. **Physical Phone Networking:** Connect phone and host machine to the same Wi-Fi network and update server URL in app Settings screen to `http://<YOUR_LOCAL_IP>:8080/`.
-
----
-
-### 4. Web Dashboard Setup
-1. Navigate to `web-dashboard/`:
-   ```bash
-   cd web-dashboard
-   ```
-2. Install dependencies and start Vite dev server:
-   ```bash
-   npm install
-   npm run dev
-   ```
-3. Open browser at `http://localhost:5173`.
-
----
-
-## 🧪 Testing
-
-* **Backend Integration Tests:** Run `mvn test` in `backend/` to execute MockMvc security and command lifecycle tests.
-* **Android Unit Tests:** Run `./gradlew test` in root.
-
----
-
-## 🔒 Security & Privacy Notices
-* Background location access is strictly opt-in and toggled manually by the user.
-* Remote lock capability requires explicit activation of Device Administrator privileges.
-* Pairing codes expire in 10 minutes and are single-use.
+## 🔒 Security & Secret Protection
+* All production secrets and credentials must be set via environment variables.
+* `.gitignore` excludes temporary build artifacts, `.env`, local properties, and keystores.
