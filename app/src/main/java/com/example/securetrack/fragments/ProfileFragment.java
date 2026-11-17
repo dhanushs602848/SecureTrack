@@ -12,6 +12,7 @@ import com.example.securetrack.activities.LoginActivity;
 import com.example.securetrack.activities.SettingsActivity;
 import com.example.securetrack.databinding.FragmentProfileBinding;
 import com.example.securetrack.utils.SessionManager;
+import com.google.firebase.auth.FirebaseAuth;
 
 public class ProfileFragment extends Fragment {
 
@@ -39,6 +40,7 @@ public class ProfileFragment extends Fragment {
         });
 
         binding.btnLogout.setOnClickListener(v -> {
+            FirebaseAuth.getInstance().signOut();
             sessionManager.logout();
             Intent intent = new Intent(requireContext(), LoginActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);

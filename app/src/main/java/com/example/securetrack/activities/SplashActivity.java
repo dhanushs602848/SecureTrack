@@ -8,6 +8,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.example.securetrack.MainActivity;
 import com.example.securetrack.R;
 import com.example.securetrack.utils.SessionManager;
+import com.google.firebase.auth.FirebaseAuth;
 
 public class SplashActivity extends AppCompatActivity {
 
@@ -18,7 +19,8 @@ public class SplashActivity extends AppCompatActivity {
 
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             SessionManager sessionManager = new SessionManager(this);
-            if (sessionManager.isLoggedIn()) {
+            boolean firebaseLoggedIn = FirebaseAuth.getInstance().getCurrentUser() != null;
+            if (sessionManager.isLoggedIn() || firebaseLoggedIn) {
                 startActivity(new Intent(SplashActivity.this, MainActivity.class));
             } else {
                 startActivity(new Intent(SplashActivity.this, LoginActivity.class));

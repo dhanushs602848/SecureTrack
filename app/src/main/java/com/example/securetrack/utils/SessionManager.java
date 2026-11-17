@@ -10,6 +10,7 @@ public class SessionManager {
     private static final String KEY_TOKEN = "access_token";
     private static final String KEY_REFRESH_TOKEN = "refresh_token";
     private static final String KEY_USER_ID = "user_id";
+    private static final String KEY_FIREBASE_UID = "firebase_uid";
     private static final String KEY_USER_EMAIL = "user_email";
     private static final String KEY_USER_NAME = "user_name";
     private static final String KEY_INSTALLATION_ID = "installation_id";
@@ -33,8 +34,22 @@ public class SessionManager {
                 .apply();
     }
 
+    public void saveFirebaseAuthSession(String uid, String email, String fullName) {
+        prefs.edit()
+                .putString(KEY_TOKEN, uid)
+                .putString(KEY_REFRESH_TOKEN, uid)
+                .putString(KEY_FIREBASE_UID, uid)
+                .putString(KEY_USER_EMAIL, email)
+                .putString(KEY_USER_NAME, fullName)
+                .apply();
+    }
+
     public String getToken() {
         return prefs.getString(KEY_TOKEN, null);
+    }
+
+    public String getFirebaseUid() {
+        return prefs.getString(KEY_FIREBASE_UID, prefs.getString(KEY_TOKEN, null));
     }
 
     public boolean isLoggedIn() {
@@ -94,6 +109,7 @@ public class SessionManager {
                 .remove(KEY_TOKEN)
                 .remove(KEY_REFRESH_TOKEN)
                 .remove(KEY_USER_ID)
+                .remove(KEY_FIREBASE_UID)
                 .remove(KEY_USER_EMAIL)
                 .remove(KEY_USER_NAME)
                 .apply();
