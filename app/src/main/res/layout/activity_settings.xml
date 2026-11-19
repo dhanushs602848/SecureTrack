@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:background="@color/bg_app"
     android:orientation="vertical"
-    android:padding="24dp"
+    android:padding="20dp"
     tools:ignore="HardcodedText">
 
     <!-- Header -->
@@ -38,20 +38,323 @@
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_marginTop="16dp"
-        android:fillViewport="true">
+        android:layout_marginTop="12dp"
+        android:fillViewport="true"
+        android:scrollbars="none">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:paddingBottom="24dp">
+
+            <!-- Emergency & Recovery Contacts Card -->
+            <androidx.cardview.widget.CardView
+                style="@style/Widget.SecureTrack.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Emergency Recovery Info"
+                        android:textColor="@color/primary_navy"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="Contact details displayed if this device is remotely locked or placed in lost recovery mode."
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:hint="Emergency Contact Phone"
+                        app:boxBackgroundColor="@color/input_bg"
+                        app:boxBackgroundMode="outline"
+                        app:boxCornerRadiusBottomEnd="8dp"
+                        app:boxCornerRadiusBottomStart="8dp"
+                        app:boxCornerRadiusTopEnd="8dp"
+                        app:boxCornerRadiusTopStart="8dp"
+                        app:hintTextColor="@color/input_label">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/et_emergency_contact"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="phone"
+                            android:textColor="@color/input_text"
+                            android:textSize="14sp" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:hint="Custom Lock Screen Note"
+                        app:boxBackgroundColor="@color/input_bg"
+                        app:boxBackgroundMode="outline"
+                        app:boxCornerRadiusBottomEnd="8dp"
+                        app:boxCornerRadiusBottomStart="8dp"
+                        app:boxCornerRadiusTopEnd="8dp"
+                        app:boxCornerRadiusTopStart="8dp"
+                        app:hintTextColor="@color/input_label">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/et_lock_message"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textMultiLine"
+                            android:lines="2"
+                            android:textColor="@color/input_text"
+                            android:textSize="14sp" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <Button
+                        android:id="@+id/btn_save_recovery_info"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:layout_marginTop="14dp"
+                        android:background="@drawable/bg_primary_button"
+                        android:text="Save Recovery Details"
+                        android:textColor="@color/white"
+                        android:textSize="14sp"
+                        app:backgroundTint="@null" />
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- Anti-Theft Protection Triggers Card -->
+            <androidx.cardview.widget.CardView
+                style="@style/Widget.SecureTrack.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Anti-Theft Protection Triggers"
+                        android:textColor="@color/primary_navy"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <!-- SIM Change Switch -->
+                    <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp">
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentStart="true"
+                            android:layout_toStartOf="@id/switch_sim_alert"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="SIM Change Alerts"
+                                android:textColor="@color/text_primary"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Trigger security alert when SIM card is replaced or removed"
+                                android:textColor="@color/text_secondary"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/switch_sim_alert"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentEnd="true"
+                            android:layout_centerVertical="true" />
+                    </RelativeLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginVertical="10dp"
+                        android:background="@color/border_color" />
+
+                    <!-- Low Battery Switch -->
+                    <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content">
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentStart="true"
+                            android:layout_toStartOf="@id/switch_low_battery_alert"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Low Battery GPS Beacon"
+                                android:textColor="@color/text_primary"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Automatically report final GPS coordinates before battery dies"
+                                android:textColor="@color/text_secondary"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/switch_low_battery_alert"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentEnd="true"
+                            android:layout_centerVertical="true" />
+                    </RelativeLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginVertical="10dp"
+                        android:background="@color/border_color" />
+
+                    <!-- Background GPS Switch -->
+                    <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content">
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentStart="true"
+                            android:layout_toStartOf="@id/switch_background_gps"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Continuous Background Tracking"
+                                android:textColor="@color/text_primary"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="Periodically update location when device moves"
+                                android:textColor="@color/text_secondary"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/switch_background_gps"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentEnd="true"
+                            android:layout_centerVertical="true" />
+                    </RelativeLayout>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- Device Administrator Privileges Card -->
+            <androidx.cardview.widget.CardView
+                style="@style/Widget.SecureTrack.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Device Policy Administrator"
+                        android:textColor="@color/primary_navy"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="Grants SecureTrack system privilege to remotely lock or wipe the device in emergency."
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Privilege Status:"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/tv_admin_status"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Checking..."
+                            android:textColor="@color/primary_navy"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <Button
+                        android:id="@+id/btn_manage_admin"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:layout_marginTop="12dp"
+                        android:background="@drawable/bg_secondary_button"
+                        android:text="Manage Device Admin"
+                        android:textColor="@color/primary_navy"
+                        android:textSize="14sp"
+                        app:backgroundTint="@null" />
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
 
             <!-- System & Cloud Status Card -->
             <androidx.cardview.widget.CardView
                 style="@style/Widget.SecureTrack.Card"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp">
+                android:layout_marginTop="14dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -105,16 +408,16 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="App Version"
+                            android:text="Security Protocol"
                             android:textColor="@color/text_secondary"
                             android:textSize="14sp" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="1.0.0"
-                            android:textColor="@color/text_primary"
-                            android:textSize="14sp"
+                            android:text="256-Bit Cryptographic Pairing"
+                            android:textColor="@color/primary_navy"
+                            android:textSize="13sp"
                             android:textStyle="bold" />
                     </LinearLayout>
 
@@ -133,50 +436,18 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="Telemetry Sync"
+                            android:text="App Version"
                             android:textColor="@color/text_secondary"
                             android:textSize="14sp" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Active &amp; Encrypted"
-                            android:textColor="@color/status_success"
+                            android:text="1.0.0 (Release)"
+                            android:textColor="@color/text_primary"
                             android:textSize="14sp"
                             android:textStyle="bold" />
                     </LinearLayout>
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-
-            <!-- Security & Privacy Card -->
-            <androidx.cardview.widget.CardView
-                style="@style/Widget.SecureTrack.Card"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Security &amp; Protection"
-                        android:textColor="@color/primary_navy"
-                        android:textSize="16sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:lineSpacingExtra="2dp"
-                        android:text="SecureTrack uses end-to-end 256-bit token authentication for cross-device pairing. Only authorized owner accounts can view location history and send remote security commands."
-                        android:textColor="@color/text_secondary"
-                        android:textSize="13sp" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 

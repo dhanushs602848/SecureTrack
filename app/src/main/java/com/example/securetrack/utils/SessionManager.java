@@ -23,6 +23,10 @@ public class SessionManager {
     private static final String KEY_BACKGROUND_TRACKING = "background_tracking_enabled";
     private static final String KEY_PRIMARY_DEVICE_ID = "primary_device_id";
     private static final String KEY_PRIMARY_DEVICE_ID_STR = "primary_device_id_str";
+    private static final String KEY_EMERGENCY_CONTACT = "emergency_contact";
+    private static final String KEY_LOCK_MESSAGE = "lock_message";
+    private static final String KEY_SIM_ALERT = "sim_alert_enabled";
+    private static final String KEY_LOW_BATTERY_ALERT = "low_battery_alert_enabled";
 
     private final SharedPreferences prefs;
 
@@ -190,6 +194,38 @@ public class SessionManager {
 
     public void setPrimaryDeviceIdStr(String deviceId) {
         setCurrentDeviceId(deviceId);
+    }
+
+    public String getEmergencyContact() {
+        return prefs.getString(KEY_EMERGENCY_CONTACT, "");
+    }
+
+    public void setEmergencyContact(String contact) {
+        prefs.edit().putString(KEY_EMERGENCY_CONTACT, contact).apply();
+    }
+
+    public String getLockMessage() {
+        return prefs.getString(KEY_LOCK_MESSAGE, "This phone is protected by SecureTrack. If found, please return it.");
+    }
+
+    public void setLockMessage(String message) {
+        prefs.edit().putString(KEY_LOCK_MESSAGE, message).apply();
+    }
+
+    public boolean isSimAlertEnabled() {
+        return prefs.getBoolean(KEY_SIM_ALERT, true);
+    }
+
+    public void setSimAlertEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_SIM_ALERT, enabled).apply();
+    }
+
+    public boolean isLowBatteryAlertEnabled() {
+        return prefs.getBoolean(KEY_LOW_BATTERY_ALERT, true);
+    }
+
+    public void setLowBatteryAlertEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_LOW_BATTERY_ALERT, enabled).apply();
     }
 
     public void logout() {
