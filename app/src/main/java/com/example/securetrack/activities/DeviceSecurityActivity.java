@@ -7,6 +7,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import com.example.securetrack.adapters.CommandAdapter;
 import com.example.securetrack.databinding.ActivityDeviceSecurityBinding;
 import com.example.securetrack.models.DeviceCommand;
+import com.example.securetrack.repositories.DeviceRepository;
 import com.example.securetrack.repositories.SecurityRepository;
 import com.example.securetrack.utils.SessionManager;
 import java.util.ArrayList;
@@ -16,6 +17,7 @@ public class DeviceSecurityActivity extends AppCompatActivity {
 
     private ActivityDeviceSecurityBinding binding;
     private SecurityRepository securityRepository;
+    private DeviceRepository deviceRepository;
     private SessionManager sessionManager;
     private CommandAdapter adapter;
 
@@ -26,6 +28,7 @@ public class DeviceSecurityActivity extends AppCompatActivity {
         setContentView(binding.getRoot());
 
         securityRepository = new SecurityRepository(this);
+        deviceRepository = new DeviceRepository(this);
         sessionManager = new SessionManager(this);
 
         adapter = new CommandAdapter();
@@ -36,6 +39,7 @@ public class DeviceSecurityActivity extends AppCompatActivity {
         binding.btnLockDevice.setOnClickListener(v -> dispatchCommand("LOCK_DEVICE"));
         binding.btnAlarm.setOnClickListener(v -> dispatchCommand("ALARM_ALERT"));
         binding.btnWipeDevice.setOnClickListener(v -> dispatchCommand("WIPE_DEVICE"));
+        binding.btnRevokeDevice.setOnClickListener(v -> confirmRevocation());
 
         loadCommandHistory();
     }
@@ -85,5 +89,33 @@ public class DeviceSecurityActivity extends AppCompatActivity {
                 Toast.makeText(DeviceSecurityActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    private void confirmRevocation() {
+        String deviceId = getTargetDeviceId();
+        if (deviceId == null || deviceId.isEmpty()) {
+            Toast.makeText(this, "No device selected", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Revoke Device Access")
+                .setMessage("Are you sure you want to revoke this device? It will immediately lose authorization to report telemetry, sync location, and execute commands.")
+                .setPositiveButton("Revoke", (dialog, which) -> {
+                    deviceRepository.revokePairedDevice(deviceId, new DeviceRepository.ApiCallback<Void>() {
+                        @Override
+                        public void onSuccess(Void result) {
+                            Toast.makeText(DeviceSecurityActivity.this, "Device access revoked successfully", Toast.LENGTH_LONG).show();
+                            finish();
+                        }
+
+                        @Override
+                        public void onError(String errorMessage) {
+                            Toast.makeText(DeviceSecurityActivity.this, "Failed to revoke device: " + errorMessage, Toast.LENGTH_LONG).show();
+                        }
+                    });
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 }

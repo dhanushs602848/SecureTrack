@@ -48,13 +48,21 @@
     <string name="recent_activity">Recent Activity</string>
     <string name="view_all">View All</string>
 
-    <!-- Devices -->
+    <!-- Devices & Pairing -->
     <string name="my_devices">My Devices</string>
     <string name="register_new_device">Register New Device</string>
     <string name="device_details">Device Details</string>
     <string name="setup_method">Choose Setup Method</string>
-    <string name="this_phone">This Android Phone</string>
-    <string name="another_device">Another Device (Pairing Code)</string>
+    <string name="this_phone">This Android Phone (Primary Device)</string>
+    <string name="pair_second_phone">Pair a Second Phone (Generate QR / Token)</string>
+    <string name="enrol_as_secondary">Enrol This Phone as Secondary Device</string>
+    <string name="scan_qr_code">Scan Pairing QR Code</string>
+    <string name="copy_token">Copy Token</string>
+    <string name="copied_to_clipboard">Token copied to clipboard</string>
+    <string name="waiting_owner_approval">Claim submitted. Waiting for owner approval…</string>
+    <string name="approve_device">Approve Device</string>
+    <string name="reject_device">Reject Device</string>
+    <string name="pair_token_hint">256-Bit Pairing Token</string>
     <string name="device_name">Device Name</string>
     <string name="enter_device_name">e.g., John\'s Pixel 8</string>
     <string name="pairing_code">Pairing Code</string>

@@ -14,9 +14,13 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.firestore.WriteBatch;
+import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.functions.FirebaseFunctions;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Date;
@@ -193,147 +197,280 @@ public class DeviceRepository {
                 });
     }
 
-    public void createPairingCode(ApiCallback<PairingResponse> callback) {
+    public static String hashToken(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.trim().getBytes("UTF-8"));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (Exception e) {
+            throw new RuntimeException("SHA-256 algorithm not available", e);
+        }
+    }
+
+    /**
+     * Spark-Compatible: Owner generates a 256-bit cryptographic one-time pairing invitation.
+     */
+    public void createPairingInvitation(ApiCallback<PairingInvitation> callback) {
         String uid = getUid();
         if (uid == null) {
             callback.onError("User not authenticated");
             return;
         }
 
-        FirebaseFunctions.getInstance()
-                .getHttpsCallable("createDevicePairingCode")
-                .call()
-                .addOnSuccessListener(httpsCallableResult -> {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> data = (Map<String, Object>) httpsCallableResult.getData();
-                    if (data != null && data.containsKey("code")) {
-                        String code = String.valueOf(data.get("code"));
-                        callback.onSuccess(new PairingResponse(code, 600));
-                    } else {
-                        callback.onError("Malformed response from pairing function.");
-                    }
+        byte[] bytes = new byte[32];
+        new SecureRandom().nextBytes(bytes);
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02x", b));
+        }
+        String rawToken = sb.toString();
+        String tokenHash = hashToken(rawToken);
+
+        Date expiresAt = new Date(System.currentTimeMillis() + 10 * 60 * 1000);
+
+        Map<String, Object> map = new HashMap<>();
+        map.put("ownerUid", uid);
+        map.put("ownerEmail", sessionManager.getUserEmail());
+        map.put("status", "PENDING_CLAIM");
+        map.put("createdAt", FieldValue.serverTimestamp());
+        map.put("expiresAt", new Timestamp(expiresAt));
+        map.put("claimedByUid", null);
+        map.put("claimedDeviceId", null);
+        map.put("deviceInfo", null);
+        map.put("approvedAt", null);
+
+        String qrPayload = "{\"scheme\":\"securetrack\",\"action\":\"pair\",\"token\":\"" + rawToken + "\",\"ownerUid\":\"" + uid + "\"}";
+
+        db.collection("pairing_invitations").document(tokenHash)
+                .set(map)
+                .addOnSuccessListener(aVoid -> {
+                    PairingInvitation inv = new PairingInvitation(
+                            rawToken,
+                            tokenHash,
+                            uid,
+                            sessionManager.getUserEmail(),
+                            "PENDING_CLAIM",
+                            expiresAt,
+                            qrPayload
+                    );
+                    callback.onSuccess(inv);
                 })
                 .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to create pairing code via Cloud Function", e);
-                    callback.onError("Failed to create pairing code: " + e.getMessage());
+                    Log.e(TAG, "Failed to create pairing invitation", e);
+                    callback.onError("Failed to create pairing invitation: " + e.getMessage());
                 });
     }
 
-    public void completePairing(PairingRequest request, ApiCallback<Device> callback) {
-        String code = request.getCode() != null ? request.getCode().trim() : "";
-        if (code.length() != 8) {
-            callback.onError("Invalid pairing code. Code must be 8 digits.");
+    /**
+     * Real-time listener for owner to monitor status of an invitation.
+     */
+    public ListenerRegistration listenToInvitation(String tokenHash, ApiCallback<PairingInvitation> callback) {
+        return db.collection("pairing_invitations").document(tokenHash)
+                .addSnapshotListener((snapshot, error) -> {
+                    if (error != null) {
+                        callback.onError(error.getMessage());
+                        return;
+                    }
+                    if (snapshot != null && snapshot.exists()) {
+                        PairingInvitation inv = new PairingInvitation();
+                        inv.setTokenHash(tokenHash);
+                        inv.setOwnerUid(snapshot.getString("ownerUid"));
+                        inv.setOwnerEmail(snapshot.getString("ownerEmail"));
+                        inv.setStatus(snapshot.getString("status"));
+                        Timestamp exp = snapshot.getTimestamp("expiresAt");
+                        if (exp != null) inv.setExpiresAt(exp.toDate());
+                        inv.setClaimedByUid(snapshot.getString("claimedByUid"));
+                        inv.setClaimedDeviceId(snapshot.getString("claimedDeviceId"));
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> devInfo = (Map<String, Object>) snapshot.get("deviceInfo");
+                        inv.setDeviceInfo(devInfo);
+                        callback.onSuccess(inv);
+                    }
+                });
+    }
+
+    /**
+     * Owner approves an enrolling secondary device.
+     */
+    public void approveDeviceClaim(PairingInvitation invitation, ApiCallback<Void> callback) {
+        String uid = getUid();
+        if (uid == null || !uid.equals(invitation.getOwnerUid())) {
+            callback.onError("Unauthorized");
             return;
         }
 
-        String installId = request.getInstallationId() != null ? request.getInstallationId() : sessionManager.getInstallationId();
+        String deviceId = invitation.getClaimedDeviceId();
+        Map<String, Object> devInfo = invitation.getDeviceInfo();
 
-        Map<String, Object> data = new HashMap<>();
-        data.put("code", code);
-        data.put("deviceName", request.getDeviceName());
-        data.put("model", request.getModel());
-        data.put("androidVersion", request.getAndroidVersion());
-        data.put("installationId", installId);
-        data.put("batteryLevel", DeviceUtils.getBatteryPercentage(context));
+        Map<String, Object> deviceMap = new HashMap<>();
+        deviceMap.put("id", deviceId);
+        deviceMap.put("ownerUid", uid);
+        deviceMap.put("deviceAuthUid", invitation.getClaimedByUid());
+        deviceMap.put("deviceName", devInfo != null && devInfo.get("deviceName") != null ? devInfo.get("deviceName") : "Paired Android Device");
+        deviceMap.put("model", devInfo != null && devInfo.get("model") != null ? devInfo.get("model") : "Android");
+        deviceMap.put("androidVersion", devInfo != null && devInfo.get("androidVersion") != null ? devInfo.get("androidVersion") : "14");
+        deviceMap.put("batteryLevel", devInfo != null && devInfo.get("batteryLevel") instanceof Number ? ((Number) devInfo.get("batteryLevel")).intValue() : 100);
+        deviceMap.put("status", "ONLINE");
+        deviceMap.put("paired", true);
+        deviceMap.put("protectionEnabled", true);
+        deviceMap.put("installationId", deviceId);
+        deviceMap.put("lastSeen", FieldValue.serverTimestamp());
+        deviceMap.put("locationStatus", "ENABLED");
+        deviceMap.put("trackingStatus", "ACTIVE");
+        deviceMap.put("networkStatus", "CONNECTED");
 
-        FirebaseFunctions.getInstance()
-                .getHttpsCallable("claimDevicePairingCode")
-                .call(data)
-                .addOnSuccessListener(httpsCallableResult -> {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> res = (Map<String, Object>) httpsCallableResult.getData();
-                    if (res != null && Boolean.TRUE.equals(res.get("success"))) {
-                        String ownerUid = (String) res.get("ownerUid");
-                        String deviceId = (String) res.get("deviceId");
-                        String customToken = (String) res.get("customToken");
+        WriteBatch batch = db.batch();
+        DocumentReference devRef = db.collection("users").document(uid).collection("devices").document(deviceId);
+        batch.set(devRef, deviceMap, SetOptions.merge());
 
-                        // Sign in with the device-scoped custom token issued by Firebase Admin
-                        if (customToken != null && !customToken.isEmpty()) {
-                            FirebaseAuth.getInstance().signInWithCustomToken(customToken)
-                                    .addOnSuccessListener(authResult -> {
-                                        com.google.firebase.auth.FirebaseUser user = authResult.getUser();
-                                        if (user == null) {
-                                            callback.onError("Authentication failed: null user after custom token sign in");
-                                            return;
-                                        }
+        DocumentReference invRef = db.collection("pairing_invitations").document(invitation.getTokenHash());
+        Map<String, Object> invUpdate = new HashMap<>();
+        invUpdate.put("status", "APPROVED");
+        invUpdate.put("approvedAt", FieldValue.serverTimestamp());
+        batch.update(invRef, invUpdate);
 
-                                        // Force token refresh and verify cryptographic custom claims
-                                        user.getIdToken(true).addOnSuccessListener(tokenResult -> {
-                                            Map<String, Object> claims = tokenResult.getClaims();
-                                            String roleClaim = claims != null ? (String) claims.get("role") : null;
-                                            String ownerUidClaim = claims != null ? (String) claims.get("ownerUid") : null;
-                                            String deviceIdClaim = claims != null ? (String) claims.get("deviceId") : null;
-                                            Boolean revokedClaim = claims != null ? (Boolean) claims.get("revoked") : null;
+        batch.commit()
+                .addOnSuccessListener(aVoid -> callback.onSuccess(null))
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to approve device claim", e);
+                    callback.onError("Failed to approve device: " + e.getMessage());
+                });
+    }
 
-                                            // Fail closed if claims do not match the expected owner and device
-                                            if (!"device".equals(roleClaim) ||
-                                                    ownerUidClaim == null || !ownerUidClaim.equals(ownerUid) ||
-                                                    deviceIdClaim == null || !deviceIdClaim.equals(deviceId) ||
-                                                    Boolean.TRUE.equals(revokedClaim)) {
+    /**
+     * Owner rejects an enrolling secondary device.
+     */
+    public void rejectDeviceClaim(String tokenHash, ApiCallback<Void> callback) {
+        db.collection("pairing_invitations").document(tokenHash)
+                .update("status", "REJECTED")
+                .addOnSuccessListener(aVoid -> callback.onSuccess(null))
+                .addOnFailureListener(e -> callback.onError("Failed to reject device: " + e.getMessage()));
+    }
 
-                                                Log.e(TAG, "Security claims mismatch! Claims: " + claims);
-                                                FirebaseAuth.getInstance().signOut();
-                                                sessionManager.logout();
-                                                callback.onError("Security violation: Token claims do not match pairing authorization");
-                                                return;
-                                            }
+    /**
+     * Secondary enrolling device claims a pairing invitation.
+     */
+    public void claimPairingInvitation(String rawToken, String deviceName, ApiCallback<Device> callback) {
+        if (rawToken == null || rawToken.trim().length() < 32) {
+            callback.onError("Invalid pairing token. Token must be at least 32 characters.");
+            return;
+        }
 
-                                            sessionManager.setOwnerUid(ownerUid);
-                                            sessionManager.setCurrentDeviceId(deviceId);
-                                            sessionManager.setDeviceName(request.getDeviceName());
+        FirebaseAuth auth = FirebaseAuth.getInstance();
+        if (auth.getCurrentUser() == null) {
+            auth.signInAnonymously()
+                    .addOnSuccessListener(authResult -> executeClaim(authResult.getUser().getUid(), rawToken.trim(), deviceName, callback))
+                    .addOnFailureListener(e -> callback.onError("Failed device authentication: " + e.getMessage()));
+        } else {
+            executeClaim(auth.getCurrentUser().getUid(), rawToken.trim(), deviceName, callback);
+        }
+    }
 
-                                            Device enrolledDevice = new Device(
-                                                    deviceId,
-                                                    request.getDeviceName(),
-                                                    request.getModel(),
-                                                    request.getAndroidVersion(),
-                                                    DeviceUtils.getBatteryPercentage(context),
-                                                    "ONLINE",
-                                                    true,
-                                                    installId
-                                            );
-                                            callback.onSuccess(enrolledDevice);
-                                        }).addOnFailureListener(e -> {
-                                            Log.e(TAG, "Failed to retrieve and verify ID token claims", e);
-                                            FirebaseAuth.getInstance().signOut();
-                                            sessionManager.logout();
-                                            callback.onError("Failed to verify token claims: " + e.getMessage());
-                                        });
-                                    })
-                                    .addOnFailureListener(e -> {
-                                        Log.e(TAG, "Failed to sign in with device custom token", e);
-                                        callback.onError("Failed to authenticate device credentials: " + e.getMessage());
-                                    });
-                        } else {
-                            callback.onError("Security violation: Missing custom token from pairing response.");
+    private void executeClaim(String deviceAuthUid, String rawToken, String deviceName, ApiCallback<Device> callback) {
+        String tokenHash = hashToken(rawToken);
+        String installId = sessionManager.getInstallationId();
+        DocumentReference invRef = db.collection("pairing_invitations").document(tokenHash);
+
+        db.runTransaction(transaction -> {
+            DocumentSnapshot snap = transaction.get(invRef);
+            if (!snap.exists()) {
+                throw new FirebaseFirestoreException("Invalid or unrecognized pairing token.", FirebaseFirestoreException.Code.NOT_FOUND);
+            }
+            String status = snap.getString("status");
+            if (!"PENDING_CLAIM".equals(status)) {
+                throw new FirebaseFirestoreException("Invitation is " + (status != null ? status.toLowerCase() : "invalid") + " and cannot be reused.", FirebaseFirestoreException.Code.FAILED_PRECONDITION);
+            }
+            Timestamp exp = snap.getTimestamp("expiresAt");
+            if (exp != null && exp.toDate().before(new Date())) {
+                throw new FirebaseFirestoreException("Pairing invitation has expired.", FirebaseFirestoreException.Code.DEADLINE_EXCEEDED);
+            }
+
+            Map<String, Object> update = new HashMap<>();
+            update.put("status", "PENDING_APPROVAL");
+            update.put("claimedByUid", deviceAuthUid);
+            update.put("claimedDeviceId", installId);
+
+            Map<String, Object> devInfo = new HashMap<>();
+            devInfo.put("deviceName", deviceName != null && !deviceName.isEmpty() ? deviceName : DeviceUtils.getDeviceName());
+            devInfo.put("model", DeviceUtils.getDeviceModel());
+            devInfo.put("androidVersion", DeviceUtils.getAndroidVersion());
+            devInfo.put("batteryLevel", DeviceUtils.getBatteryPercentage(context));
+            update.put("deviceInfo", devInfo);
+            update.put("claimedAt", FieldValue.serverTimestamp());
+
+            transaction.update(invRef, update);
+            return snap.getString("ownerUid");
+        }).addOnSuccessListener(ownerUid -> {
+            // Listen for owner approval
+            final ListenerRegistration[] reg = new ListenerRegistration[1];
+            reg[0] = db.collection("pairing_invitations").document(tokenHash)
+                    .addSnapshotListener((snapshot, error) -> {
+                        if (error != null) {
+                            if (reg[0] != null) reg[0].remove();
+                            callback.onError("Error waiting for approval: " + error.getMessage());
+                            return;
                         }
-                    } else {
-                        callback.onError("Pairing failed: invalid response from server.");
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Cloud function claimDevicePairingCode failed", e);
-                    callback.onError(e.getMessage() != null ? e.getMessage() : "Pairing failed");
-                });
+                        if (snapshot != null && snapshot.exists()) {
+                            String status = snapshot.getString("status");
+                            if ("APPROVED".equals(status)) {
+                                if (reg[0] != null) reg[0].remove();
+                                sessionManager.setOwnerUid(ownerUid);
+                                sessionManager.setCurrentDeviceId(installId);
+                                sessionManager.setDeviceName(deviceName);
+
+                                Device enrolled = new Device(
+                                        installId,
+                                        deviceName,
+                                        DeviceUtils.getDeviceModel(),
+                                        DeviceUtils.getAndroidVersion(),
+                                        DeviceUtils.getBatteryPercentage(context),
+                                        "ONLINE",
+                                        true,
+                                        installId
+                                );
+                                callback.onSuccess(enrolled);
+                            } else if ("REJECTED".equals(status)) {
+                                if (reg[0] != null) reg[0].remove();
+                                callback.onError("Device pairing was rejected by the owner.");
+                            }
+                        }
+                    });
+        }).addOnFailureListener(e -> {
+            Log.e(TAG, "Failed to submit pairing claim", e);
+            callback.onError(e.getMessage() != null ? e.getMessage() : "Failed to claim pairing token");
+        });
     }
 
+    /**
+     * Spark-Compatible Revocation: Sets status = 'REVOKED' directly in Firestore.
+     * Enforced immediately by Firestore Security Rules.
+     */
     public void revokePairedDevice(String deviceId, ApiCallback<Void> callback) {
-        if (deviceId == null || deviceId.isEmpty()) {
-            if (callback != null) callback.onError("Invalid device ID");
+        String uid = getUid();
+        if (uid == null) {
+            if (callback != null) callback.onError("No authenticated owner session");
             return;
         }
 
-        Map<String, Object> data = new HashMap<>();
-        data.put("deviceId", deviceId);
+        Map<String, Object> update = new HashMap<>();
+        update.put("status", "REVOKED");
+        update.put("protectionEnabled", false);
+        update.put("trackingStatus", "STOPPED");
+        update.put("revokedAt", FieldValue.serverTimestamp());
 
-        FirebaseFunctions.getInstance()
-                .getHttpsCallable("revokePairedDevice")
-                .call(data)
-                .addOnSuccessListener(httpsCallableResult -> {
+        db.collection("users").document(uid).collection("devices").document(deviceId)
+                .update(update)
+                .addOnSuccessListener(aVoid -> {
                     if (callback != null) callback.onSuccess(null);
                 })
                 .addOnFailureListener(e -> {
-                    Log.e(TAG, "Revoke paired device failed", e);
+                    Log.e(TAG, "Revoke device failed in Firestore", e);
                     if (callback != null) callback.onError(e.getMessage());
                 });
     }

@@ -19,13 +19,15 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(userId)/devices/$(deviceId)).data.status != 'REVOKED';
     }
 
-    function isActiveDevice(userId, deviceId) {
+    function isAuthorizedDevice(userId, deviceId) {
       return isAuthenticated() &&
-             request.auth.token.role == 'device' &&
-             request.auth.token.revoked != true &&
-             request.auth.token.ownerUid == userId &&
-             request.auth.token.deviceId == deviceId &&
-             isDeviceActive(userId, deviceId);
+             isDeviceActive(userId, deviceId) &&
+             (
+               // Spark-compatible Anonymous/Auth device identity:
+               get(/databases/$(database)/documents/users/$(userId)/devices/$(deviceId)).data.deviceAuthUid == request.auth.uid ||
+               // Cloud Function custom token identity (future server option):
+               (request.auth.token.role == 'device' && request.auth.token.ownerUid == userId && request.auth.token.deviceId == deviceId)
+             );
     }
 
     match /users/{userId} {
@@ -33,8 +35,8 @@ service cloud.firestore {
       allow read, write: if isHumanOwner(userId);
 
       match /devices/{deviceId} {
-        // Read: Human owner can read all devices. Active paired device can read its own document.
-        allow read: if isHumanOwner(userId) || isActiveDevice(userId, deviceId);
+        // Read: Human owner can read all devices. Authorized device can read its own document.
+        allow read: if isHumanOwner(userId) || isAuthorizedDevice(userId, deviceId);
 
         // Create & Delete: Restricted strictly to the human owner
         allow create: if isHumanOwner(userId);
@@ -42,11 +44,11 @@ service cloud.firestore {
 
         // Update:
         // - Owner has full update capability.
-        // - Active paired device can ONLY update an explicit allowlist of telemetry fields.
-        // - Identity, ownership, pairing and protection-control fields (id, ownerUid, installationId, paired, protectionEnabled, deviceName, model, androidVersion) are strictly immutable to devices.
+        // - Authorized device can ONLY update an explicit allowlist of telemetry fields.
+        // - Identity, ownership, pairing and protection-control fields are strictly immutable to devices.
         // - Devices cannot set their own status to REVOKED.
         allow update: if isHumanOwner(userId) || (
-          isActiveDevice(userId, deviceId) &&
+          isAuthorizedDevice(userId, deviceId) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'batteryLevel', 'lastSeen', 'locationStatus', 'trackingStatus', 'networkStatus', 'status'
           ]) &&
@@ -54,20 +56,20 @@ service cloud.firestore {
         );
 
         match /locations/{locationId} {
-          allow read: if isHumanOwner(userId) || isActiveDevice(userId, deviceId);
-          allow create: if isHumanOwner(userId) || isActiveDevice(userId, deviceId);
+          allow read: if isHumanOwner(userId) || isAuthorizedDevice(userId, deviceId);
+          allow create: if isHumanOwner(userId) || isAuthorizedDevice(userId, deviceId);
           allow update, delete: if isHumanOwner(userId);
         }
 
         match /commands/{commandId} {
-          allow read: if isHumanOwner(userId) || isActiveDevice(userId, deviceId);
+          allow read: if isHumanOwner(userId) || isAuthorizedDevice(userId, deviceId);
           // ONLY human owner can create or delete commands
           allow create: if isHumanOwner(userId);
           allow delete: if isHumanOwner(userId);
 
           // Update: Owner can update, or active device can ONLY update execution status/result fields
           allow update: if isHumanOwner(userId) || (
-            isActiveDevice(userId, deviceId) &&
+            isAuthorizedDevice(userId, deviceId) &&
             request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               'status', 'result', 'executedAt', 'error', 'details', 'progress'
             ]) &&
@@ -84,13 +86,11 @@ service cloud.firestore {
 
       match /alerts/{alertId} {
         allow read: if isHumanOwner(userId);
-        // Human owner or any active device owned by this user can create security alerts
+        // Human owner or any active authorized device owned by this user can create security alerts
         allow create: if isHumanOwner(userId) || (
           isAuthenticated() &&
-          request.auth.token.role == 'device' &&
-          request.auth.token.revoked != true &&
-          request.auth.token.ownerUid == userId &&
-          isDeviceActive(userId, request.auth.token.deviceId)
+          request.resource.data.ownerUid == userId &&
+          isAuthorizedDevice(userId, request.resource.data.deviceId)
         );
         allow update, delete: if isHumanOwner(userId);
       }
@@ -100,9 +100,50 @@ service cloud.firestore {
       }
     }
 
-    // Pairing codes collection:
+    // Spark-Compatible One-Time Pairing Invitations
+    match /pairing_invitations/{tokenHash} {
+      // Get: Any authenticated user who knows the 256-bit token hash can inspect the invitation
+      allow get: if isAuthenticated();
+
+      // List: Only authenticated owners can list their own invitations
+      allow list: if isAuthenticated() && resource.data.ownerUid == request.auth.uid;
+
+      // Create: Only authenticated human owner
+      allow create: if isAuthenticated() &&
+                    request.resource.data.ownerUid == request.auth.uid &&
+                    request.resource.data.status == 'PENDING_CLAIM' &&
+                    request.resource.data.expiresAt > request.time;
+
+      // Update:
+      // 1. Claimant transitions PENDING_CLAIM -> PENDING_APPROVAL with device info
+      // 2. Owner approves (-> APPROVED) or rejects (-> REJECTED)
+      allow update: if (
+        // Case 1: Claimant claims invitation
+        (
+          resource.data.status == 'PENDING_CLAIM' &&
+          request.time < resource.data.expiresAt &&
+          request.resource.data.status == 'PENDING_APPROVAL' &&
+          request.resource.data.claimedByUid == request.auth.uid &&
+          request.resource.data.ownerUid == resource.data.ownerUid &&
+          request.resource.data.expiresAt == resource.data.expiresAt &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'claimedByUid', 'claimedDeviceId', 'deviceInfo', 'claimedAt'
+          ])
+        ) ||
+        // Case 2: Owner approves or rejects
+        (
+          isAuthenticated() &&
+          request.auth.uid == resource.data.ownerUid &&
+          (request.resource.data.status == 'APPROVED' || request.resource.data.status == 'REJECTED')
+        )
+      );
+
+      // Delete: Only owner
+      allow delete: if isAuthenticated() && resource.data.ownerUid == request.auth.uid;
+    }
+
+    // Legacy pairing codes collection:
     // Clients cannot read or list pairing codes directly to prevent enumeration/theft.
-    // Privileged Cloud Functions handle creation and redemption using the Firebase Admin SDK.
     match /pairing_codes/{codeHash} {
       allow read, write: if false;
     }

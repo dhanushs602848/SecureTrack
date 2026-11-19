@@ -245,21 +245,130 @@ export const deviceService = {
     return null;
   },
 
-  createPairingCode: async (): Promise<{ code: string; expiresAt: string }> => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) throw new Error('User not authenticated');
+  /**
+   * Spark-Compatible: Generate a cryptographically secure 256-bit one-time pairing invitation.
+   * Stored as SHA-256 hash in Firestore with a 10-minute validity window.
+   */
+  createPairingInvitation: async (): Promise<{ rawToken: string; tokenHash: string; expiresAt: string; qrPayload: string }> => {
+    const user = auth.currentUser;
+    if (!user) throw new Error('User not authenticated');
 
-    const fn = httpsCallable<any, { code: string; expiresAt: string }>(functions, 'createDevicePairingCode');
-    const result = await fn();
-    return result.data;
+    // Generate 32 cryptographically random bytes (256 bits)
+    const bytes = new Uint8Array(32);
+    window.crypto.getRandomValues(bytes);
+    const rawToken = Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+
+    // Compute SHA-256 hash
+    const msgBuffer = new TextEncoder().encode(rawToken);
+    const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgBuffer);
+    const tokenHash = Array.from(new Uint8Array(hashBuffer))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    const expiresAtDate = new Date(Date.now() + 10 * 60 * 1000);
+
+    // Save invitation to Firestore
+    await setDoc(doc(db, 'pairing_invitations', tokenHash), {
+      ownerUid: user.uid,
+      ownerEmail: user.email || '',
+      status: 'PENDING_CLAIM',
+      createdAt: serverTimestamp(),
+      expiresAt: Timestamp.fromDate(expiresAtDate),
+      claimedByUid: null,
+      claimedDeviceId: null,
+      deviceInfo: null,
+      approvedAt: null
+    });
+
+    const qrPayload = JSON.stringify({
+      scheme: 'securetrack',
+      action: 'pair',
+      token: rawToken,
+      ownerUid: user.uid
+    });
+
+    return {
+      rawToken,
+      tokenHash,
+      expiresAt: expiresAtDate.toISOString(),
+      qrPayload
+    };
   },
 
+  /**
+   * Real-time subscription to an active pairing invitation.
+   */
+  subscribeToInvitation: (tokenHash: string, callback: (invitation: any) => void) => {
+    return onSnapshot(doc(db, 'pairing_invitations', tokenHash), (snapshot) => {
+      if (snapshot.exists()) {
+        callback({ id: snapshot.id, ...snapshot.data() });
+      } else {
+        callback(null);
+      }
+    });
+  },
+
+  /**
+   * Owner approves an enrolling device.
+   * Enrolls device under users/{ownerUid}/devices/{deviceId} and marks invitation APPROVED.
+   */
+  approveDeviceClaim: async (tokenHash: string, invitation: any): Promise<void> => {
+    const user = auth.currentUser;
+    if (!user || user.uid !== invitation.ownerUid) {
+      throw new Error('Unauthorized to approve this pairing request');
+    }
+
+    const deviceId = invitation.claimedDeviceId;
+    if (!deviceId) throw new Error('Missing claimed device ID');
+
+    // 1. Create registered device document under owner account
+    await setDoc(doc(db, 'users', user.uid, 'devices', deviceId), {
+      id: deviceId,
+      ownerUid: user.uid,
+      deviceAuthUid: invitation.claimedByUid,
+      deviceName: invitation.deviceInfo?.deviceName || 'Paired Android Device',
+      model: invitation.deviceInfo?.model || 'Android Phone',
+      androidVersion: invitation.deviceInfo?.androidVersion || '14',
+      batteryLevel: invitation.deviceInfo?.batteryLevel ?? 100,
+      status: 'ONLINE',
+      paired: true,
+      protectionEnabled: true,
+      installationId: deviceId,
+      lastSeen: serverTimestamp(),
+      locationStatus: 'ENABLED',
+      trackingStatus: 'ACTIVE',
+      networkStatus: 'CONNECTED'
+    }, { merge: true });
+
+    // 2. Mark invitation APPROVED
+    await updateDoc(doc(db, 'pairing_invitations', tokenHash), {
+      status: 'APPROVED',
+      approvedAt: serverTimestamp()
+    });
+  },
+
+  /**
+   * Owner rejects an enrolling device.
+   */
+  rejectDeviceClaim: async (tokenHash: string): Promise<void> => {
+    await updateDoc(doc(db, 'pairing_invitations', tokenHash), {
+      status: 'REJECTED'
+    });
+  },
+
+  /**
+   * Revoke device credentials immediately in Firestore.
+   */
   revokePairedDevice: async (deviceId: string): Promise<void> => {
     const uid = auth.currentUser?.uid;
     if (!uid) throw new Error('User not authenticated');
 
-    const fn = httpsCallable<{ deviceId: string }, any>(functions, 'revokePairedDevice');
-    await fn({ deviceId });
+    await updateDoc(doc(db, 'users', uid, 'devices', deviceId), {
+      status: 'REVOKED',
+      protectionEnabled: false,
+      trackingStatus: 'STOPPED',
+      revokedAt: serverTimestamp()
+    });
   }
 };
 

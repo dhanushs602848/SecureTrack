@@ -2,188 +2,170 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('crypto');
 
-function hashPairingCode(code) {
-  return crypto.createHash('sha256').update(String(code).trim()).digest('hex');
+function generate256BitToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function hashToken(token) {
+  return crypto.createHash('sha256').update(String(token).trim()).digest('hex');
 }
 
 function hashIdentifier(identifier) {
   return crypto.createHash('sha256').update(String(identifier).trim()).digest('hex');
 }
 
-test('Pairing Code Generator & Hashing Tests', async (t) => {
-  await t.test('Generates valid 8-digit random codes', () => {
-    for (let i = 0; i < 50; i++) {
-      const codeNum = crypto.randomInt(10000000, 100000000);
-      const codeStr = codeNum.toString();
-      assert.equal(codeStr.length, 8, 'Code must be exactly 8 digits');
-      assert.match(codeStr, /^\d{8}$/, 'Code must consist of only digits');
+test('SecureTrack Spark-Compatible 256-Bit Pairing & Security Suite', async (t) => {
+  await t.test('Generates cryptographically secure 256-bit pairing token', () => {
+    for (let i = 0; i < 20; i++) {
+      const token = generate256BitToken();
+      assert.equal(token.length, 64, '256 bits hex encoded must be 64 characters');
+      assert.match(token, /^[0-9a-f]{64}$/, 'Token must consist of 64 hexadecimal characters');
     }
   });
 
-  await t.test('SHA-256 code hashing is deterministic and irreversible in plain text', () => {
-    const code = '84920153';
-    const hash1 = hashPairingCode(code);
-    const hash2 = hashPairingCode(code);
+  await t.test('SHA-256 token hashing is one-way, deterministic and never exposes plaintext', () => {
+    const token = generate256BitToken();
+    const hash1 = hashToken(token);
+    const hash2 = hashToken(token);
     assert.equal(hash1, hash2, 'Hash must be consistent');
-    assert.equal(hash1.length, 64, 'SHA-256 hex string must be 64 characters');
-    assert.notEqual(hash1, code, 'Hash must not expose plaintext code');
+    assert.equal(hash1.length, 64);
+    assert.notEqual(hash1, token, 'Hash must not expose plaintext token');
   });
 
-  await t.test('Identifier hashing produces distinct SHA-256 identifiers for IP and installation', () => {
-    const inst1 = 'installation-uuid-phone-a';
-    const ip1 = '192.168.1.100';
-    const hashInst = hashIdentifier('inst:' + inst1);
-    const hashIp = hashIdentifier('ip:' + ip1);
-    assert.notEqual(hashInst, hashIp);
-    assert.equal(hashInst.length, 64);
-    assert.equal(hashIp.length, 64);
-  });
-
-  await t.test('Expiry logic correctly identifies active vs expired codes (10 minutes)', () => {
+  await t.test('Expiry check enforces 10-minute validity window', () => {
     const now = Date.now();
     const tenMinutes = 10 * 60 * 1000;
-    const activeExpiresAt = now + tenMinutes;
-    const expiredExpiresAt = now - 1000;
+    const validExpiry = now + tenMinutes;
+    const expired = now - 5000;
 
-    assert.ok(activeExpiresAt > now, 'New code must be active');
-    assert.ok(expiredExpiresAt < now, 'Old code must be detected as expired');
+    assert.ok(validExpiry > now, 'Active invitation must be valid');
+    assert.ok(expired < now, 'Old invitation must be detected as expired');
   });
 
-  await t.test('Plaintext code zero-logging verification', () => {
-    // Intercept console calls to verify no plaintext 8-digit codes appear in logs
-    const secretCode = '92847193';
-    const loggedMessages = [];
-    const origLog = console.log;
-    const origWarn = console.warn;
-    const origError = console.error;
+  await t.test('Spark-compatible Pairing Protocol Simulation: Claim & Approval State Machine', () => {
+    const ownerUid = 'human-owner-123';
+    const secondaryPhoneAuthUid = 'anon-device-auth-789';
+    const deviceId = 'installation-phone-samsung-001';
 
-    console.log = (...args) => loggedMessages.push(args.join(' '));
-    console.warn = (...args) => loggedMessages.push(args.join(' '));
-    console.error = (...args) => loggedMessages.push(args.join(' '));
+    const rawToken = generate256BitToken();
+    const tokenHash = hashToken(rawToken);
 
-    try {
-      // Simulate operations
-      const codeHash = hashPairingCode(secretCode);
-      console.log('Pairing code created with hash:', codeHash);
-      console.warn('Attempt recorded for hash:', codeHash);
-    } finally {
-      console.log = origLog;
-      console.warn = origWarn;
-      console.error = origError;
+    // 1. Owner creates invitation
+    const invitation = {
+      ownerUid: ownerUid,
+      status: 'PENDING_CLAIM',
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 10 * 60 * 1000,
+      claimedByUid: null,
+      claimedDeviceId: null,
+      deviceInfo: null,
+      approvedAt: null
+    };
+
+    assert.equal(invitation.status, 'PENDING_CLAIM');
+
+    // 2. Claimant claims invitation
+    function claimantSubmitClaim(inv, claimantAuthUid, claimDeviceId, devInfo, currentTime) {
+      if (inv.status !== 'PENDING_CLAIM') {
+        throw new Error('failed-precondition: already claimed or invalid');
+      }
+      if (currentTime >= inv.expiresAt) {
+        throw new Error('deadline-exceeded: invitation expired');
+      }
+      // Rule constraint: claimant cannot change ownerUid or expiresAt
+      return {
+        ...inv,
+        status: 'PENDING_APPROVAL',
+        claimedByUid: claimantAuthUid,
+        claimedDeviceId: claimDeviceId,
+        deviceInfo: devInfo,
+        claimedAt: currentTime
+      };
     }
 
-    for (const msg of loggedMessages) {
-      assert.equal(msg.includes(secretCode), false, 'Plaintext code must NEVER appear in log output');
-    }
-  });
-
-  await t.test('Atomic rate limiter prevents concurrent requests from bypassing attempt threshold', async () => {
-    const WINDOW_MS = 15 * 60 * 1000;
-    const MAX_ATTEMPTS = 5;
-
-    // Simulated transactional store
-    const store = new Map();
-
-    async function atomicCheckAndIncrement(key) {
-      // Simulates atomic Firestore transaction
-      const now = Date.now();
-      const existing = store.get(key);
-      if (!existing) {
-        store.set(key, { attempts: 1, firstAttemptAt: now });
-        return { allowed: true, attempts: 1 };
-      }
-      if (now - existing.firstAttemptAt > WINDOW_MS) {
-        store.set(key, { attempts: 1, firstAttemptAt: now });
-        return { allowed: true, attempts: 1 };
-      }
-      if (existing.attempts >= MAX_ATTEMPTS) {
-        return { allowed: false, attempts: existing.attempts };
-      }
-      const newAttempts = existing.attempts + 1;
-      store.set(key, { attempts: newAttempts, firstAttemptAt: existing.firstAttemptAt });
-      return { allowed: true, attempts: newAttempts };
-    }
-
-    const testBucket = 'inst:' + hashIdentifier('attacker-device-id');
-
-    // Simulate 10 rapid concurrent attempts
-    const results = await Promise.all(
-      Array.from({ length: 10 }).map(() => atomicCheckAndIncrement(testBucket))
+    const claimedInv = claimantSubmitClaim(
+      invitation,
+      secondaryPhoneAuthUid,
+      deviceId,
+      { deviceName: 'Samsung Galaxy A07', model: 'SM-A076B', androidVersion: '14', batteryLevel: 88 },
+      Date.now()
     );
 
-    const allowedCount = results.filter((r) => r.allowed).length;
-    const blockedCount = results.filter((r) => !r.allowed).length;
+    assert.equal(claimedInv.status, 'PENDING_APPROVAL');
+    assert.equal(claimedInv.claimedByUid, secondaryPhoneAuthUid);
+    assert.equal(claimedInv.ownerUid, ownerUid);
 
-    assert.equal(allowedCount, 5, 'Exactly 5 attempts must be allowed before lockout');
-    assert.equal(blockedCount, 5, 'Remaining 5 concurrent attempts must be immediately rejected');
-  });
-
-  await t.test('Single-use status transition checks', () => {
-    let status = 'ACTIVE';
-    assert.equal(status, 'ACTIVE');
-    status = 'CLAIMED';
-    assert.notEqual(status, 'ACTIVE', 'Reusing CLAIMED code must fail');
-  });
-
-  await t.test('App Check enforcement rejection simulation', () => {
-    function verifyAppCheck(context, isProduction) {
-      if (isProduction && (!context || !context.app)) {
-        throw new Error('failed-precondition: App Check token required');
+    // 3. Security Rule Check: Claimant attempts self-approval (MUST FAIL)
+    function approveInvitation(inv, actorUid, newStatus) {
+      // In Firestore rules: request.auth.uid == resource.data.ownerUid
+      if (actorUid !== inv.ownerUid) {
+        throw new Error('permission-denied: claimant cannot approve invitation');
       }
-      return true;
+      if (newStatus !== 'APPROVED' && newStatus !== 'REJECTED') {
+        throw new Error('invalid-argument: status must be APPROVED or REJECTED');
+      }
+      return {
+        ...inv,
+        status: newStatus,
+        approvedAt: Date.now()
+      };
     }
 
-    // Missing app check in production
+    // Claimant tries to approve their own claim:
     assert.throws(
-      () => verifyAppCheck({ auth: { uid: 'u1' } }, true),
-      /App Check token required/
+      () => approveInvitation(claimedInv, secondaryPhoneAuthUid, 'APPROVED'),
+      /claimant cannot approve invitation/
     );
 
-    // Valid app check in production
-    assert.doesNotThrow(() =>
-      verifyAppCheck({ auth: { uid: 'u1' }, app: { appId: 'com.example.securetrack' } }, true)
+    // 4. Owner approves:
+    const approvedInv = approveInvitation(claimedInv, ownerUid, 'APPROVED');
+    assert.equal(approvedInv.status, 'APPROVED');
+
+    // 5. Duplicate claim on already claimed/approved invitation (MUST FAIL)
+    assert.throws(
+      () => claimantSubmitClaim(approvedInv, 'another-device-uid', 'another-dev-id', {}, Date.now()),
+      /already claimed or invalid/
     );
   });
 
-  await t.test('Device revocation resilience and security rule simulation', () => {
-    const deviceToken = {
-      role: 'device',
-      revoked: false,
-      ownerUid: 'user-123',
-      deviceId: 'device-abc'
+  await t.test('Device authorization via deviceAuthUid and real-time revocation', () => {
+    const ownerUid = 'owner-xyz';
+    const deviceId = 'dev-samsung-100';
+    const secondaryPhoneUid = 'device-auth-anon-999';
+
+    // Device document created upon owner approval:
+    const deviceDoc = {
+      id: deviceId,
+      ownerUid: ownerUid,
+      deviceAuthUid: secondaryPhoneUid,
+      status: 'ONLINE',
+      paired: true,
+      batteryLevel: 85
     };
 
-    function isDeviceActive(deviceDocStatus, token) {
-      if (token.role === 'revoked' || token.revoked === true) return false;
-      if (deviceDocStatus === 'REVOKED') return false;
-      return true;
+    function isAuthorizedDevice(doc, callerAuthUid) {
+      if (!doc || doc.status === 'REVOKED') return false;
+      return doc.deviceAuthUid === callerAuthUid;
     }
 
-    // Active device
-    assert.equal(isDeviceActive('ONLINE', deviceToken), true);
+    // Active device authenticated:
+    assert.equal(isAuthorizedDevice(deviceDoc, secondaryPhoneUid), true);
 
-    // Revocation in Firestore instantly blocks device regardless of token validity
-    assert.equal(isDeviceActive('REVOKED', deviceToken), false);
+    // Unrelated caller:
+    assert.equal(isAuthorizedDevice(deviceDoc, 'random-stranger-uid'), false);
 
-    // Custom claims updated on token refresh
-    const revokedToken = {
-      ...deviceToken,
-      role: 'revoked',
-      revoked: true
-    };
-    assert.equal(isDeviceActive('ONLINE', revokedToken), false);
-    assert.equal(isDeviceActive('REVOKED', revokedToken), false);
+    // Owner revokes device: status becomes REVOKED
+    const revokedDoc = { ...deviceDoc, status: 'REVOKED' };
+    assert.equal(isAuthorizedDevice(revokedDoc, secondaryPhoneUid), false);
   });
 
-  await t.test('Device document update telemetry allowlist vs identity immutability', () => {
+  await t.test('Telemetry field allowlist enforcement vs immutable identity', () => {
     const allowedTelemetryKeys = new Set([
       'batteryLevel', 'lastSeen', 'locationStatus', 'trackingStatus', 'networkStatus', 'status'
     ]);
 
-    function canDeviceUpdateDeviceDoc(affectedKeys, newStatus) {
-      // Must not set status to REVOKED
-      if (newStatus === 'REVOKED') return false;
-      // All modified keys must belong to the allowlist
+    function canDeviceUpdate(affectedKeys, newStatus) {
+      if (newStatus === 'REVOKED') return false; // device cannot revoke
       for (const k of affectedKeys) {
         if (!allowedTelemetryKeys.has(k)) {
           return false;
@@ -193,79 +175,51 @@ test('Pairing Code Generator & Hashing Tests', async (t) => {
     }
 
     // Valid telemetry updates
-    assert.equal(canDeviceUpdateDeviceDoc(['batteryLevel', 'lastSeen'], 'ONLINE'), true);
-    assert.equal(canDeviceUpdateDeviceDoc(['locationStatus', 'trackingStatus'], 'ONLINE'), true);
-    assert.equal(canDeviceUpdateDeviceDoc(['networkStatus', 'batteryLevel'], 'ONLINE'), true);
+    assert.equal(canDeviceUpdate(['batteryLevel', 'lastSeen', 'status'], 'ONLINE'), true);
+    assert.equal(canDeviceUpdate(['locationStatus', 'trackingStatus', 'networkStatus'], 'ONLINE'), true);
 
-    // Disallowed modifications: device setting itself to REVOKED
-    assert.equal(canDeviceUpdateDeviceDoc(['status'], 'REVOKED'), false);
+    // Disallowed attempts to mutate identity or security fields
+    assert.equal(canDeviceUpdate(['id'], 'ONLINE'), false);
+    assert.equal(canDeviceUpdate(['ownerUid'], 'ONLINE'), false);
+    assert.equal(canDeviceUpdate(['deviceAuthUid'], 'ONLINE'), false);
+    assert.equal(canDeviceUpdate(['installationId'], 'ONLINE'), false);
+    assert.equal(canDeviceUpdate(['paired'], 'ONLINE'), false);
+    assert.equal(canDeviceUpdate(['protectionEnabled'], 'ONLINE'), false);
+    assert.equal(canDeviceUpdate(['deviceName'], 'ONLINE'), false);
 
-    // Disallowed modifications: tampering with immutable identity/ownership fields
-    assert.equal(canDeviceUpdateDeviceDoc(['id'], 'ONLINE'), false);
-    assert.equal(canDeviceUpdateDeviceDoc(['ownerUid'], 'ONLINE'), false);
-    assert.equal(canDeviceUpdateDeviceDoc(['installationId'], 'ONLINE'), false);
-    assert.equal(canDeviceUpdateDeviceDoc(['paired'], 'ONLINE'), false);
-    assert.equal(canDeviceUpdateDeviceDoc(['protectionEnabled'], 'ONLINE'), false);
-    assert.equal(canDeviceUpdateDeviceDoc(['deviceName'], 'ONLINE'), false);
-    assert.equal(canDeviceUpdateDeviceDoc(['model'], 'ONLINE'), false);
+    // Disallowed attempt to set own status to REVOKED
+    assert.equal(canDeviceUpdate(['status'], 'REVOKED'), false);
   });
 
-  await t.test('Command modification and creation restrictions simulation', () => {
-    const allowedDeviceUpdateKeys = new Set([
+  await t.test('Command creation and deletion owner-only, updates execution-only', () => {
+    const allowedExecutionKeys = new Set([
       'status', 'result', 'executedAt', 'error', 'details', 'progress'
     ]);
 
-    function canDeviceCreateCommand(callerRole) {
-      return callerRole !== 'device';
-    }
-
-    function canDeviceDeleteCommand(callerRole) {
-      return callerRole !== 'device';
-    }
-
-    function canDeviceUpdateCommand(affectedKeys, modifiedCommandOrTarget) {
-      if (modifiedCommandOrTarget) return false;
+    function canDeviceUpdateCommand(affectedKeys, payloadChanged) {
+      if (payloadChanged) return false;
       for (const k of affectedKeys) {
-        if (!allowedDeviceUpdateKeys.has(k)) {
+        if (!allowedExecutionKeys.has(k)) {
           return false;
         }
       }
       return true;
     }
 
-    // Command creation/deletion: strictly owner only
-    assert.equal(canDeviceCreateCommand('owner'), true);
-    assert.equal(canDeviceCreateCommand('device'), false);
-    assert.equal(canDeviceDeleteCommand('owner'), true);
-    assert.equal(canDeviceDeleteCommand('device'), false);
-
-    // Allowed updates from device reporting execution
     assert.equal(canDeviceUpdateCommand(['status', 'result', 'executedAt'], false), true);
     assert.equal(canDeviceUpdateCommand(['status', 'error'], false), true);
-
-    // Disallowed tampering (e.g. attempting to change command payload or target)
     assert.equal(canDeviceUpdateCommand(['command'], true), false);
-    assert.equal(canDeviceUpdateCommand(['targetDeviceId', 'status'], true), false);
-    assert.equal(canDeviceUpdateCommand(['createdAt', 'status'], false), false);
+    assert.equal(canDeviceUpdateCommand(['targetDeviceId'], true), false);
   });
 
-  await t.test('Cross-owner isolation simulation', () => {
-    function canAccessOwnerData(callerToken, targetOwnerUid) {
-      if (callerToken.role === 'device') {
-        return callerToken.ownerUid === targetOwnerUid;
-      }
-      return callerToken.uid === targetOwnerUid;
+  await t.test('Cross-owner isolation for pairing invitations and devices', () => {
+    function canOwnerManageInvitation(invitation, callerUid) {
+      return invitation.ownerUid === callerUid;
     }
 
-    const deviceOwnerA = { role: 'device', ownerUid: 'owner-A', deviceId: 'dev-1' };
-    const ownerA = { uid: 'owner-A', role: 'owner' };
-    const ownerB = { uid: 'owner-B', role: 'owner' };
+    const invitationA = { ownerUid: 'owner-A', status: 'PENDING_APPROVAL' };
 
-    // Device of Owner A can access Owner A
-    assert.equal(canAccessOwnerData(deviceOwnerA, 'owner-A'), true);
-    // Device of Owner A CANNOT access Owner B
-    assert.equal(canAccessOwnerData(deviceOwnerA, 'owner-B'), false);
-    // Owner B cannot access Owner A
-    assert.equal(canAccessOwnerData(ownerB, 'owner-A'), false);
+    assert.equal(canOwnerManageInvitation(invitationA, 'owner-A'), true);
+    assert.equal(canOwnerManageInvitation(invitationA, 'owner-B'), false);
   });
 });

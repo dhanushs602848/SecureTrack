@@ -30,6 +30,7 @@
             android:textColor="@color/text_secondary"
             android:textSize="14sp" />
 
+        <!-- 3 Setup Modes -->
         <RadioGroup
             android:id="@+id/rg_setup_method"
             android:layout_width="match_parent"
@@ -41,139 +42,44 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:checked="true"
-                android:padding="12dp"
+                android:padding="8dp"
                 android:text="@string/this_phone"
                 android:textColor="@color/text_primary"
-                android:textSize="16sp" />
+                android:textSize="15sp" />
 
             <RadioButton
-                android:id="@+id/rb_another_device"
+                android:id="@+id/rb_generate_invitation"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:padding="12dp"
-                android:text="@string/another_device"
+                android:padding="8dp"
+                android:text="@string/pair_second_phone"
                 android:textColor="@color/text_primary"
-                android:textSize="16sp" />
+                android:textSize="15sp" />
+
+            <RadioButton
+                android:id="@+id/rb_enrol_device"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="8dp"
+                android:text="@string/enrol_as_secondary"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp" />
         </RadioGroup>
 
-        <!-- Form Section -->
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/til_device_name"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:hint="@string/device_name"
-            app:boxBackgroundColor="@color/input_bg"
-            app:boxBackgroundMode="outline"
-            app:hintTextColor="@color/input_label"
-            app:boxCornerRadiusBottomEnd="12dp"
-            app:boxCornerRadiusBottomStart="12dp"
-            app:boxCornerRadiusTopEnd="12dp"
-            app:boxCornerRadiusTopStart="12dp">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/et_device_name"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="@color/input_text"
-                android:textColorHint="@color/input_hint"
-                android:textCursorDrawable="@null" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- IMEI Registration (Optional) -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="@string/recovery_info_title"
-            android:textColor="@color/primary_navy"
-            android:textSize="18sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/recovery_info_desc"
-            android:textColor="@color/text_secondary"
-            android:textSize="13sp"
-            android:lineSpacingExtra="2dp" />
-
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/til_imei1"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:hint="@string/imei1_hint"
-            app:errorEnabled="true"
-            app:boxBackgroundColor="@color/input_bg"
-            app:boxBackgroundMode="outline"
-            app:hintTextColor="@color/input_label"
-            app:boxCornerRadiusBottomEnd="12dp"
-            app:boxCornerRadiusBottomStart="12dp"
-            app:boxCornerRadiusTopEnd="12dp"
-            app:boxCornerRadiusTopStart="12dp">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/et_imei1"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="number"
-                android:imeOptions="actionNext"
-                android:maxLength="15"
-                android:textColor="@color/input_text"
-                android:textColorHint="@color/input_hint"
-                android:textCursorDrawable="@null" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/til_imei2"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:hint="@string/imei2_hint"
-            app:errorEnabled="true"
-            app:boxBackgroundColor="@color/input_bg"
-            app:boxBackgroundMode="outline"
-            app:hintTextColor="@color/input_label"
-            app:boxCornerRadiusBottomEnd="12dp"
-            app:boxCornerRadiusBottomStart="12dp"
-            app:boxCornerRadiusTopEnd="12dp"
-            app:boxCornerRadiusTopStart="12dp">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/et_imei2"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="number"
-                android:imeOptions="actionDone"
-                android:maxLength="15"
-                android:textColor="@color/input_text"
-                android:textColorHint="@color/input_hint"
-                android:textCursorDrawable="@null" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <CheckBox
-            android:id="@+id/cb_imei_consent"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:minHeight="48dp"
-            android:text="@string/imei_consent_text"
-            android:textColor="@color/text_secondary"
-            android:textSize="13sp" />
-
-        <!-- Pairing Code Section (for another device) -->
+        <!-- SECTION 1: This Phone Primary Registration -->
         <LinearLayout
-            android:id="@+id/layout_pairing_code"
+            android:id="@+id/layout_primary_registration"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
             android:orientation="vertical"
-            android:visibility="gone">
+            android:visibility="visible">
 
             <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_device_name"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="@string/pairing_code_hint"
+                android:layout_marginTop="20dp"
+                android:hint="@string/device_name"
                 app:boxBackgroundColor="@color/input_bg"
                 app:boxBackgroundMode="outline"
                 app:hintTextColor="@color/input_label"
@@ -183,39 +89,362 @@
                 app:boxCornerRadiusTopStart="12dp">
 
                 <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/et_pairing_code"
+                    android:id="@+id/et_device_name"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:inputType="number"
-                    android:imeOptions="actionDone"
-                    android:maxLength="8"
                     android:textColor="@color/input_text"
                     android:textColorHint="@color/input_hint"
                     android:textCursorDrawable="@null" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <Button
-                android:id="@+id/btn_generate_pairing"
-                android:layout_width="wrap_content"
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="@string/recovery_info_title"
+                android:textColor="@color/primary_navy"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:background="@drawable/bg_secondary_button"
-                android:text="@string/generate_pairing_code"
-                android:textColor="@color/primary_blue"
+                android:text="@string/recovery_info_desc"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp"
+                android:lineSpacingExtra="2dp" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_imei1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:hint="@string/imei1_hint"
+                app:errorEnabled="true"
+                app:boxBackgroundColor="@color/input_bg"
+                app:boxBackgroundMode="outline"
+                app:hintTextColor="@color/input_label"
+                app:boxCornerRadiusBottomEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp"
+                app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusTopStart="12dp">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_imei1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"
+                    android:imeOptions="actionNext"
+                    android:maxLength="15"
+                    android:textColor="@color/input_text"
+                    android:textColorHint="@color/input_hint"
+                    android:textCursorDrawable="@null" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_imei2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:hint="@string/imei2_hint"
+                app:errorEnabled="true"
+                app:boxBackgroundColor="@color/input_bg"
+                app:boxBackgroundMode="outline"
+                app:hintTextColor="@color/input_label"
+                app:boxCornerRadiusBottomEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp"
+                app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusTopStart="12dp">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_imei2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"
+                    android:imeOptions="actionDone"
+                    android:maxLength="15"
+                    android:textColor="@color/input_text"
+                    android:textColorHint="@color/input_hint"
+                    android:textCursorDrawable="@null" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <CheckBox
+                android:id="@+id/cb_imei_consent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minHeight="48dp"
+                android:text="@string/imei_consent_text"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btn_complete_registration"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="24dp"
+                android:background="@drawable/bg_primary_button"
+                android:text="@string/complete_registration"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:textStyle="bold"
                 app:backgroundTint="@null" />
         </LinearLayout>
 
-        <Button
-            android:id="@+id/btn_complete_registration"
+        <!-- SECTION 2: Owner Generates Invitation (QR & Token) -->
+        <LinearLayout
+            android:id="@+id/layout_generate_invitation"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="32dp"
-            android:background="@drawable/bg_primary_button"
-            android:text="@string/complete_registration"
-            android:textColor="@color/white"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            app:backgroundTint="@null" />
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <Button
+                android:id="@+id/btn_create_invitation"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/bg_primary_button"
+                android:text="Generate 256-Bit Invitation"
+                android:textColor="@color/white"
+                android:textStyle="bold"
+                app:backgroundTint="@null" />
+
+            <!-- Display QR Code and Token Card -->
+            <LinearLayout
+                android:id="@+id/card_invitation_display"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:background="@color/card_bg"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/tv_countdown"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Invitation expires in: 10:00"
+                    android:textColor="@color/primary_navy"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:gravity="center" />
+
+                <ImageView
+                    android:id="@+id/iv_qr_code"
+                    android:layout_width="220dp"
+                    android:layout_height="220dp"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="12dp"
+                    android:contentDescription="Pairing QR Code" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="256-Bit Pairing Token (Manual Entry):"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_pairing_token"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:padding="8dp"
+                    android:background="@color/input_bg"
+                    android:fontFamily="monospace"
+                    android:textColor="@color/primary_navy"
+                    android:textSize="11sp"
+                    android:textIsSelectable="true" />
+
+                <Button
+                    android:id="@+id/btn_copy_token"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_secondary_button"
+                    android:text="@string/copy_token"
+                    android:textColor="@color/primary_blue"
+                    app:backgroundTint="@null" />
+
+                <!-- Incoming Approval Request Box -->
+                <LinearLayout
+                    android:id="@+id/layout_pending_approval"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:orientation="vertical"
+                    android:padding="12dp"
+                    android:background="@color/bg_app"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="New Device Pairing Request!"
+                        android:textColor="@color/primary_navy"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tv_pending_device_info"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/btn_approve_device"
+                            android:layout_width="0dp"
+                            android:layout_height="44dp"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="4dp"
+                            android:background="@drawable/bg_primary_button"
+                            android:text="@string/approve_device"
+                            android:textColor="@color/white"
+                            app:backgroundTint="@null" />
+
+                        <Button
+                            android:id="@+id/btn_reject_device"
+                            android:layout_width="0dp"
+                            android:layout_height="44dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="4dp"
+                            android:background="@drawable/bg_secondary_button"
+                            android:text="@string/reject_device"
+                            android:textColor="@color/primary_blue"
+                            app:backgroundTint="@null" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- SECTION 3: Secondary Device Enrolment (Scan QR or Enter Token) -->
+        <LinearLayout
+            android:id="@+id/layout_enrol_secondary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <Button
+                android:id="@+id/btn_scan_qr"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/bg_secondary_button"
+                android:text="@string/scan_qr_code"
+                android:textColor="@color/primary_blue"
+                android:textStyle="bold"
+                app:backgroundTint="@null" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:gravity="center"
+                android:text="— OR ENTER TOKEN MANUALLY —"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_secondary_device_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:hint="@string/device_name"
+                app:boxBackgroundColor="@color/input_bg"
+                app:boxBackgroundMode="outline"
+                app:hintTextColor="@color/input_label"
+                app:boxCornerRadiusBottomEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp"
+                app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusTopStart="12dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_secondary_device_name"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/input_text"
+                    android:textColorHint="@color/input_hint"
+                    android:textCursorDrawable="@null" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/til_manual_token"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:hint="@string/pair_token_hint"
+                app:boxBackgroundColor="@color/input_bg"
+                app:boxBackgroundMode="outline"
+                app:hintTextColor="@color/input_label"
+                app:boxCornerRadiusBottomEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp"
+                app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusTopStart="12dp">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_manual_token"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:lines="2"
+                    android:textColor="@color/input_text"
+                    android:textColorHint="@color/input_hint"
+                    android:textSize="12sp" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <Button
+                android:id="@+id/btn_submit_claim"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/bg_primary_button"
+                android:text="Submit Pairing Claim"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:backgroundTint="@null" />
+
+            <!-- Claim In Progress Status -->
+            <LinearLayout
+                android:id="@+id/layout_claim_progress"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:padding="12dp"
+                android:background="@color/card_bg"
+                android:visibility="gone">
+
+                <ProgressBar
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginEnd="8dp" />
+
+                <TextView
+                    android:id="@+id/tv_claim_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/waiting_owner_approval"
+                    android:textColor="@color/primary_navy"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
 
     </LinearLayout>
 </ScrollView>
