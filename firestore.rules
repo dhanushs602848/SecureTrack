@@ -10,9 +10,8 @@ service cloud.firestore {
     function isHumanOwner(userId) {
       return isAuthenticated() &&
              request.auth.uid == userId &&
-             request.auth.token.role != 'device' &&
-             request.auth.token.role != 'revoked' &&
-             request.auth.token.revoked != true;
+             (!('role' in request.auth.token) || (request.auth.token.role != 'device' && request.auth.token.role != 'revoked')) &&
+             (!('revoked' in request.auth.token) || request.auth.token.revoked != true);
     }
 
     function isDeviceActive(userId, deviceId) {
@@ -26,7 +25,7 @@ service cloud.firestore {
                // Spark-compatible Anonymous/Auth device identity:
                get(/databases/$(database)/documents/users/$(userId)/devices/$(deviceId)).data.deviceAuthUid == request.auth.uid ||
                // Cloud Function custom token identity (future server option):
-               (request.auth.token.role == 'device' && request.auth.token.ownerUid == userId && request.auth.token.deviceId == deviceId)
+               (('role' in request.auth.token) && request.auth.token.role == 'device' && request.auth.token.ownerUid == userId && request.auth.token.deviceId == deviceId)
              );
     }
 

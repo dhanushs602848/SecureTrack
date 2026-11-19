@@ -21,18 +21,24 @@ public class SettingsActivity extends AppCompatActivity {
 
         sessionManager = new SessionManager(this);
 
-        binding.etServerUrl.setText(sessionManager.getBaseUrl());
+        binding.btnBack.setOnClickListener(v -> finish());
 
-        binding.btnSaveSettings.setOnClickListener(v -> {
-            String url = binding.etServerUrl.getText() != null ? binding.etServerUrl.getText().toString().trim() : "";
-            if (!TextUtils.isEmpty(url)) {
-                sessionManager.setBaseUrl(url);
-                ApiClient.resetClient();
-                Toast.makeText(this, "Server URL updated successfully", Toast.LENGTH_SHORT).show();
-                finish();
-            } else {
-                Toast.makeText(this, "URL cannot be empty", Toast.LENGTH_SHORT).show();
-            }
-        });
+        if (binding.etServerUrl != null) {
+            binding.etServerUrl.setText(sessionManager.getBaseUrl());
+        }
+
+        if (binding.btnSaveSettings != null) {
+            binding.btnSaveSettings.setOnClickListener(v -> {
+                String url = binding.etServerUrl.getText() != null ? binding.etServerUrl.getText().toString().trim() : "";
+                if (!TextUtils.isEmpty(url)) {
+                    sessionManager.setBaseUrl(url);
+                    ApiClient.resetClient();
+                    Toast.makeText(this, "Server URL updated successfully", Toast.LENGTH_SHORT).show();
+                    finish();
+                } else {
+                    Toast.makeText(this, "URL cannot be empty", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
     }
 }
