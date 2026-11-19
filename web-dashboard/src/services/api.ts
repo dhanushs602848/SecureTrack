@@ -1,6 +1,10 @@
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  signInWithPopup,
+  signInWithRedirect,
+  GoogleAuthProvider,
+  sendPasswordResetEmail,
   signOut as firebaseSignOut
 } from 'firebase/auth';
 import {
@@ -17,8 +21,7 @@ import {
   limit,
   serverTimestamp,
   onSnapshot,
-  Timestamp,
-  runTransaction
+  Timestamp
 } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { Device, DeviceCommand, LocationRecord, SecurityEvent, User, SafeZone } from '../types';
@@ -35,84 +38,136 @@ export const authService = {
   login: async (email: string, password: string) => {
     const credential = await signInWithEmailAndPassword(auth, email, password);
     const user = credential.user;
-    const uid = user.uid;
+    const token = await user.getIdToken();
 
-    const userDoc = await getDoc(doc(db, 'users', uid));
-    const fullName = userDoc.exists() ? (userDoc.data()?.fullName || user.displayName || email) : (user.displayName || email);
+    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    const fullName = userDoc.exists()
+      ? (userDoc.data()?.fullName || user.displayName || email)
+      : (user.displayName || email);
+    const phoneNumber = userDoc.exists() ? (userDoc.data()?.phoneNumber || '') : '';
 
     const userObj: User = {
-      id: uid,
+      id: user.uid,
       email: email,
       fullName: fullName,
+      phoneNumber: phoneNumber
     };
-
-    localStorage.setItem('access_token', uid);
-    localStorage.setItem('user_email', email);
-    localStorage.setItem('user_name', fullName);
 
     return {
       success: true,
       message: 'Login successful',
-      data: { accessToken: uid, refreshToken: uid, user: userObj }
+      data: { token, user: userObj }
+    };
+  },
+
+  loginWithGoogle: async () => {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    let credential;
+    try {
+      credential = await signInWithPopup(auth, provider);
+    } catch (err: any) {
+      if (err.code === 'auth/popup-blocked') {
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+      throw err;
+    }
+
+    const user = credential.user;
+    const token = await user.getIdToken();
+
+    const userRef = doc(db, 'users', user.uid);
+    const userDoc = await getDoc(userRef);
+    let fullName = user.displayName || user.email || 'Google User';
+
+    if (!userDoc.exists()) {
+      await setDoc(userRef, {
+        id: user.uid,
+        email: user.email || '',
+        fullName: fullName,
+        phoneNumber: user.phoneNumber || '',
+        createdAt: serverTimestamp(),
+        authProvider: 'google.com'
+      }, { merge: true });
+    } else {
+      fullName = userDoc.data()?.fullName || fullName;
+    }
+
+    const userObj: User = {
+      id: user.uid,
+      email: user.email || '',
+      fullName: fullName
+    };
+
+    return {
+      success: true,
+      message: 'Google Sign-In successful',
+      data: { token, user: userObj }
     };
   },
 
   register: async (email: string, password: string, fullName: string, phoneNumber?: string) => {
     const credential = await createUserWithEmailAndPassword(auth, email, password);
     const user = credential.user;
-    const uid = user.uid;
+    const token = await user.getIdToken();
 
-    await setDoc(doc(db, 'users', uid), {
-      id: uid,
+    // Store non-sensitive user profile in Firestore
+    await setDoc(doc(db, 'users', user.uid), {
+      id: user.uid,
       email: email,
       fullName: fullName,
       phoneNumber: phoneNumber || '',
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
+      authProvider: 'password'
     }, { merge: true });
 
     const userObj: User = {
-      id: uid,
+      id: user.uid,
       email: email,
       fullName: fullName,
       phoneNumber: phoneNumber
     };
 
-    localStorage.setItem('access_token', uid);
-    localStorage.setItem('user_email', email);
-    localStorage.setItem('user_name', fullName);
-
     return {
       success: true,
       message: 'Registration successful',
-      data: { accessToken: uid, refreshToken: uid, user: userObj }
+      data: { token, user: userObj }
     };
   },
 
-  getCurrentUser: async (): Promise<User> => {
-    const currentUser = auth.currentUser;
-    const uid = currentUser?.uid || localStorage.getItem('access_token');
-    const email = currentUser?.email || localStorage.getItem('user_email') || '';
-    const fullName = currentUser?.displayName || localStorage.getItem('user_name') || email;
+  sendPasswordReset: async (email: string) => {
+    await sendPasswordResetEmail(auth, email);
+    return {
+      success: true,
+      message: 'Password reset email sent'
+    };
+  },
 
-    if (uid) {
-      const userDoc = await getDoc(doc(db, 'users', uid));
-      if (userDoc.exists()) {
-        const data = userDoc.data();
-        return {
-          id: uid,
-          email: data.email || email,
-          fullName: data.fullName || fullName,
-          phoneNumber: data.phoneNumber || ''
-        };
-      }
+  getCurrentUser: async (): Promise<User | null> => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return null;
+
+    const uid = currentUser.uid;
+    const email = currentUser.email || '';
+    let fullName = currentUser.displayName || email;
+
+    const userDoc = await getDoc(doc(db, 'users', uid));
+    if (userDoc.exists()) {
+      const data = userDoc.data();
+      return {
+        id: uid,
+        email: data.email || email,
+        fullName: data.fullName || fullName,
+        phoneNumber: data.phoneNumber || ''
+      };
     }
 
-    return { id: uid || '', email: email, fullName: fullName };
+    return { id: uid, email, fullName };
   },
 
   logout: async () => {
     await firebaseSignOut(auth);
-    localStorage.clear();
   }
 };
 
@@ -153,7 +208,7 @@ const parseDeviceDoc = (d: any): Device => {
 
 export const deviceService = {
   subscribeToDevices: (callback: (devices: Device[]) => void) => {
-    const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
+    const uid = auth.currentUser?.uid;
     if (!uid) { callback([]); return () => {}; }
 
     return onSnapshot(collection(db, 'users', uid, 'devices'), (snapshot) => {
@@ -166,7 +221,7 @@ export const deviceService = {
   },
 
   getDevices: async (): Promise<Device[]> => {
-    const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
+    const uid = auth.currentUser?.uid;
     if (!uid) return [];
 
     const snapshot = await getDocs(collection(db, 'users', uid, 'devices'));
@@ -178,7 +233,7 @@ export const deviceService = {
   },
 
   getRecoveryInfo: async (deviceId: string): Promise<{ imei1?: string; imei2?: string; consentGiven?: boolean } | null> => {
-    const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
+    const uid = auth.currentUser?.uid;
     if (!uid) return null;
 
     const docRef = doc(db, 'users', uid, 'private_recovery', deviceId);
@@ -190,19 +245,11 @@ export const deviceService = {
   },
 
   createPairingCode: async (): Promise<{ code: string; expiresAt: string }> => {
-    const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
+    const uid = auth.currentUser?.uid;
     if (!uid) throw new Error('User not authenticated');
 
-    // Generate random 8-digit code
     const code = Math.floor(10000000 + Math.random() * 90000000).toString();
     const expiresAtMillis = Date.now() + 10 * 60 * 1000;
-
-    // Compute simple hash for client-side storage
-    let hash = 0;
-    for (let i = 0; i < code.length; i++) {
-      hash = ((hash << 5) - hash) + code.charCodeAt(i);
-      hash |= 0;
-    }
     const codeId = code;
 
     await setDoc(doc(db, 'pairing_codes', codeId), {
@@ -221,7 +268,7 @@ export const deviceService = {
   },
 
   revokePairedDevice: async (deviceId: string): Promise<void> => {
-    const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
+    const uid = auth.currentUser?.uid;
     if (!uid) throw new Error('User not authenticated');
 
     const devRef = doc(db, 'users', uid, 'devices', deviceId);
@@ -235,7 +282,7 @@ export const deviceService = {
 
 export const locationService = {
   subscribeToLocationHistory: (deviceId: string, callback: (history: LocationRecord[]) => void) => {
-    const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
+    const uid = auth.currentUser?.uid;
     if (!uid || !deviceId) { callback([]); return () => {}; }
 
     const q = query(
@@ -270,7 +317,7 @@ export const locationService = {
 
 export const securityService = {
   subscribeToSecurityEvents: (callback: (events: SecurityEvent[]) => void, deviceId?: string) => {
-    const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
+    const uid = auth.currentUser?.uid;
     if (!uid) { callback([]); return () => {}; }
 
     const q = query(
@@ -305,7 +352,7 @@ export const securityService = {
 
 export const commandService = {
   subscribeToDeviceCommands: (deviceId: string, callback: (commands: DeviceCommand[]) => void) => {
-    const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
+    const uid = auth.currentUser?.uid;
     if (!uid || !deviceId) { callback([]); return () => {}; }
 
     const q = query(
@@ -334,7 +381,7 @@ export const commandService = {
   },
 
   sendCommand: async (deviceId: string, commandType: string, payload?: string): Promise<DeviceCommand> => {
-    const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
+    const uid = auth.currentUser?.uid;
     if (!uid) throw new Error('User not authenticated');
 
     const commandDoc = await addDoc(
@@ -361,7 +408,7 @@ export const commandService = {
 
 export const safeZoneService = {
   subscribeToSafeZones: (callback: (zones: SafeZone[]) => void) => {
-    const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
+    const uid = auth.currentUser?.uid;
     if (!uid) { callback([]); return () => {}; }
 
     return onSnapshot(collection(db, 'users', uid, 'safe_zones'), (snapshot) => {
@@ -386,7 +433,7 @@ export const safeZoneService = {
   },
 
   createSafeZone: async (zone: Omit<SafeZone, 'id' | 'createdAt' | 'updatedAt' | 'zoneId'>) => {
-    const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
+    const uid = auth.currentUser?.uid;
     if (!uid) throw new Error('User not authenticated');
 
     const zoneRef = doc(collection(db, 'users', uid, 'safe_zones'));
@@ -402,7 +449,7 @@ export const safeZoneService = {
   },
 
   updateSafeZone: async (zoneId: string, updates: Partial<SafeZone>) => {
-    const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
+    const uid = auth.currentUser?.uid;
     if (!uid) throw new Error('User not authenticated');
 
     await setDoc(doc(db, 'users', uid, 'safe_zones', zoneId), {
@@ -412,7 +459,7 @@ export const safeZoneService = {
   },
 
   deleteSafeZone: async (zoneId: string) => {
-    const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
+    const uid = auth.currentUser?.uid;
     if (!uid) throw new Error('User not authenticated');
 
     await deleteDoc(doc(db, 'users', uid, 'safe_zones', zoneId));

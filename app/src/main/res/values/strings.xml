@@ -3,8 +3,14 @@
     <string name="app_name">SecureTrack</string>
     <string name="app_tagline">Track smart. Stay secure.</string>
 
-    <!-- Google OAuth Client ID Placeholder -->
-    <string name="default_web_client_id">YOUR_WEB_CLIENT_ID.apps.googleusercontent.com</string>
+    <!-- Google OAuth Web Client ID from google-services.json -->
+    <string name="default_web_client_id">302801589438-10lp66rvkd682agipq54uavcqpmbpfb4.apps.googleusercontent.com</string>
+    <string name="confirm_password">Confirm Password</string>
+    <string name="passwords_do_not_match">Passwords do not match</string>
+    <string name="password_too_short">Password must be at least 6 characters</string>
+    <string name="google_sign_in">Sign In with Google</string>
+    <string name="google_sign_up">Sign Up with Google</string>
+    <string name="password_reset_sent">If an account exists for this email, password reset instructions have been sent.</string>
 
     <!-- Navigation -->
     <string name="nav_home">Home</string>

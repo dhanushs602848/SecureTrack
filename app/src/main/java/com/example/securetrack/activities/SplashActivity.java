@@ -19,8 +19,14 @@ public class SplashActivity extends AppCompatActivity {
 
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             SessionManager sessionManager = new SessionManager(this);
-            boolean firebaseLoggedIn = FirebaseAuth.getInstance().getCurrentUser() != null;
-            if (sessionManager.isLoggedIn() || firebaseLoggedIn) {
+            com.google.firebase.auth.FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+            if (currentUser != null) {
+                String uid = currentUser.getUid();
+                String email = currentUser.getEmail() != null ? currentUser.getEmail() : "";
+                String name = currentUser.getDisplayName() != null ? currentUser.getDisplayName() : email;
+                sessionManager.saveFirebaseAuthSession(uid, email, name);
+                startActivity(new Intent(SplashActivity.this, MainActivity.class));
+            } else if (sessionManager.isLoggedIn()) {
                 startActivity(new Intent(SplashActivity.this, MainActivity.class));
             } else {
                 startActivity(new Intent(SplashActivity.this, LoginActivity.class));

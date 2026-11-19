@@ -7,7 +7,9 @@ import android.util.Log;
 import android.widget.Toast;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import com.example.securetrack.MainActivity;
+import com.example.securetrack.R;
 import com.example.securetrack.databinding.ActivityLoginBinding;
 import com.example.securetrack.utils.GoogleAuthManager;
 import com.example.securetrack.utils.SessionManager;
@@ -70,8 +72,17 @@ public class LoginActivity extends AppCompatActivity {
                         fetchUserProfileAndNavigate(firebaseUser);
                     } else {
                         binding.btnLogin.setEnabled(true);
-                        String errorMsg = task.getException() != null ? task.getException().getLocalizedMessage() : "Authentication failed";
-                        Toast.makeText(LoginActivity.this, "Login Error: " + errorMsg, Toast.LENGTH_LONG).show();
+                        Exception exp = task.getException();
+                        String errorMsg;
+                        if (exp instanceof com.google.firebase.auth.FirebaseAuthInvalidCredentialsException ||
+                            exp instanceof com.google.firebase.auth.FirebaseAuthInvalidUserException) {
+                            errorMsg = "Invalid email or password. Please check your credentials or tap 'Forgot Password?'.";
+                        } else if (exp instanceof com.google.firebase.FirebaseNetworkException) {
+                            errorMsg = "Network error. Please verify your internet connection.";
+                        } else {
+                            errorMsg = exp != null ? exp.getLocalizedMessage() : "Authentication failed";
+                        }
+                        Toast.makeText(LoginActivity.this, errorMsg, Toast.LENGTH_LONG).show();
                     }
                 });
     }
@@ -190,24 +201,43 @@ public class LoginActivity extends AppCompatActivity {
 
     private void showForgotPasswordDialog() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Reset Password");
+        builder.setTitle(R.string.reset_password);
+        builder.setMessage(R.string.enter_registered_email);
 
-        final android.widget.EditText input = new android.widget.EditText(this);
-        input.setHint("Registered Email");
-        builder.setView(input);
+        android.widget.FrameLayout container = new android.widget.FrameLayout(this);
+        int pad = (int) (20 * getResources().getDisplayMetrics().density);
+        container.setPadding(pad, pad / 2, pad, pad / 4);
 
-        builder.setPositiveButton("Send Link", (dialog, which) -> {
-            String email = input.getText().toString().trim();
+        final com.google.android.material.textfield.TextInputEditText input = new com.google.android.material.textfield.TextInputEditText(this);
+        input.setHint(R.string.email);
+        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+        input.setTextColor(ContextCompat.getColor(this, R.color.input_text));
+        input.setHintTextColor(ContextCompat.getColor(this, R.color.input_hint));
+
+        String currentTypedEmail = binding.etEmail.getText() != null ? binding.etEmail.getText().toString().trim() : "";
+        if (!TextUtils.isEmpty(currentTypedEmail)) {
+            input.setText(currentTypedEmail);
+            input.setSelection(currentTypedEmail.length());
+        }
+
+        container.addView(input);
+        builder.setView(container);
+
+        builder.setPositiveButton(R.string.reset_password, (dialog, which) -> {
+            String email = input.getText() != null ? input.getText().toString().trim() : "";
             if (!TextUtils.isEmpty(email)) {
                 mAuth.sendPasswordResetEmail(email)
                         .addOnCompleteListener(task -> {
+                            // Regardless of email-enumeration, provide clear feedback respecting user privacy
                             if (task.isSuccessful()) {
-                                Toast.makeText(LoginActivity.this, "Password reset email sent to " + email, Toast.LENGTH_LONG).show();
+                                Toast.makeText(LoginActivity.this, getString(R.string.password_reset_sent), Toast.LENGTH_LONG).show();
                             } else {
-                                String errorMsg = task.getException() != null ? task.getException().getLocalizedMessage() : "Failed to send reset email";
+                                String errorMsg = task.getException() != null ? task.getException().getLocalizedMessage() : "Unable to dispatch reset email";
                                 Toast.makeText(LoginActivity.this, errorMsg, Toast.LENGTH_LONG).show();
                             }
                         });
+            } else {
+                Toast.makeText(LoginActivity.this, "Please enter an email address", Toast.LENGTH_SHORT).show();
             }
         });
 

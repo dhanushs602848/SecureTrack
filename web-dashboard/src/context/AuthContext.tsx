@@ -1,53 +1,121 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '../types';
+import { auth, db } from '../services/firebase';
+import {
+  onAuthStateChanged,
+  onIdTokenChanged,
+  User as FirebaseUser
+} from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 import { authService } from '../services/api';
 
 interface AuthContextType {
   user: User | null;
+  firebaseUser: FirebaseUser | null;
   token: string | null;
-  login: (accessToken: string, refreshToken: string, user: User) => void;
-  logout: () => void;
   loading: boolean;
+  login: (email: string, password: string) => Promise<any>;
+  loginWithGoogle: () => Promise<any>;
+  register: (email: string, password: string, fullName: string, phoneNumber?: string) => Promise<any>;
+  sendPasswordReset: (email: string) => Promise<any>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('access_token'));
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const initAuth = async () => {
-      if (token) {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (fbUser) => {
+      setFirebaseUser(fbUser);
+      if (fbUser) {
         try {
-          const currentUser = await authService.getCurrentUser();
-          setUser(currentUser);
-        } catch {
-          logout();
+          const idToken = await fbUser.getIdToken();
+          setToken(idToken);
+
+          const userDoc = await getDoc(doc(db, 'users', fbUser.uid));
+          const fullName = userDoc.exists()
+            ? (userDoc.data()?.fullName || fbUser.displayName || fbUser.email || 'User')
+            : (fbUser.displayName || fbUser.email || 'User');
+          const phoneNumber = userDoc.exists() ? (userDoc.data()?.phoneNumber || '') : '';
+
+          setUser({
+            id: fbUser.uid,
+            email: fbUser.email || '',
+            fullName: fullName,
+            phoneNumber: phoneNumber
+          });
+        } catch (error) {
+          console.error('Error fetching user profile in onAuthStateChanged:', error);
+          setUser({
+            id: fbUser.uid,
+            email: fbUser.email || '',
+            fullName: fbUser.displayName || fbUser.email || 'User'
+          });
         }
+      } else {
+        setUser(null);
+        setToken(null);
       }
       setLoading(false);
-    };
-    initAuth();
-  }, [token]);
+    });
 
-  const login = (accessToken: string, refreshToken: string, userData: User) => {
-    localStorage.setItem('access_token', accessToken);
-    localStorage.setItem('refresh_token', refreshToken);
-    setToken(accessToken);
-    setUser(userData);
+    const unsubscribeToken = onIdTokenChanged(auth, async (fbUser) => {
+      if (fbUser) {
+        const idToken = await fbUser.getIdToken();
+        setToken(idToken);
+      } else {
+        setToken(null);
+      }
+    });
+
+    return () => {
+      unsubscribeAuth();
+      unsubscribeToken();
+    };
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    return await authService.login(email, password);
   };
 
-  const logout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    setToken(null);
+  const loginWithGoogle = async () => {
+    return await authService.loginWithGoogle();
+  };
+
+  const register = async (email: string, password: string, fullName: string, phoneNumber?: string) => {
+    return await authService.register(email, password, fullName, phoneNumber);
+  };
+
+  const sendPasswordReset = async (email: string) => {
+    return await authService.sendPasswordReset(email);
+  };
+
+  const logout = async () => {
+    await authService.logout();
     setUser(null);
+    setToken(null);
+    setFirebaseUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        firebaseUser,
+        token,
+        loading,
+        login,
+        loginWithGoogle,
+        register,
+        sendPasswordReset,
+        logout
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

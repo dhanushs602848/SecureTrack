@@ -54,9 +54,20 @@ public class RegisterActivity extends AppCompatActivity {
         String email = binding.etEmail.getText() != null ? binding.etEmail.getText().toString().trim() : "";
         String phone = binding.etPhone.getText() != null ? binding.etPhone.getText().toString().trim() : "";
         String password = binding.etPassword.getText() != null ? binding.etPassword.getText().toString().trim() : "";
+        String confirmPassword = binding.etConfirmPassword.getText() != null ? binding.etConfirmPassword.getText().toString().trim() : "";
 
         if (TextUtils.isEmpty(name) || TextUtils.isEmpty(email) || TextUtils.isEmpty(password)) {
-            Toast.makeText(this, "Please fill in required fields", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Please fill in all required fields", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (password.length() < 6) {
+            Toast.makeText(this, getString(com.example.securetrack.R.string.password_too_short), Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (!password.equals(confirmPassword)) {
+            Toast.makeText(this, getString(com.example.securetrack.R.string.passwords_do_not_match), Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -69,8 +80,18 @@ public class RegisterActivity extends AppCompatActivity {
                         saveUserProfileToFirestoreAndNavigate(firebaseUser, name, phone);
                     } else {
                         binding.btnRegister.setEnabled(true);
-                        String errorMsg = task.getException() != null ? task.getException().getMessage() : "Registration failed";
-                        Toast.makeText(RegisterActivity.this, "Registration Error: " + errorMsg, Toast.LENGTH_LONG).show();
+                        Exception exp = task.getException();
+                        String errorMsg;
+                        if (exp instanceof com.google.firebase.auth.FirebaseAuthUserCollisionException) {
+                            errorMsg = "An account with this email already exists. Please sign in.";
+                        } else if (exp instanceof com.google.firebase.auth.FirebaseAuthWeakPasswordException) {
+                            errorMsg = "Password is too weak. Please use at least 6 characters.";
+                        } else if (exp instanceof com.google.firebase.auth.FirebaseAuthInvalidCredentialsException) {
+                            errorMsg = "Invalid email address format.";
+                        } else {
+                            errorMsg = exp != null ? exp.getLocalizedMessage() : "Registration failed";
+                        }
+                        Toast.makeText(RegisterActivity.this, errorMsg, Toast.LENGTH_LONG).show();
                     }
                 });
     }

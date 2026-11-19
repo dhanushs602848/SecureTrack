@@ -85,7 +85,9 @@
                     app:boxCornerRadiusTopEnd="12dp"
                     app:boxCornerRadiusTopStart="12dp"
                     app:hintTextColor="@color/input_label"
-                    app:passwordToggleEnabled="true">
+                    app:endIconMode="password_toggle"
+                    app:endIconTint="@color/input_hint"
+                    app:endIconContentDescription="Toggle password visibility">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/et_password"
