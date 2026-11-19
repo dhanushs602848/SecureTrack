@@ -1,0 +1,21 @@
+sequenceDiagram
+    autonumber
+    actor Owner as Device Owner
+    participant Web as Web Dashboard (React)
+    participant Cloud as Cloud Firestore
+    participant App as Android Client (SecureTrack)
+
+    Owner->>Web: Click "Add New Device"
+    Web->>Web: Generate cryptographically random code
+    Web->>Cloud: Create invitation doc (code, ownerUid, 10m TTL)
+    Cloud-->>Web: Document stored
+    Web->>Web: Render QR Code on screen
+
+    Owner->>App: Launch App & tap "Scan QR Code"
+    App->>Web: Camera scans QR Code payload
+    App->>Cloud: Query invitation by code & claim (used = true)
+    Cloud-->>App: Claim verified & ownerUid associated
+    App->>Cloud: Register device doc (status: "ONLINE", telemetry)
+    Cloud-->>App: Registration successful
+    Cloud-->>Web: Real-time listener triggers update
+    Web-->>Owner: Displays new device as ONLINE

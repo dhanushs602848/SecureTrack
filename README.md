@@ -1,109 +1,232 @@
 # SecureTrack — Smart Mobile Tracking & Anti-Theft System
 
-![SecureTrack Logo](app/src/main/res/drawable/ic_securetrack_logo.xml)
+<div align="center">
 
-**Tagline:** Track smart. Stay secure.
+**Track smart. Stay secure.**
 
-SecureTrack is a production-grade, multi-platform mobile tracking and anti-theft solution designed to protect Android mobile endpoints. The monorepo incorporates a native Android application (Java/XML), a Spring Boot REST API (Java 17/21), an authoritative MySQL database schema managed by Flyway, and a responsive React TypeScript Web Dashboard.
+*A prototype mobile tracking and security monitoring system engineered for Android devices, featuring real-time telemetry, QR-based pairing, and administrative device controls.*
+
+[![CI Pipeline](https://github.com/dhanushs602848/SecureTrack/actions/workflows/ci.yml/badge.svg)](https://github.com/dhanushs602848/SecureTrack/actions/workflows/ci.yml)
+[![Live Dashboard](https://img.shields.io/badge/Hosting-Live%20Dashboard-blue)](https://track-99c90.web.app)
+[![Android](https://img.shields.io/badge/Android-API%2026--35-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
+[![React](https://img.shields.io/badge/Web-React%2018%20%2B%20TypeScript-61DAFB?logo=react&logoColor=black)](https://react.dev)
+[![Firebase](https://img.shields.io/badge/Cloud-Firebase%20Spark-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com)
+
+</div>
+
+---
+
+## 📋 Table of Contents
+- [Overview](#-overview)
+- [System Architecture](#-system-architecture)
+- [Key Features](#-key-features)
+- [Technology Stack](#-technology-stack)
+- [Quick Start](#-quick-start)
+  - [Android Client Setup](#1-android-client-setup)
+  - [Web Dashboard Setup](#2-web-dashboard-setup)
+  - [Firebase Cloud Services](#3-firebase-cloud-services)
+- [Automated Testing & CI](#-automated-testing--ci)
+- [Documentation Suite](#-comprehensive-documentation-suite)
+- [Security & Threat Model](#-security--threat-model)
+- [Contributing & License](#-contributing--license)
+
+---
+
+## 🌟 Overview
+
+**SecureTrack** is an end-to-end endpoint security and device recovery ecosystem. It pairs an active Android handset with a secure, real-time web administration portal. Whether a device is misplaced, subjected to unauthorized handling, or stolen, SecureTrack provides immediate visibility into geographic coordinates, device battery/network health, and provides remote security remediation tools.
+
+### Production Environment:
+- **Web Dashboard**: [https://track-99c90.web.app](https://track-99c90.web.app)
+- **Firebase Project**: `track-99c90` (Authentication, Cloud Firestore, Firebase Hosting)
+- **Repository**: [https://github.com/dhanushs602848/SecureTrack](https://github.com/dhanushs602848/SecureTrack)
 
 ---
 
 ## 🏛 System Architecture
 
+SecureTrack employs a modern multi-tier cloud-synchronized architecture:
+
+```mermaid
+graph TD
+    subgraph ClientLayer ["Client Devices & Interfaces"]
+        Browser["Web Browser (React 18 + TS Dashboard)"]
+        Phone["Android Device (SecureTrack Mobile App)"]
+    end
+
+    subgraph CloudLayer ["Firebase Cloud Backend (track-99c90)"]
+        Auth["Firebase Authentication (Email/Password)"]
+        Firestore["Cloud Firestore (Real-time NoSQL)"]
+        Hosting["Firebase Hosting (SPA CDN)"]
+    end
+
+    subgraph EnterpriseRef ["Optional Reference Architecture"]
+        SpringBoot["Spring Boot 3 REST API"]
+        MySQL["MySQL Relational DB"]
+    end
+
+    Browser -->|HTTPS / Hosting| Hosting
+    Browser -->|Auth Tokens| Auth
+    Browser -->|Read / Write Telemetry & Commands| Firestore
+
+    Phone -->|QR Handshake & Telemetry Ingestion| Firestore
+    Phone -->|Listen for Anti-Theft Commands| Firestore
+    Phone -.->|Optional Reference Telemetry| SpringBoot
+    SpringBoot -.->|JDBC Persistence| MySQL
 ```
-┌────────────────────────────────┐         ┌────────────────────────────────┐
-│  Android App (Java / XML)      │         │  React Web Dashboard           │
-│  - FusedLocationProviderClient │         │  - TypeScript + Vite           │
-│  - Foreground Tracking Service │         │  - Tailwind CSS                │
-│  - Credential Manager & Google │         │  - Leaflet OpenStreetMap       │
-│  - DeviceAdminReceiver         │         │  - JWT Session Auth            │
-└───────────────┬────────────────┘         └───────────────┬────────────────┘
-                │                                          │
-                │              HTTPS REST API              │
-                └────────────────────┬─────────────────────┘
-                                     │
-                     ┌───────────────▼────────────────┐
-                     │  Spring Boot REST Backend      │
-                     │  - Java 17/21 / Spring Security│
-                     │  - JWT Auth + Google OAuth2 ID │
-                     │  - Command State Engine        │
-                     │  - Flyway Migrations           │
-                     └───────────────┬────────────────┘
-                                     │
-                     ┌───────────────▼────────────────┐
-                     │  MySQL 8.4 Database            │
-                     │  - users (with google_sub_id)  │
-                     │  - devices, locations, etc.    │
-                     └────────────────────────────────┘
-```
+
+1. **Native Android Client (`app/`)**: Runs a persistent `LocationTrackingService` foreground service, uses Google Play Services `FusedLocationProviderClient`, binds `DevicePolicyManager` for remote lock/wipe, and features an integrated ZXing QR pairing scanner.
+2. **Cloud Infrastructure (`firebase/`)**: Fully serverless, zero-cost Spark tier architecture. Cloud Firestore serves as the low-latency real-time state bus with declarative security rules.
+3. **Web Management Dashboard (`web-dashboard/`)**: Single-Page Application (SPA) built with React 18, TypeScript, and Tailwind CSS, featuring Leaflet/OpenStreetMap geospatial visualization.
+4. **Enterprise Reference Backend (`backend/`)**: Preserved Spring Boot 3 + MySQL relational reference architecture demonstrating traditional enterprise RDBMS persistence and Flyway migrations.
 
 ---
 
-## 📱 Features & Component Overview
+## 🚀 Key Features
 
-### 1. Native Android Application (`app/`)
-* **UI & Branding:** Crisp navy (`#152C4F`) and blue (`#255DA8`) palette matching Figma specs. Custom shield & location pin vector logo (`ic_securetrack_logo.xml`).
-* **Authentication:** Traditional Email/Password registration/login + **Sign in with Google** via Credential Manager (`GetGoogleIdOption`) and Play Services Auth API.
-* **Tracking & Location:** `FusedLocationProviderClient`, `LocationTrackingService` (Foreground Service with ongoing notification), `BootReceiver` reboot status handling, and OpenStreetMap Osmdroid with visible copyright attribution.
-* **Anti-Theft & Remote Lock:** `DeviceAdminReceiver` for remote locking, `SimChangeReceiver` for SIM swap monitoring, and `CommandExecutionManager` for processing remote device commands.
-
-### 2. Spring Boot REST Backend (`backend/`)
-* **Framework:** Spring Boot 3.2.5, Java 17/21, Maven (`mvnw` / `mvnw.cmd`).
-* **Google OAuth Verification:** `GoogleIdTokenVerifier` verifies token signature, audience, `email_verified` claim, and expiry. Creates or links corresponding SecureTrack accounts via `google_sub_id`.
-* **Security & JWT:** Spring Security, JWT (JJWT 0.12), BCrypt password hashing, and ownership authorization filters.
-* **Documentation:** OpenAPI / Swagger UI (`http://localhost:8080/swagger-ui.html`).
-
-### 3. Database Schema (`database/` & `backend/src/main/resources/db/migration/`)
-* **Flyway Migrations:** `V1__init_schema.sql` (core tables) and `V2__add_google_sub_id.sql` (Google account linking).
-
-### 4. React Web Dashboard (`web-dashboard/`)
-* **Tech Stack:** React 18, TypeScript, Vite, Tailwind CSS, React-Leaflet (OpenStreetMap).
+- **QR-Based Device Pairing**: Enroll devices by scanning a single-use cryptographically random token (valid for 10 minutes) generated by the web client.
+- **Continuous Real-Time Telemetry**: Real-time GPS coordinates, battery percentage, charging status, network type, and last-seen timestamps.
+- **Remote Siren / Audible Alarm**: Sends a ring command to trigger an alert on the phone (Note: requires active testing across varying vendor OS power managers).
+- **Remote Screen Lock**: Remotely lock lost devices via Android's `DevicePolicyManager` (requires Device Administrator permission enabled on device).
+- **Owner-Authorized Device Revocation**: Decommission devices directly from the web dashboard with idempotent duplicate cleanup (note: Firestore root document deletion does not automatically delete subcollections).
+- **Persistent Tracking**: Android `ForegroundService` with system notification and `BootReceiver` for restart upon phone reboot.
 
 ---
 
-## 🔑 Google Cloud OAuth Setup Guide
+## 📷 Screenshots
 
-To enable live Google Sign-In authentication on Android:
+> *Status: Screenshot capture from active physical test runs is documented in the test protocol. Physical device screenshots will be updated upon next test hardware cycle.*
 
-1. **Open Google Cloud Console:** [Google Cloud Credentials](https://console.cloud.google.com/apis/credentials)
-2. **Create Web Application Client ID:**
-   - Application Type: **Web application**
-   - Name: `SecureTrack Backend Web Client`
-   - Copy the generated **Client ID** (e.g. `123456789-abcdef.apps.googleusercontent.com`).
-3. **Create Android Client ID:**
-   - Application Type: **Android**
-   - Package Name: `com.example.securetrack`
-   - SHA-1 Certificate Fingerprint: `1A:86:27:77:E2:B1:F7:B6:7A:14:AB:60:C8:F5:04:E8:BC:77:D0:F7`
-4. **Configure Credentials:**
-   - **Android App:** Update `default_web_client_id` in `app/src/main/res/values/strings.xml` with your **Web Client ID**.
-   - **Backend Environment:** Set `GOOGLE_CLIENT_ID` environment variable to your **Web Client ID**.
+| Web Dashboard Overview | Device List & Pairing Modal | Android Registration |
+|:---:|:---:|:---:|
+| *(Pending hardware capture)* | *(Pending hardware capture)* | *(Pending hardware capture)* |
 
 ---
 
-## 🚀 Execution Instructions
+## 💻 Technology Stack
 
-### 1. Database & Backend
+| Layer | Technologies |
+|---|---|
+| **Android Client** | Java, Android SDK (API 26–35), Google Play Services Location & Maps, Material Components 3, ZXing Barcode Scanner |
+| **Web Dashboard** | React 18, TypeScript 5, Vite 5, Tailwind CSS 3, Lucide React, Leaflet & OpenStreetMap |
+| **Cloud Services** | Firebase Authentication, Cloud Firestore NoSQL, Firebase Hosting (Spark Plan) |
+| **Enterprise Reference** | Spring Boot 3.2, Java 17/21, Spring Security, JJWT, MySQL 8.4, Flyway |
+| **Tooling & CI** | GitHub Actions, Gradle 8.x, npm, Firebase CLI, Git |
+
+---
+
+## ⚡ Quick Start
+
+### 1. Android Client Setup
 ```bash
-# Set environment variables (Use your actual local credentials in your environment)
-export SPRING_DATASOURCE_URL="jdbc:mysql://localhost:3306/securetrack_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
-export SPRING_DATASOURCE_USERNAME="YOUR_DATABASE_USERNAME"
-export SPRING_DATASOURCE_PASSWORD="YOUR_DATABASE_PASSWORD"
-export JWT_SECRET="YOUR_256_BIT_SECRET_KEY"
-export GOOGLE_CLIENT_ID="YOUR_WEB_CLIENT_ID.apps.googleusercontent.com"
+# Clone the repository
+git clone https://github.com/dhanushs602848/SecureTrack.git
+cd SecureTrack
 
-# Run Spring Boot backend via Maven Wrapper
-cd backend
-./mvnw clean spring-boot:run
+# Run unit tests
+./gradlew testDebugUnitTest
+
+# Assemble debug APK
+./gradlew assembleDebug
 ```
-
-### 2. Android Debug APK
+The compiled APK will be located at `app/build/outputs/apk/debug/app-debug.apk`.  
+Install via ADB:
 ```bash
-./gradlew app:assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
-APK Path: `app/build/outputs/apk/debug/app-debug.apk`
+
+### 2. Web Dashboard Setup
+```bash
+cd web-dashboard
+
+# Install dependencies
+npm install
+
+# Start local Vite development server
+npm run dev
+
+# Run automated web tests
+node --test test/auth.test.js
+
+# Build production bundle
+npm run build
+```
+
+### 3. Firebase Cloud Services
+```bash
+# Deploy updated Firestore Security Rules
+firebase deploy --only firestore:rules
+
+# Deploy Web Dashboard to Firebase Hosting
+firebase deploy --only hosting
+```
 
 ---
 
-## 🔒 Security & Secret Protection
-* All production secrets and credentials must be set via environment variables.
-* `.gitignore` excludes temporary build artifacts, `.env`, local properties, and keystores.
+## 🧪 Automated Testing & CI
+
+Continuous Integration is automated via GitHub Actions (`.github/workflows/ci.yml`):
+- **Web Build & Test**: Compiles TypeScript, bundles assets with Vite, and runs auth/validation tests.
+- **Pairing & Revocation Suite**: 10 automated test cases in `functions/test/pairing.test.js` verifying token entropy, TTL expiration, single-use constraints, and safe device revocation.
+- **Android Compilation & Tests**: Executes `:app:testDebugUnitTest` and builds `:app:assembleDebug`.
+
+To run all local test suites manually:
+```bash
+# Pairing & Revocation cryptographic suite
+node --test functions/test/pairing.test.js
+
+# Web authentication tests
+node --test web-dashboard/test/auth.test.js
+
+# Android unit test suite
+./gradlew :app:testDebugUnitTest
+```
+
+---
+
+## 📚 Comprehensive Documentation Suite
+
+Complete technical and architectural documentation is maintained in the [`docs/`](docs/) directory:
+
+| Document | Description |
+|---|---|
+| [**INDEX.md**](docs/INDEX.md) | Master catalog and directory of all documentation |
+| [**PROJECT_OVERVIEW.md**](docs/PROJECT_OVERVIEW.md) | Problem statement, functional objectives, and scope |
+| [**SYSTEM_ARCHITECTURE.md**](docs/SYSTEM_ARCHITECTURE.md) | Multi-tier architecture and component interaction |
+| [**DATABASE_DESIGN.md**](docs/DATABASE_DESIGN.md) | Cloud Firestore NoSQL schema, collections, and security |
+| [**ER_MODEL.md**](docs/ER_MODEL.md) | Entity-Relationship diagram and cardinality constraints |
+| [**NETWORK_MODEL.md**](docs/NETWORK_MODEL.md) | CODASYL network model representation |
+| [**HIERARCHICAL_MODEL.md**](docs/HIERARCHICAL_MODEL.md) | Tree hierarchy and document-subcollection mapping |
+| [**RELATIONAL_MODEL.md**](docs/RELATIONAL_MODEL.md) | MySQL schema reference, 1NF–3NF/BCNF normalization |
+| [**XML_MODEL.md**](docs/XML_MODEL.md) | Android XML layouts and telemetry exchange XSD schema |
+| [**OBJECT_ORIENTED_MODEL.md**](docs/OBJECT_ORIENTED_MODEL.md) | Domain class hierarchy, UML diagrams, and design patterns |
+| [**FIREBASE_SETUP.md**](docs/FIREBASE_SETUP.md) | Cloud setup, Authentication, and Firestore configuration |
+| [**ANDROID_SETUP.md**](docs/ANDROID_SETUP.md) | Android Studio SDK requirements, permissions, and build guide |
+| [**WEB_DASHBOARD_SETUP.md**](docs/WEB_DASHBOARD_SETUP.md) | Vite, React, TypeScript setup, and build procedures |
+| [**SECURITY_AND_PRIVACY.md**](docs/SECURITY_AND_PRIVACY.md) | Threat model, zero-trust pairing, and privacy controls |
+| [**TESTING.md**](docs/TESTING.md) | Test suites, coverage metrics, and physical device test protocol |
+| [**DEPLOYMENT.md**](docs/DEPLOYMENT.md) | Release assembly and Firebase deployment procedures |
+| [**USER_GUIDE.md**](docs/USER_GUIDE.md) | End-user instructions and operational manual |
+| [**DEMO_GUIDE.md**](docs/DEMO_GUIDE.md) | 5-minute college presentation script and walkthrough |
+| [**KNOWN_LIMITATIONS.md**](docs/KNOWN_LIMITATIONS.md) | System boundaries, OS constraints, and hardware caveats |
+| [**FUTURE_ENHANCEMENTS.md**](docs/FUTURE_ENHANCEMENTS.md) | Engineering roadmap (BLE mesh, geofencing, intruder capture) |
+| [**TROUBLESHOOTING.md**](docs/TROUBLESHOOTING.md) | Diagnostic solutions for common issues |
+
+---
+
+## 🛡 Security & Threat Model
+
+SecureTrack enforces security by design:
+- **Least-Privilege Cloud Access**: Firestore Security Rules require `request.auth.uid == resource.data.ownerUid` for all device telemetry queries and mutations.
+- **Cryptographic Token Verification**: Enrolling devices requires matching a single-use 256-bit token generated server-side.
+- **Zero Plaintext Secrets**: No passwords or privileged service account keys are stored in client source code.
+
+For vulnerability disclosure, please refer to [SECURITY.md](SECURITY.md).
+
+---
+
+## 🤝 Contributing & License
+
+Contributions are welcome! Please review [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+
+This repository is maintained for research, academic evaluation, and demonstration purposes. All rights reserved by the repository owner unless explicitly licensed otherwise.

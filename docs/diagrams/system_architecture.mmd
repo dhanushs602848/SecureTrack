@@ -1,0 +1,25 @@
+graph TD
+    subgraph ClientLayer ["Client Devices & Interfaces"]
+        Browser["Web Browser (React 18 + TS Dashboard)"]
+        Phone["Android Device (SecureTrack Mobile App)"]
+    end
+
+    subgraph CloudLayer ["Firebase Cloud Backend (track-99c90)"]
+        Auth["Firebase Authentication (Email/Password)"]
+        Firestore["Cloud Firestore (Real-time NoSQL)"]
+        Hosting["Firebase Hosting (SPA CDN)"]
+    end
+
+    subgraph EnterpriseRef ["Optional Reference Implementation"]
+        SpringBoot["Spring Boot 3 REST API"]
+        MySQL["MySQL Relational DB"]
+    end
+
+    Browser -->|HTTPS / Hosting| Hosting
+    Browser -->|Auth Tokens| Auth
+    Browser -->|Read / Write Telemetry & Commands| Firestore
+
+    Phone -->|QR Handshake & Telemetry Ingestion| Firestore
+    Phone -->|Listen for Anti-Theft Commands| Firestore
+    Phone -.->|Optional Reference Telemetry| SpringBoot
+    SpringBoot -.->|JDBC Persistence| MySQL

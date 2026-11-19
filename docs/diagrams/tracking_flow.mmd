@@ -1,0 +1,18 @@
+flowchart TD
+    Start([Foreground Service Started]) --> InitLocation[Initialize FusedLocationProviderClient]
+    InitLocation --> ReqUpdates[Request Periodic Location Updates<br/>High Accuracy GPS]
+    ReqUpdates --> CheckGPS{Location Fix Acquired?}
+    CheckGPS -- No --> WaitInterval[Wait next interval]
+    WaitInterval --> ReqUpdates
+    CheckGPS -- Yes --> ExtractTelemetry[Extract Coordinates, Battery Level, Network State]
+    ExtractTelemetry --> OnlineCheck{Internet Available?}
+    OnlineCheck -- No --> BufferLocal[Buffer location in local cache]
+    BufferLocal --> WaitInterval
+    OnlineCheck -- Yes --> PushFirestore[Write location batch to Firestore subcollection]
+    PushFirestore --> UpdateDevice[Update parent device document lastSeen & status]
+    UpdateDevice --> ListenCommands[Check pending commands subcollection]
+    ListenCommands --> HasCmd{Pending Command?}
+    HasCmd -- No --> WaitInterval
+    HasCmd -- Yes --> ExecuteCmd[Execute Command: RING / LOCK / WIPE]
+    ExecuteCmd --> AckCmd[Mark command executed in Firestore]
+    AckCmd --> WaitInterval
