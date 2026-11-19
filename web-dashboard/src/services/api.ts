@@ -365,17 +365,67 @@ export const deviceService = {
 
   /**
    * Revoke device credentials immediately in Firestore.
+   * Owner-authorized, safe, and idempotent.
    */
   revokePairedDevice: async (deviceId: string): Promise<void> => {
     const uid = auth.currentUser?.uid;
-    if (!uid) throw new Error('User not authenticated');
+    if (!uid) {
+      throw new Error('User not authenticated. Please log in to revoke devices.');
+    }
 
-    await updateDoc(doc(db, 'users', uid, 'devices', deviceId), {
-      status: 'REVOKED',
-      protectionEnabled: false,
-      trackingStatus: 'STOPPED',
-      revokedAt: serverTimestamp()
-    });
+    try {
+      const deviceRef = doc(db, 'users', uid, 'devices', deviceId);
+      await updateDoc(deviceRef, {
+        status: 'REVOKED',
+        protectionEnabled: false,
+        trackingStatus: 'STOPPED',
+        revokedAt: serverTimestamp()
+      });
+    } catch (err: any) {
+      console.error('Firestore revokePairedDevice failed:', {
+        code: err?.code,
+        message: err?.message,
+        stack: err?.stack,
+        path: `users/${uid}/devices/${deviceId}`,
+        deviceId
+      });
+      const enhancedError: any = new Error(
+        err?.code ? `[${err.code}] ${err.message}` : (err?.message || 'Failed to revoke device in Firestore')
+      );
+      enhancedError.code = err?.code || 'unknown';
+      enhancedError.originalError = err;
+      throw enhancedError;
+    }
+  },
+
+  /**
+   * Remove/delete a device registration from the owner's account.
+   * Owner-authorized, safe, and targets only the specified device document.
+   */
+  deleteDevice: async (deviceId: string): Promise<void> => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      throw new Error('User not authenticated. Please log in to delete devices.');
+    }
+
+    try {
+      const deviceRef = doc(db, 'users', uid, 'devices', deviceId);
+      await deleteDoc(deviceRef);
+    } catch (err: any) {
+      console.error('Firestore deleteDevice failed:', {
+        code: err?.code,
+        message: err?.message,
+        stack: err?.stack,
+        path: `users/${uid}/devices/${deviceId}`,
+        deviceId
+      });
+      const enhancedError: any = new Error(
+        err?.code ? `[${err.code}] ${err.message}` : (err?.message || 'Failed to delete device document')
+      );
+      enhancedError.code = err?.code || 'unknown';
+      enhancedError.originalError = err;
+      throw enhancedError;
+    }
   }
 };
 

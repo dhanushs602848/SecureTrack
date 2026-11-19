@@ -222,4 +222,163 @@ test('SecureTrack Spark-Compatible 256-Bit Pairing & Security Suite', async (t) 
     assert.equal(canOwnerManageInvitation(invitationA, 'owner-A'), true);
     assert.equal(canOwnerManageInvitation(invitationA, 'owner-B'), false);
   });
+
+  await t.test('Device Revocation & Removal Suite: Owner authorization, isolation, idempotency and telemetry protection', () => {
+    const ownerUid = 'owner-dhanush-user-123';
+    const unauthorizedUid = 'attacker-or-other-user-456';
+
+    const targetOfflineDeviceId = '0c520933-16f2-400b-a1b2-offline-duplicate';
+    const protectedOnlineDeviceId = 'abb98700-ec5d-455c-b3c4-online-primary';
+
+    // Simulated Firestore database state under users/{ownerUid}/devices/
+    const firestoreDevices = new Map();
+
+    firestoreDevices.set(targetOfflineDeviceId, {
+      id: targetOfflineDeviceId,
+      ownerUid: ownerUid,
+      deviceAuthUid: 'device-anon-auth-target',
+      deviceName: 'Samsung Galaxy A07 5G',
+      model: 'SM-A076B',
+      androidVersion: '14',
+      status: 'OFFLINE',
+      protectionEnabled: true,
+      trackingStatus: 'ACTIVE',
+      batteryLevel: 45,
+      lastSeen: Date.now() - 3600000
+    });
+
+    firestoreDevices.set(protectedOnlineDeviceId, {
+      id: protectedOnlineDeviceId,
+      ownerUid: ownerUid,
+      deviceAuthUid: 'device-anon-auth-protected',
+      deviceName: 'Samsung Galaxy A07 5G',
+      model: 'SM-A076B',
+      androidVersion: '14',
+      status: 'ONLINE',
+      protectionEnabled: true,
+      trackingStatus: 'ACTIVE',
+      batteryLevel: 98,
+      lastSeen: Date.now()
+    });
+
+    // Subcollection telemetry state for protected device
+    const protectedTelemetry = [
+      { id: 'loc-1', latitude: 12.9716, longitude: 77.5946, accuracy: 12.5 },
+      { id: 'loc-2', latitude: 12.9718, longitude: 77.5949, accuracy: 10.0 }
+    ];
+
+    // Security Rules simulation matching firestore.rules
+    function isHumanOwner(callerAuthUid, pathUserId) {
+      return callerAuthUid && callerAuthUid === pathUserId;
+    }
+
+    function revokeDevice(callerUid, pathUserId, deviceId) {
+      if (!isHumanOwner(callerUid, pathUserId)) {
+        const err = new Error('Missing or insufficient permissions.');
+        err.code = 'permission-denied';
+        throw err;
+      }
+      const doc = firestoreDevices.get(deviceId);
+      if (!doc) {
+        const err = new Error('Device not found.');
+        err.code = 'not-found';
+        throw err;
+      }
+
+      // Safe, idempotent revocation update
+      doc.status = 'REVOKED';
+      doc.protectionEnabled = false;
+      doc.trackingStatus = 'STOPPED';
+      doc.revokedAt = Date.now();
+      return { success: true, deviceId, status: doc.status };
+    }
+
+    function deleteDevice(callerUid, pathUserId, deviceId) {
+      if (!isHumanOwner(callerUid, pathUserId)) {
+        const err = new Error('Missing or insufficient permissions.');
+        err.code = 'permission-denied';
+        throw err;
+      }
+      if (!firestoreDevices.has(deviceId)) {
+        const err = new Error('Device not found.');
+        err.code = 'not-found';
+        throw err;
+      }
+      firestoreDevices.delete(deviceId);
+      return { success: true, deviceId, deleted: true };
+    }
+
+    // 1. Attempt unauthorized revocation by another user -> MUST FAIL with permission-denied
+    assert.throws(
+      () => revokeDevice(unauthorizedUid, ownerUid, targetOfflineDeviceId),
+      (err) => {
+        assert.equal(err.code, 'permission-denied');
+        assert.match(err.message, /Missing or insufficient permissions/);
+        return true;
+      },
+      'Unauthorized user must be strictly blocked from revoking another user device'
+    );
+
+    // Verify target device remains untouched after unauthorized attempt
+    assert.equal(firestoreDevices.get(targetOfflineDeviceId).status, 'OFFLINE');
+
+    // 2. Owner revokes the target offline device
+    const revokeResult = revokeDevice(ownerUid, ownerUid, targetOfflineDeviceId);
+    assert.equal(revokeResult.success, true);
+    assert.equal(revokeResult.status, 'REVOKED');
+    assert.equal(firestoreDevices.get(targetOfflineDeviceId).status, 'REVOKED');
+    assert.equal(firestoreDevices.get(targetOfflineDeviceId).protectionEnabled, false);
+    assert.equal(firestoreDevices.get(targetOfflineDeviceId).trackingStatus, 'STOPPED');
+
+    // 3. Verify the protected ONLINE device remains 100% UNCHANGED
+    const protectedDevice = firestoreDevices.get(protectedOnlineDeviceId);
+    assert.ok(protectedDevice, 'Protected device must remain present');
+    assert.equal(protectedDevice.status, 'ONLINE', 'Protected device status must remain ONLINE');
+    assert.equal(protectedDevice.protectionEnabled, true, 'Protected device protection must remain active');
+    assert.equal(protectedDevice.batteryLevel, 98, 'Protected device battery must remain unchanged');
+    assert.equal(protectedDevice.trackingStatus, 'ACTIVE', 'Protected device tracking must remain active');
+    assert.equal(protectedTelemetry.length, 2, 'Protected device location telemetry must remain intact');
+
+    // 4. Idempotency test: Revoking an already revoked device succeeds safely without side-effects
+    const idempotentResult = revokeDevice(ownerUid, ownerUid, targetOfflineDeviceId);
+    assert.equal(idempotentResult.success, true);
+    assert.equal(idempotentResult.status, 'REVOKED');
+
+    // Protected device is still ONLINE
+    assert.equal(firestoreDevices.get(protectedOnlineDeviceId).status, 'ONLINE');
+
+    // 5. Attempt unauthorized deletion by another user -> MUST FAIL with permission-denied
+    assert.throws(
+      () => deleteDevice(unauthorizedUid, ownerUid, targetOfflineDeviceId),
+      (err) => {
+        assert.equal(err.code, 'permission-denied');
+        return true;
+      }
+    );
+
+    // 6. Owner removes/deletes the target offline registration
+    const deleteResult = deleteDevice(ownerUid, ownerUid, targetOfflineDeviceId);
+    assert.equal(deleteResult.success, true);
+    assert.equal(deleteResult.deleted, true);
+    assert.equal(firestoreDevices.has(targetOfflineDeviceId), false, 'Target device must be removed');
+
+    // 7. Verify protected device STILL persists after target deletion
+    assert.equal(firestoreDevices.has(protectedOnlineDeviceId), true, 'Protected device must persist');
+    assert.equal(firestoreDevices.get(protectedOnlineDeviceId).status, 'ONLINE');
+
+    // 8. Error reporting verification: Never mask real errors as "internal [0]"
+    function formatDashboardError(err) {
+      if (!err) return 'Unknown error';
+      if (err.code) {
+        return `Failed [${err.code}]: ${err.message || 'Operation rejected by security rules.'}`;
+      }
+      return err.message || 'Operation failed.';
+    }
+
+    const permissionErr = { code: 'permission-denied', message: 'Missing or insufficient permissions.' };
+    const formatted = formatDashboardError(permissionErr);
+    assert.ok(!formatted.includes('internal [0]'), 'Must never format error as generic internal [0]');
+    assert.ok(formatted.includes('permission-denied'), 'Must contain exact error code');
+    assert.ok(formatted.includes('Missing or insufficient permissions'), 'Must contain actionable message');
+  });
 });

@@ -106,15 +106,55 @@ export const Devices: React.FC = () => {
 
   const handleRevokeDevice = async (deviceId: string, deviceName: string) => {
     const confirmed = window.confirm(
-      `Are you sure you want to revoke "${deviceName}"? It will immediately lose access to tracking and commands.`
+      `Are you sure you want to revoke "${deviceName}" (${deviceId})? It will immediately lose access to tracking and commands.`
     );
     if (!confirmed) return;
 
+    setActionLoading(true);
     try {
       await deviceService.revokePairedDevice(deviceId);
-      alert(`Device "${deviceName}" has been revoked.`);
+      alert(`Device "${deviceName}" has been successfully revoked.`);
     } catch (e: any) {
-      alert(e.message || 'Failed to revoke device');
+      console.error('Revoke device error:', {
+        code: e?.code,
+        message: e?.message,
+        stack: e?.stack,
+        deviceId,
+        error: e
+      });
+      const errorText = e?.code
+        ? `Revocation failed [${e.code}]: ${e.message || 'Operation was rejected by security rules.'}`
+        : (e?.message || 'Failed to revoke device. Please check your network and account permissions.');
+      alert(errorText);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteDevice = async (deviceId: string, deviceName: string) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to remove "${deviceName}" (${deviceId}) from your dashboard? This will delete the duplicate registration record.`
+    );
+    if (!confirmed) return;
+
+    setActionLoading(true);
+    try {
+      await deviceService.deleteDevice(deviceId);
+      alert(`Device registration for "${deviceName}" has been removed.`);
+    } catch (e: any) {
+      console.error('Delete device error:', {
+        code: e?.code,
+        message: e?.message,
+        stack: e?.stack,
+        deviceId,
+        error: e
+      });
+      const errorText = e?.code
+        ? `Deletion failed [${e.code}]: ${e.message || 'Operation was rejected by security rules.'}`
+        : (e?.message || 'Failed to delete device registration.');
+      alert(errorText);
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -315,19 +355,31 @@ export const Devices: React.FC = () => {
                 </div>
 
                 <div className="pt-3 border-t border-[#CBD5E1] flex items-center justify-between">
-                  <span className="text-[11px] text-[#64748B] font-mono truncate max-w-[150px]">
+                  <span className="text-[11px] text-[#64748B] font-mono truncate max-w-[130px]" title={device.id}>
                     ID: {device.id}
                   </span>
-                  {!isRevoked && (
+                  <div className="flex items-center gap-3">
+                    {!isRevoked && (
+                      <button
+                        onClick={() => handleRevokeDevice(device.id, device.deviceName)}
+                        disabled={actionLoading}
+                        className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-800 font-medium disabled:opacity-50"
+                        title="Revoke device tracking and credentials"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        Revoke
+                      </button>
+                    )}
                     <button
-                      onClick={() => handleRevokeDevice(device.id, device.deviceName)}
-                      className="flex items-center gap-1 text-xs text-red-600 hover:text-red-800 font-medium"
-                      title="Revoke device access"
+                      onClick={() => handleDeleteDevice(device.id, device.deviceName)}
+                      disabled={actionLoading}
+                      className="flex items-center gap-1 text-xs text-red-600 hover:text-red-800 font-medium disabled:opacity-50"
+                      title="Remove device registration"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                      Revoke
+                      Remove
                     </button>
-                  )}
+                  </div>
                 </div>
               </div>
             );
