@@ -16,6 +16,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  writeBatch,
   query,
   orderBy,
   limit,
@@ -321,8 +322,11 @@ export const deviceService = {
     const deviceId = invitation.claimedDeviceId;
     if (!deviceId) throw new Error('Missing claimed device ID');
 
+    const batch = writeBatch(db);
+
     // 1. Create registered device document under owner account
-    await setDoc(doc(db, 'users', user.uid, 'devices', deviceId), {
+    const devRef = doc(db, 'users', user.uid, 'devices', deviceId);
+    batch.set(devRef, {
       id: deviceId,
       ownerUid: user.uid,
       deviceAuthUid: invitation.claimedByUid,
@@ -340,11 +344,14 @@ export const deviceService = {
       networkStatus: 'CONNECTED'
     }, { merge: true });
 
-    // 2. Mark invitation APPROVED
-    await updateDoc(doc(db, 'pairing_invitations', tokenHash), {
+    // 2. Mark invitation APPROVED atomically
+    const invRef = doc(db, 'pairing_invitations', tokenHash);
+    batch.update(invRef, {
       status: 'APPROVED',
       approvedAt: serverTimestamp()
     });
+
+    await batch.commit();
   },
 
   /**
