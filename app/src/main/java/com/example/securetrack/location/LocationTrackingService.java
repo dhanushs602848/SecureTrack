@@ -19,6 +19,8 @@ import com.example.securetrack.R;
 import com.example.securetrack.models.LocationRecord;
 import com.example.securetrack.repositories.LocationRepository;
 import com.example.securetrack.security.CommandExecutionManager;
+import com.example.securetrack.security.LocationSecurityManager;
+import com.example.securetrack.security.LocationStateReceiver;
 import com.example.securetrack.utils.PermissionUtils;
 import com.example.securetrack.utils.SessionManager;
 import com.google.android.gms.location.FusedLocationProviderClient;
@@ -27,6 +29,8 @@ import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.Priority;
+import android.content.IntentFilter;
+import android.location.LocationManager;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -43,6 +47,7 @@ public class LocationTrackingService extends Service {
     private LocationRepository locationRepository;
     private SessionManager sessionManager;
     private CommandExecutionManager commandExecutionManager;
+    private LocationStateReceiver locationStateReceiver;
 
     @Override
     public void onCreate() {
@@ -67,6 +72,16 @@ public class LocationTrackingService extends Service {
 
         // Listen to Firestore real-time commands while tracking service is running
         commandExecutionManager.startListeningToCommands();
+
+        // Register LocationStateReceiver to detect when Location is disabled/enabled
+        locationStateReceiver = new LocationStateReceiver();
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(LocationManager.MODE_CHANGED_ACTION);
+        filter.addAction(LocationManager.PROVIDERS_CHANGED_ACTION);
+        registerReceiver(locationStateReceiver, filter);
+
+        // Check state when the tracking service starts
+        LocationSecurityManager.getInstance(context).checkLocationState();
     }
 
     @Override
@@ -101,7 +116,7 @@ public class LocationTrackingService extends Service {
     }
 
     private void handleNewLocation(Location location) {
-        String deviceIdStr = sessionManager.getPrimaryDeviceIdStr();
+        String deviceIdStr = sessionManager.getCurrentDeviceId();
         if (deviceIdStr == null) return;
 
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
@@ -169,6 +184,25 @@ public class LocationTrackingService extends Service {
         }
         if (fusedLocationClient != null && locationCallback != null) {
             fusedLocationClient.removeLocationUpdates(locationCallback);
+        }
+        if (locationStateReceiver != null) {
+            try {
+                unregisterReceiver(locationStateReceiver);
+            } catch (Exception e) {
+                // Ignore if not registered
+            }
+        }
+
+        String uid = sessionManager.getOwnerUid();
+        String devId = sessionManager.getCurrentDeviceId();
+        if (uid != null && devId != null) {
+            java.util.Map<String, Object> update = new java.util.HashMap<>();
+            update.put("trackingStatus", "STOPPED");
+            update.put("lastSeen", com.google.firebase.firestore.FieldValue.serverTimestamp());
+            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("users").document(uid)
+                    .collection("devices").document(devId)
+                    .set(update, com.google.firebase.firestore.SetOptions.merge());
         }
     }
 

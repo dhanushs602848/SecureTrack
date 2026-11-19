@@ -6,6 +6,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 import com.example.securetrack.databinding.ActivityMainBinding;
 import com.example.securetrack.fragments.*;
+import com.example.securetrack.security.LocationSecurityManager;
 import org.osmdroid.config.Configuration;
 
 public class MainActivity extends AppCompatActivity {
@@ -61,6 +62,18 @@ public class MainActivity extends AppCompatActivity {
             getSupportFragmentManager().beginTransaction()
                     .replace(R.id.nav_host_container, new HomeFragment())
                     .commit();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Check location state when the app resumes to identify missed transitions
+        LocationSecurityManager.getInstance(this).checkLocationState();
+        // Update device heartbeat on app resume
+        com.example.securetrack.utils.SessionManager sm = new com.example.securetrack.utils.SessionManager(this);
+        if (sm.isLoggedIn()) {
+            new com.example.securetrack.repositories.DeviceRepository(this).sendHeartbeat(null);
         }
     }
 

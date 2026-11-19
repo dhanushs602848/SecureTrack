@@ -22,4 +22,12 @@
     <!-- Navigation States -->
     <color name="nav_selected">#152C4F</color>
     <color name="nav_unselected">#62666D</color>
+
+    <!-- High-Visibility Input Specifications -->
+    <color name="input_text">#152C4F</color>
+    <color name="input_hint">#64748B</color>
+    <color name="input_label">#334155</color>
+    <color name="input_border">#CBD5E1</color>
+    <color name="input_focus_border">#315C97</color>
+    <color name="input_bg">#FFFFFF</color>
 </resources>

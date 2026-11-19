@@ -12,6 +12,7 @@ import { LocationHistory } from './pages/LocationHistory';
 import { SecurityEvents } from './pages/SecurityEvents';
 import { Commands } from './pages/Commands';
 import { Settings } from './pages/Settings';
+import { LostPhoneRecovery } from './pages/LostPhoneRecovery';
 
 const ProtectedLayout: React.FC = () => {
   const { token, loading } = useAuth();
@@ -37,6 +38,7 @@ const ProtectedLayout: React.FC = () => {
             <Route path="/history" element={<LocationHistory />} />
             <Route path="/security" element={<SecurityEvents />} />
             <Route path="/commands" element={<Commands />} />
+            <Route path="/recovery" element={<LostPhoneRecovery />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </main>

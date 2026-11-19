@@ -10,12 +10,15 @@ import {
   getDocs,
   setDoc,
   addDoc,
+  updateDoc,
   deleteDoc,
   query,
   orderBy,
   limit,
   serverTimestamp,
-  onSnapshot
+  onSnapshot,
+  Timestamp,
+  runTransaction
 } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { Device, DeviceCommand, LocationRecord, SecurityEvent, User, SafeZone } from '../types';
@@ -104,13 +107,48 @@ export const authService = {
       }
     }
 
-    return { id: uid || '1', email: email, fullName: fullName };
+    return { id: uid || '', email: email, fullName: fullName };
   },
 
   logout: async () => {
     await firebaseSignOut(auth);
     localStorage.clear();
   }
+};
+
+const parseDeviceDoc = (d: any): Device => {
+  const data = d.data();
+  const now = Date.now();
+  let status: 'ONLINE' | 'OFFLINE' | 'REVOKED' = data.status || 'OFFLINE';
+  const lastSeenTs = data.lastSeen ? (data.lastSeen.toMillis ? data.lastSeen.toMillis() : 0) : 0;
+
+  if (status !== 'REVOKED') {
+    if (lastSeenTs > 0 && now - lastSeenTs > 5 * 60 * 1000) {
+      status = 'OFFLINE';
+    }
+  }
+
+  return {
+    id: d.id,
+    deviceName: data.deviceName || 'Android Device',
+    model: data.model || 'Generic Device',
+    androidVersion: data.androidVersion || '14',
+    installationId: data.installationId || d.id,
+    status: status,
+    protectionEnabled: data.protectionEnabled ?? true,
+    batteryLevel: data.batteryLevel ?? 100,
+    lastSeen: convertTimestamp(data.lastSeen),
+    locationStatus: data.locationStatus || 'ENABLED',
+    trackingStatus: data.trackingStatus || 'ACTIVE',
+    networkStatus: data.networkStatus || 'CONNECTED',
+    lastLatitude: data.lastLatitude,
+    lastLongitude: data.lastLongitude,
+    locationAccuracy: data.locationAccuracy,
+    locationSource: data.locationSource || 'GPS',
+    locationTimestamp: convertTimestamp(data.locationTimestamp || data.lastSeen),
+    paired: data.paired || false,
+    ownerUid: data.ownerUid
+  };
 };
 
 export const deviceService = {
@@ -120,38 +158,79 @@ export const deviceService = {
 
     return onSnapshot(collection(db, 'users', uid, 'devices'), (snapshot) => {
       const list: Device[] = [];
-      const now = Date.now();
       snapshot.forEach((d) => {
-        const data = d.data();
-
-        let status = data.status || 'OFFLINE';
-        const lastSeenTs = data.lastSeen ? (data.lastSeen.toMillis ? data.lastSeen.toMillis() : 0) : 0;
-
-        if (lastSeenTs > 0) {
-          if (now - lastSeenTs > 5 * 60 * 1000) {
-            status = 'OFFLINE';
-          }
-        }
-
-        list.push({
-          id: d.id,
-          deviceName: data.deviceName || 'Android Device',
-          model: data.model || 'Generic Device',
-          androidVersion: data.androidVersion || '14',
-          installationId: data.installationId || d.id,
-          status: status as any,
-          protectionEnabled: data.protectionEnabled ?? true,
-          batteryLevel: data.batteryLevel ?? 100,
-          lastSeen: convertTimestamp(data.lastSeen)
-        });
+        list.push(parseDeviceDoc(d));
       });
       callback(list);
     });
   },
 
-  createPairingCode: async (): Promise<{ code: string; expiresAt: string }> => {
-    throw new Error('Server-side pairing functions not deployed. Firebase Cloud Functions with billing enabled is required.');
+  getDevices: async (): Promise<Device[]> => {
+    const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
+    if (!uid) return [];
+
+    const snapshot = await getDocs(collection(db, 'users', uid, 'devices'));
+    const list: Device[] = [];
+    snapshot.forEach((d) => {
+      list.push(parseDeviceDoc(d));
+    });
+    return list;
   },
+
+  getRecoveryInfo: async (deviceId: string): Promise<{ imei1?: string; imei2?: string; consentGiven?: boolean } | null> => {
+    const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
+    if (!uid) return null;
+
+    const docRef = doc(db, 'users', uid, 'private_recovery', deviceId);
+    const snapshot = await getDoc(docRef);
+    if (snapshot.exists()) {
+      return snapshot.data() as { imei1?: string; imei2?: string; consentGiven?: boolean };
+    }
+    return null;
+  },
+
+  createPairingCode: async (): Promise<{ code: string; expiresAt: string }> => {
+    const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
+    if (!uid) throw new Error('User not authenticated');
+
+    // Generate random 8-digit code
+    const code = Math.floor(10000000 + Math.random() * 90000000).toString();
+    const expiresAtMillis = Date.now() + 10 * 60 * 1000;
+
+    // Compute simple hash for client-side storage
+    let hash = 0;
+    for (let i = 0; i < code.length; i++) {
+      hash = ((hash << 5) - hash) + code.charCodeAt(i);
+      hash |= 0;
+    }
+    const codeId = code;
+
+    await setDoc(doc(db, 'pairing_codes', codeId), {
+      code: code,
+      ownerUid: uid,
+      status: 'ACTIVE',
+      createdAt: serverTimestamp(),
+      expiresAt: Timestamp.fromMillis(expiresAtMillis),
+      attempts: 0
+    });
+
+    return {
+      code,
+      expiresAt: new Date(expiresAtMillis).toISOString()
+    };
+  },
+
+  revokePairedDevice: async (deviceId: string): Promise<void> => {
+    const uid = auth.currentUser?.uid || localStorage.getItem('access_token');
+    if (!uid) throw new Error('User not authenticated');
+
+    const devRef = doc(db, 'users', uid, 'devices', deviceId);
+    await updateDoc(devRef, {
+      status: 'REVOKED',
+      protectionEnabled: false,
+      revokedAt: serverTimestamp()
+    });
+  }
 };
 
 export const locationService = {
@@ -179,7 +258,8 @@ export const locationService = {
             accuracy: data.accuracy || 0,
             altitude: data.altitude || 0,
             speed: data.speed || 0,
-            timestamp: convertTimestamp(data.timestamp)
+            timestamp: convertTimestamp(data.timestamp),
+            source: data.source || 'GPS'
           });
         }
       });
@@ -207,10 +287,12 @@ export const securityService = {
           events.push({
             id: d.id,
             deviceId: data.deviceId || 'unknown',
+            deviceName: data.deviceName || 'Android Device',
             eventType: data.eventType || 'SECURITY_ALERT',
             severity: data.severity || 'INFO',
             description: data.description || 'Security notification',
             timestamp: convertTimestamp(data.timestamp),
+            locationStatus: data.locationStatus,
             zoneId: data.zoneId,
             zoneName: data.zoneName
           });

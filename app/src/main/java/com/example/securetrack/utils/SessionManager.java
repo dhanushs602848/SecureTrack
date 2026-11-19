@@ -2,6 +2,7 @@ package com.example.securetrack.utils;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Build;
 import com.google.firebase.auth.FirebaseAuth;
 import java.util.UUID;
 
@@ -12,9 +13,12 @@ public class SessionManager {
     private static final String KEY_REFRESH_TOKEN = "refresh_token";
     private static final String KEY_USER_ID = "user_id";
     private static final String KEY_FIREBASE_UID = "firebase_uid";
+    private static final String KEY_OWNER_UID = "owner_uid";
     private static final String KEY_USER_EMAIL = "user_email";
     private static final String KEY_USER_NAME = "user_name";
     private static final String KEY_INSTALLATION_ID = "installation_id";
+    private static final String KEY_CURRENT_DEVICE_ID = "current_device_id";
+    private static final String KEY_CURRENT_DEVICE_NAME = "current_device_name";
     private static final String KEY_BASE_URL = "base_url";
     private static final String KEY_BACKGROUND_TRACKING = "background_tracking_enabled";
     private static final String KEY_PRIMARY_DEVICE_ID = "primary_device_id";
@@ -39,6 +43,7 @@ public class SessionManager {
     public void saveFirebaseAuthSession(String uid, String email, String fullName) {
         prefs.edit()
                 .putString(KEY_FIREBASE_UID, uid)
+                .putString(KEY_OWNER_UID, uid)
                 .putString(KEY_USER_EMAIL, email)
                 .putString(KEY_USER_NAME, fullName)
                 .apply();
@@ -54,6 +59,18 @@ public class SessionManager {
             uid = FirebaseAuth.getInstance().getCurrentUser().getUid();
         }
         return uid;
+    }
+
+    public String getOwnerUid() {
+        String uid = prefs.getString(KEY_OWNER_UID, null);
+        if (uid == null) {
+            uid = getFirebaseUid();
+        }
+        return uid;
+    }
+
+    public void setOwnerUid(String ownerUid) {
+        prefs.edit().putString(KEY_OWNER_UID, ownerUid).apply();
     }
 
     public boolean isLoggedIn() {
@@ -86,6 +103,10 @@ public class SessionManager {
         return name;
     }
 
+    /**
+     * Unique, persistent installation ID for this physical device.
+     * Guaranteed to persist across logout and app restarts.
+     */
     public String getInstallationId() {
         String id = prefs.getString(KEY_INSTALLATION_ID, null);
         if (id == null) {
@@ -93,6 +114,33 @@ public class SessionManager {
             prefs.edit().putString(KEY_INSTALLATION_ID, id).apply();
         }
         return id;
+    }
+
+    /**
+     * Returns this phone's actual registered Firestore device document ID.
+     * Matches the installation ID or assigned registered document ID for this physical installation.
+     */
+    public String getCurrentDeviceId() {
+        String id = prefs.getString(KEY_CURRENT_DEVICE_ID, null);
+        if (id == null) {
+            id = getPrimaryDeviceIdStr();
+        }
+        return id != null ? id : getInstallationId();
+    }
+
+    public void setCurrentDeviceId(String deviceId) {
+        prefs.edit()
+                .putString(KEY_CURRENT_DEVICE_ID, deviceId)
+                .putString(KEY_PRIMARY_DEVICE_ID_STR, deviceId)
+                .apply();
+    }
+
+    public String getDeviceName() {
+        return prefs.getString(KEY_CURRENT_DEVICE_NAME, Build.MODEL != null ? Build.MODEL : "Android Device");
+    }
+
+    public void setDeviceName(String name) {
+        prefs.edit().putString(KEY_CURRENT_DEVICE_NAME, name).apply();
     }
 
     public String getBaseUrl() {
@@ -125,6 +173,9 @@ public class SessionManager {
     public String getPrimaryDeviceIdStr() {
         String id = prefs.getString(KEY_PRIMARY_DEVICE_ID_STR, null);
         if (id == null) {
+            id = prefs.getString(KEY_CURRENT_DEVICE_ID, null);
+        }
+        if (id == null) {
             long oldId = getPrimaryDeviceId();
             if (oldId != -1) {
                 id = String.valueOf(oldId);
@@ -136,7 +187,7 @@ public class SessionManager {
     }
 
     public void setPrimaryDeviceIdStr(String deviceId) {
-        prefs.edit().putString(KEY_PRIMARY_DEVICE_ID_STR, deviceId).apply();
+        setCurrentDeviceId(deviceId);
     }
 
     public void logout() {
@@ -144,13 +195,16 @@ public class SessionManager {
             FirebaseAuth.getInstance().signOut();
         } catch (Exception ignored) {}
 
+        // Clear user session data, but NEVER clear KEY_INSTALLATION_ID so device retains its identity
         prefs.edit()
                 .remove(KEY_TOKEN)
                 .remove(KEY_REFRESH_TOKEN)
                 .remove(KEY_USER_ID)
                 .remove(KEY_FIREBASE_UID)
+                .remove(KEY_OWNER_UID)
                 .remove(KEY_USER_EMAIL)
                 .remove(KEY_USER_NAME)
+                .remove(KEY_CURRENT_DEVICE_ID)
                 .remove(KEY_PRIMARY_DEVICE_ID_STR)
                 .apply();
     }

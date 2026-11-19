@@ -55,21 +55,29 @@ public class HomeFragment extends Fragment {
                 binding.tvTotalDevices.setText(String.valueOf(devices.size()));
 
                 long onlineCount = 0;
-                Device primary = null;
+                Device thisDevice = null;
+                String currentDevId = sessionManager.getCurrentDeviceId();
+                String installId = sessionManager.getInstallationId();
+
                 for (Device d : devices) {
                     if ("ONLINE".equalsIgnoreCase(d.getStatus())) {
                         onlineCount++;
                     }
-                    if (primary == null || sessionManager.getPrimaryDeviceIdStr() != null && sessionManager.getPrimaryDeviceIdStr().equals(d.getId())) {
-                        primary = d;
+                    if ((currentDevId != null && currentDevId.equals(d.getId())) ||
+                        (installId != null && installId.equals(d.getInstallationId()))) {
+                        thisDevice = d;
                     }
                 }
                 binding.tvOnlineDevices.setText(String.valueOf(onlineCount));
 
-                if (primary != null) {
-                    binding.tvPrimaryDeviceName.setText(primary.getDeviceName());
-                    binding.tvProtectionStatus.setText(primary.isProtectionEnabled() ? "Active & Protected" : "Protection Paused");
-                    sessionManager.setPrimaryDeviceIdStr(primary.getId());
+                if (thisDevice != null) {
+                    binding.tvPrimaryDeviceName.setText(thisDevice.getDeviceName() + " (This Device)");
+                    binding.tvProtectionStatus.setText(thisDevice.isProtectionEnabled() ? "Active & Protected" : "Protection Paused");
+                    sessionManager.setCurrentDeviceId(thisDevice.getId());
+                    sessionManager.setDeviceName(thisDevice.getDeviceName());
+                } else if (!devices.isEmpty()) {
+                    binding.tvPrimaryDeviceName.setText(sessionManager.getDeviceName() + " (Unregistered)");
+                    binding.tvProtectionStatus.setText("Tap to Register");
                 } else {
                     binding.tvPrimaryDeviceName.setText("No Device Found");
                     binding.tvProtectionStatus.setText("N/A");

@@ -54,9 +54,9 @@ public class SecurityFragment extends Fragment {
     }
 
     private void dispatchCommand(String commandType) {
-        String deviceId = sessionManager.getPrimaryDeviceIdStr();
+        String deviceId = sessionManager.getCurrentDeviceId();
         if (deviceId == null) {
-            Toast.makeText(requireContext(), "No primary device selected", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "No device registered on this installation", Toast.LENGTH_SHORT).show();
             return;
         }
 

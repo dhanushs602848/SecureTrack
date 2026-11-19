@@ -1,33 +1,63 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Helper functions for multi-device & multi-user ownership
+    function isOwner(userId) {
+      return request.auth != null && (
+        request.auth.uid == userId ||
+        (request.auth.token.role == 'device' && request.auth.token.ownerUid == userId)
+      );
+    }
+
+    function isDeviceForSelf(userId, deviceId) {
+      return request.auth != null && (
+        request.auth.uid == userId ||
+        (request.auth.token.role == 'device' && request.auth.token.ownerUid == userId && request.auth.token.deviceId == deviceId)
+      );
+    }
+
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
 
       match /devices/{deviceId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        // The owner can read and write all devices. A paired device can only read and write its own document.
+        allow read: if isDeviceForSelf(userId, deviceId);
+        allow write: if isDeviceForSelf(userId, deviceId);
 
         match /locations/{locationId} {
-          allow read, write: if request.auth != null && request.auth.uid == userId;
+          allow read, write: if isDeviceForSelf(userId, deviceId);
         }
 
         match /commands/{commandId} {
-          allow read, write: if request.auth != null && request.auth.uid == userId;
+          allow read: if isDeviceForSelf(userId, deviceId);
+          allow write: if isDeviceForSelf(userId, deviceId);
         }
       }
 
+      match /private_recovery/{deviceId} {
+        // Highly sensitive IMEI data: ONLY the human owner with password re-auth can read/write.
+        // Paired device tokens or third parties are strictly denied.
+        allow read, write: if request.auth != null && request.auth.uid == userId && request.auth.token.role != 'device';
+      }
+
       match /alerts/{alertId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read: if request.auth != null && request.auth.uid == userId;
+        // Devices and owner can both create alerts under the user's alerts collection
+        allow create: if isOwner(userId);
+        allow update, delete: if request.auth != null && request.auth.uid == userId && request.auth.token.role != 'device';
       }
 
       match /safe_zones/{zoneId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if request.auth != null && request.auth.uid == userId && request.auth.token.role != 'device';
       }
     }
 
-    match /pairing_codes/{code} {
-      allow get, create, update: if request.auth != null;
-      allow list, delete: if false;
+    // Pairing codes collection:
+    // Clients cannot read or list pairing codes directly to prevent enumeration/theft.
+    // Privileged Cloud Functions handle creation and redemption using the Firebase Admin SDK.
+    match /pairing_codes/{codeHash} {
+      allow read, write: if false;
     }
   }
 }

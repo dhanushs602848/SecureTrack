@@ -49,10 +49,14 @@ public class SecurityRepository {
         String eventId = UUID.randomUUID().toString();
         Map<String, Object> map = new HashMap<>();
         map.put("id", eventId);
-        map.put("deviceId", event.getDeviceId() != null ? event.getDeviceId() : sessionManager.getPrimaryDeviceIdStr());
+        map.put("deviceId", event.getDeviceId() != null ? event.getDeviceId() : sessionManager.getCurrentDeviceId());
+        map.put("deviceName", event.getDeviceName() != null ? event.getDeviceName() : sessionManager.getDeviceName());
         map.put("eventType", event.getEventType());
         map.put("severity", event.getSeverity());
         map.put("description", event.getDescription());
+        if (event.getLocationStatus() != null) {
+            map.put("locationStatus", event.getLocationStatus());
+        }
         map.put("timestamp", FieldValue.serverTimestamp());
 
         db.collection("users").document(uid)
@@ -81,13 +85,18 @@ public class SecurityRepository {
                         String severity = doc.getString("severity");
                         String desc = doc.getString("description");
                         String devId = doc.getString("deviceId");
+                        String devName = doc.getString("deviceName");
+                        String locStatus = doc.getString("locationStatus");
 
                         SecurityEvent se = new SecurityEvent(
                                 devId,
+                                devName != null ? devName : "Android Device",
                                 type != null ? type : "SECURITY_ALERT",
                                 severity != null ? severity : "INFO",
-                                desc != null ? desc : "Security event"
+                                desc != null ? desc : "Security event",
+                                locStatus
                         );
+                        se.setId(doc.getId());
                         list.add(se);
                     }
                     callback.onSuccess(list);

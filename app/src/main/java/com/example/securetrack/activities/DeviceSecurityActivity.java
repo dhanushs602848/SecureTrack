@@ -40,10 +40,18 @@ public class DeviceSecurityActivity extends AppCompatActivity {
         loadCommandHistory();
     }
 
+    private String getTargetDeviceId() {
+        String devId = getIntent().getStringExtra("device_id");
+        if (devId != null && !devId.isEmpty()) {
+            return devId;
+        }
+        return sessionManager.getCurrentDeviceId();
+    }
+
     private void dispatchCommand(String commandType) {
-        String deviceId = sessionManager.getPrimaryDeviceIdStr();
+        String deviceId = getTargetDeviceId();
         if (deviceId == null) {
-            Toast.makeText(this, "No primary device registered", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "No device selected", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -63,7 +71,7 @@ public class DeviceSecurityActivity extends AppCompatActivity {
     }
 
     private void loadCommandHistory() {
-        String deviceId = sessionManager.getPrimaryDeviceIdStr();
+        String deviceId = getTargetDeviceId();
         if (deviceId == null) return;
 
         securityRepository.getDeviceCommands(deviceId, new SecurityRepository.ApiCallback<List<DeviceCommand>>() {

@@ -11,6 +11,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import com.example.securetrack.activities.DeviceRegistrationActivity;
+import com.example.securetrack.activities.DeviceSecurityActivity;
 import com.example.securetrack.adapters.DeviceAdapter;
 import com.example.securetrack.databinding.FragmentDevicesBinding;
 import com.example.securetrack.models.Device;
@@ -39,6 +40,13 @@ public class DevicesFragment extends Fragment {
 
         binding.rvDevices.setLayoutManager(new LinearLayoutManager(requireContext()));
         binding.rvDevices.setAdapter(adapter);
+
+        adapter.setOnDeviceClickListener(device -> {
+            Intent intent = new Intent(requireContext(), DeviceSecurityActivity.class);
+            intent.putExtra("device_id", device.getId());
+            intent.putExtra("device_name", device.getDeviceName());
+            startActivity(intent);
+        });
 
         binding.fabAddDevice.setOnClickListener(v -> {
             startActivity(new Intent(requireContext(), DeviceRegistrationActivity.class));

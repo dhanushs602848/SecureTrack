@@ -324,7 +324,7 @@ public class TrackingFragment extends Fragment {
         binding.tvLastUpdated.setText("Last Updated: " + formattedTime);
 
         // 3. Persist real coordinates to Firestore and Room
-        String deviceId = sessionManager.getPrimaryDeviceIdStr();
+        String deviceId = sessionManager.getCurrentDeviceId();
         SimpleDateFormat isoFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
         isoFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
         String isoTimestamp = isoFormat.format(new Date(location.getTime() > 0 ? location.getTime() : System.currentTimeMillis()));
@@ -364,7 +364,7 @@ public class TrackingFragment extends Fragment {
     }
 
     private void fetchLatestLocationHistory() {
-        String deviceId = sessionManager.getPrimaryDeviceIdStr();
+        String deviceId = sessionManager.getCurrentDeviceId();
         if (deviceId == null) return;
 
         if (binding != null) binding.progressBar.setVisibility(View.VISIBLE);

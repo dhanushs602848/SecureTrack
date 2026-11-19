@@ -42,7 +42,7 @@ public class CommandExecutionManager {
         stopListeningToCommands();
 
         String uid = getUid();
-        String deviceId = sessionManager.getPrimaryDeviceIdStr();
+        String deviceId = sessionManager.getCurrentDeviceId();
 
         if (uid == null || deviceId == null) {
             Log.w(TAG, "Cannot listen to commands: UID or Device ID missing");
@@ -78,6 +78,22 @@ public class CommandExecutionManager {
             updateCommandStatus(uid, deviceId, commandId, "FAILED", "Missing command type");
             return;
         }
+
+        // Prevent execution of expired commands (older than 2 hours)
+        com.google.firebase.Timestamp createdAt = doc.getTimestamp("createdAt");
+        if (createdAt != null) {
+            long ageMillis = System.currentTimeMillis() - createdAt.toDate().getTime();
+            if (ageMillis > 2 * 60 * 60 * 1000) {
+                updateCommandStatus(uid, deviceId, commandId, "EXPIRED", "Command expired before delivery");
+                return;
+            }
+        }
+
+        // Atomically transition status to EXECUTING to avoid duplicate concurrent execution
+        db.collection("users").document(uid)
+                .collection("devices").document(deviceId)
+                .collection("commands").document(commandId)
+                .update("status", "EXECUTING");
 
         if ("LOCK_DEVICE".equalsIgnoreCase(type)) {
             if (SecureAdminReceiver.isAdminActive(context)) {

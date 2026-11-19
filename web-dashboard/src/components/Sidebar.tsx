@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Smartphone, MapPin, History, ShieldAlert, Terminal, Settings } from 'lucide-react';
+import { LayoutDashboard, Smartphone, MapPin, History, ShieldAlert, Terminal, LifeBuoy, Settings } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
   const navItems = [
@@ -10,6 +10,7 @@ export const Sidebar: React.FC = () => {
     { to: '/history', label: 'Location History', icon: History },
     { to: '/security', label: 'Security Events', icon: ShieldAlert },
     { to: '/commands', label: 'Device Commands', icon: Terminal },
+    { to: '/recovery', label: 'Phone Recovery', icon: LifeBuoy },
     { to: '/settings', label: 'Settings', icon: Settings },
   ];
 

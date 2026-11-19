@@ -7,3 +7,47 @@ body {
   background-color: #F8F9FB;
   color: #1A1C1E;
 }
+
+/* Global input visibility rules to prevent white-on-white text */
+input,
+textarea,
+select {
+  background-color: #FFFFFF !important;
+  color: #152C4F !important;
+  caret-color: #152C4F !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #64748B !important;
+  opacity: 1;
+}
+
+/* Fix browser autofill styling */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: #152C4F !important;
+  -webkit-box-shadow: 0 0 0px 1000px #FFFFFF inset !important;
+  box-shadow: 0 0 0px 1000px #FFFFFF inset !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Standardized input classes */
+.st-input {
+  background-color: #FFFFFF !important;
+  color: #152C4F !important;
+  border-color: #CBD5E1 !important;
+  caret-color: #152C4F !important;
+}
+
+.st-input:focus {
+  border-color: #315C97 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(49, 92, 151, 0.2) !important;
+}
+
+.st-label {
+  color: #334155 !important;
+}

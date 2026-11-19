@@ -51,7 +51,7 @@ public class LocationRepository {
 
     public void recordLocation(LocationRecord record, ApiCallback<LocationRecord> callback) {
         String uid = getUid();
-        String deviceId = record.getDeviceId() != null ? record.getDeviceId() : sessionManager.getPrimaryDeviceIdStr();
+        String deviceId = record.getDeviceId() != null ? record.getDeviceId() : sessionManager.getCurrentDeviceId();
 
         if (uid == null || deviceId == null) {
             cacheLocally(record);
@@ -70,6 +70,7 @@ public class LocationRepository {
         map.put("accuracy", record.getAccuracy());
         map.put("altitude", record.getAltitude());
         map.put("speed", record.getSpeed());
+        map.put("source", "GPS");
         map.put("timestamp", FieldValue.serverTimestamp());
 
         db.collection("users").document(uid)
@@ -77,11 +78,17 @@ public class LocationRepository {
                 .collection("locations").document(locationId)
                 .set(map, SetOptions.merge())
                 .addOnSuccessListener(aVoid -> {
-                    // Update device lastSeen & last location coordinates
+                    // Update device lastSeen, location source, and telemetry
                     Map<String, Object> deviceUpdate = new HashMap<>();
                     deviceUpdate.put("lastSeen", FieldValue.serverTimestamp());
                     deviceUpdate.put("lastLatitude", record.getLatitude());
                     deviceUpdate.put("lastLongitude", record.getLongitude());
+                    deviceUpdate.put("locationAccuracy", record.getAccuracy());
+                    deviceUpdate.put("locationSource", "GPS");
+                    deviceUpdate.put("locationStatus", "ENABLED");
+                    deviceUpdate.put("trackingStatus", "ACTIVE");
+                    deviceUpdate.put("locationTimestamp", FieldValue.serverTimestamp());
+
                     db.collection("users").document(uid)
                             .collection("devices").document(deviceId)
                             .set(deviceUpdate, SetOptions.merge());

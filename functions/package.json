@@ -1,0 +1,17 @@
+{
+  "name": "securetrack-functions",
+  "description": "SecureTrack Cloud Functions for Pairing and Device Administration",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "firebase-functions": "^4.8.0"
+  },
+  "devDependencies": {
+    "mocha": "^10.4.0"
+  },
+  "engines": {
+    "node": "18 || 20"
+  },
+  "private": true
+}

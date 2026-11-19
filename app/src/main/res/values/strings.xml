@@ -38,6 +38,7 @@
     <string name="primary_device">Primary Device</string>
     <string name="track_live">Track Live</string>
     <string name="secure_device">Secure Device</string>
+    <string name="pairing_code_hint">8-Digit Pairing Code</string>
     <string name="recent_activity">Recent Activity</string>
     <string name="view_all">View All</string>
 
@@ -55,6 +56,11 @@
     <string name="enter_pairing_code">Enter 6-digit code shown on the other device</string>
     <string name="grant_permissions">Grant Required Permissions</string>
     <string name="complete_registration">Complete Registration</string>
+    <string name="recovery_info_title">Device Recovery Info (Optional)</string>
+    <string name="recovery_info_desc">Enter your IMEI numbers manually. Due to Android privacy restrictions, this app cannot automatically read your IMEI. Providing this information helps with lost phone recovery, but remember that IMEI does not independently track GPS locations.</string>
+    <string name="imei1_hint">IMEI 1</string>
+    <string name="imei2_hint">IMEI 2 (Optional)</string>
+    <string name="imei_consent_text">I explicitly consent to storing my IMEI numbers securely for potential device recovery purposes.</string>
 
     <!-- Tracking -->
     <string name="live_tracking">Live Location Tracking</string>

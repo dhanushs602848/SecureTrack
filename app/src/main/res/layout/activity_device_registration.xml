@@ -10,7 +10,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp">
+        android:padding="24dp"
+        android:paddingBottom="48dp"
+        android:clipToPadding="false">
 
         <TextView
             android:layout_width="wrap_content"
@@ -61,7 +63,9 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
             android:hint="@string/device_name"
+            app:boxBackgroundColor="@color/input_bg"
             app:boxBackgroundMode="outline"
+            app:hintTextColor="@color/input_label"
             app:boxCornerRadiusBottomEnd="12dp"
             app:boxCornerRadiusBottomStart="12dp"
             app:boxCornerRadiusTopEnd="12dp"
@@ -70,8 +74,92 @@
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/et_device_name"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
+                android:layout_height="wrap_content"
+                android:textColor="@color/input_text"
+                android:textColorHint="@color/input_hint"
+                android:textCursorDrawable="@null" />
         </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- IMEI Registration (Optional) -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/recovery_info_title"
+            android:textColor="@color/primary_navy"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/recovery_info_desc"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            android:lineSpacingExtra="2dp" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/til_imei1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:hint="@string/imei1_hint"
+            app:errorEnabled="true"
+            app:boxBackgroundColor="@color/input_bg"
+            app:boxBackgroundMode="outline"
+            app:hintTextColor="@color/input_label"
+            app:boxCornerRadiusBottomEnd="12dp"
+            app:boxCornerRadiusBottomStart="12dp"
+            app:boxCornerRadiusTopEnd="12dp"
+            app:boxCornerRadiusTopStart="12dp">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_imei1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:imeOptions="actionNext"
+                android:maxLength="15"
+                android:textColor="@color/input_text"
+                android:textColorHint="@color/input_hint"
+                android:textCursorDrawable="@null" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/til_imei2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:hint="@string/imei2_hint"
+            app:errorEnabled="true"
+            app:boxBackgroundColor="@color/input_bg"
+            app:boxBackgroundMode="outline"
+            app:hintTextColor="@color/input_label"
+            app:boxCornerRadiusBottomEnd="12dp"
+            app:boxCornerRadiusBottomStart="12dp"
+            app:boxCornerRadiusTopEnd="12dp"
+            app:boxCornerRadiusTopStart="12dp">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_imei2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="number"
+                android:imeOptions="actionDone"
+                android:maxLength="15"
+                android:textColor="@color/input_text"
+                android:textColorHint="@color/input_hint"
+                android:textCursorDrawable="@null" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <CheckBox
+            android:id="@+id/cb_imei_consent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:minHeight="48dp"
+            android:text="@string/imei_consent_text"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp" />
 
         <!-- Pairing Code Section (for another device) -->
         <LinearLayout
@@ -85,8 +173,10 @@
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="@string/pairing_code"
+                android:hint="@string/pairing_code_hint"
+                app:boxBackgroundColor="@color/input_bg"
                 app:boxBackgroundMode="outline"
+                app:hintTextColor="@color/input_label"
                 app:boxCornerRadiusBottomEnd="12dp"
                 app:boxCornerRadiusBottomStart="12dp"
                 app:boxCornerRadiusTopEnd="12dp"
@@ -97,7 +187,11 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:inputType="number"
-                    android:maxLength="6" />
+                    android:imeOptions="actionDone"
+                    android:maxLength="8"
+                    android:textColor="@color/input_text"
+                    android:textColorHint="@color/input_hint"
+                    android:textCursorDrawable="@null" />
             </com.google.android.material.textfield.TextInputLayout>
 
             <Button

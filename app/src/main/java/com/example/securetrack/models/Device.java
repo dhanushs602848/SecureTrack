@@ -11,6 +11,8 @@ public class Device {
     private Boolean protectionEnabled;
     private Integer batteryLevel;
     private String lastSeen;
+    private String imei1;
+    private String imei2;
 
     public Device() {}
 
@@ -65,4 +67,10 @@ public class Device {
 
     public String getLastSeen() { return lastSeen; }
     public void setLastSeen(String lastSeen) { this.lastSeen = lastSeen; }
+
+    public String getImei1() { return imei1; }
+    public void setImei1(String imei1) { this.imei1 = imei1; }
+
+    public String getImei2() { return imei2; }
+    public void setImei2(String imei2) { this.imei2 = imei2; }
 }

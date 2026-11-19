@@ -25,7 +25,7 @@ export const Register: React.FC = () => {
       login(res.data.accessToken, res.data.refreshToken, res.data.user);
       navigate('/');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed');
+      setError(err.message || 'Registration failed');
     } finally {
       setLoading(false);
     }
@@ -33,13 +33,13 @@ export const Register: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F8F9FB] flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-[#DFE2E7] p-8 space-y-6">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-[#CBD5E1] p-8 space-y-6">
         <div className="text-center space-y-2">
           <div className="inline-flex p-3 bg-[#D8E6FF] rounded-2xl text-[#152C4F]">
             <Shield className="w-10 h-10" />
           </div>
           <h2 className="text-2xl font-bold text-[#152C4F]">Create SecureTrack Account</h2>
-          <p className="text-sm text-[#62666D]">Track smart. Stay secure.</p>
+          <p className="text-sm text-[#64748B]">Track smart. Stay secure.</p>
         </div>
 
         {error && (
@@ -50,60 +50,60 @@ export const Register: React.FC = () => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-[#1A1C1E] mb-1">Full Name</label>
+            <label className="block text-xs font-semibold text-[#334155] mb-1">Full Name</label>
             <div className="relative">
-              <User className="w-5 h-5 absolute left-3 top-3 text-[#62666D]" />
+              <User className="w-5 h-5 absolute left-3 top-3 text-[#64748B]" />
               <input
                 type="text"
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="John Doe"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#DFE2E7] focus:outline-none focus:ring-2 focus:ring-[#255DA8] text-sm"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#CBD5E1] bg-white text-[#152C4F] placeholder-[#64748B] focus:outline-none focus:border-[#315C97] focus:ring-2 focus:ring-[#315C97]/20 text-sm"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#1A1C1E] mb-1">Email Address</label>
+            <label className="block text-xs font-semibold text-[#334155] mb-1">Email Address</label>
             <div className="relative">
-              <Mail className="w-5 h-5 absolute left-3 top-3 text-[#62666D]" />
+              <Mail className="w-5 h-5 absolute left-3 top-3 text-[#64748B]" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@example.com"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#DFE2E7] focus:outline-none focus:ring-2 focus:ring-[#255DA8] text-sm"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#CBD5E1] bg-white text-[#152C4F] placeholder-[#64748B] focus:outline-none focus:border-[#315C97] focus:ring-2 focus:ring-[#315C97]/20 text-sm"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#1A1C1E] mb-1">Phone Number</label>
+            <label className="block text-xs font-semibold text-[#334155] mb-1">Phone Number</label>
             <div className="relative">
-              <Phone className="w-5 h-5 absolute left-3 top-3 text-[#62666D]" />
+              <Phone className="w-5 h-5 absolute left-3 top-3 text-[#64748B]" />
               <input
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+1 555 0192"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#DFE2E7] focus:outline-none focus:ring-2 focus:ring-[#255DA8] text-sm"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#CBD5E1] bg-white text-[#152C4F] placeholder-[#64748B] focus:outline-none focus:border-[#315C97] focus:ring-2 focus:ring-[#315C97]/20 text-sm"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#1A1C1E] mb-1">Password</label>
+            <label className="block text-xs font-semibold text-[#334155] mb-1">Password</label>
             <div className="relative">
-              <Lock className="w-5 h-5 absolute left-3 top-3 text-[#62666D]" />
+              <Lock className="w-5 h-5 absolute left-3 top-3 text-[#64748B]" />
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#DFE2E7] focus:outline-none focus:ring-2 focus:ring-[#255DA8] text-sm"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#CBD5E1] bg-white text-[#152C4F] placeholder-[#64748B] focus:outline-none focus:border-[#315C97] focus:ring-2 focus:ring-[#315C97]/20 text-sm"
               />
             </div>
           </div>
@@ -117,9 +117,9 @@ export const Register: React.FC = () => {
           </button>
         </form>
 
-        <p className="text-center text-sm text-[#62666D]">
+        <p className="text-center text-sm text-[#64748B]">
           Already have an account?{' '}
-          <Link to="/login" className="text-[#255DA8] font-semibold hover:underline">
+          <Link to="/login" className="text-[#315C97] font-semibold hover:underline">
             Sign In
           </Link>
         </p>

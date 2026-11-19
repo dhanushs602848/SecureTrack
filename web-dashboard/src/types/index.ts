@@ -12,11 +12,23 @@ export interface Device {
   model: string;
   androidVersion: string;
   installationId: string;
-  status: 'ONLINE' | 'OFFLINE';
+  status: 'ONLINE' | 'OFFLINE' | 'REVOKED';
   protectionEnabled: boolean;
   batteryLevel: number;
   lastSeen?: string;
   createdAt?: string;
+  imei1?: string;
+  imei2?: string;
+  locationStatus?: 'ENABLED' | 'DISABLED' | 'PERMISSION_DENIED';
+  trackingStatus?: 'ACTIVE' | 'STOPPED' | 'INTERRUPTED';
+  networkStatus?: string;
+  lastLatitude?: number;
+  lastLongitude?: number;
+  locationAccuracy?: number;
+  locationSource?: 'GPS' | 'LAST_KNOWN' | 'NETWORK_ESTIMATE';
+  locationTimestamp?: string;
+  paired?: boolean;
+  ownerUid?: string;
 }
 
 export interface LocationRecord {
@@ -29,15 +41,18 @@ export interface LocationRecord {
   altitude: number;
   speed: number;
   timestamp: string;
+  source?: 'GPS' | 'LAST_KNOWN' | 'NETWORK_ESTIMATE';
 }
 
 export interface SecurityEvent {
   id: string;
   deviceId: string;
+  deviceName?: string;
   eventType: string;
   severity: 'INFO' | 'WARNING' | 'HIGH' | 'CRITICAL';
   description: string;
   timestamp: string;
+  locationStatus?: 'ENABLED' | 'DISABLED';
   zoneId?: string;
   zoneName?: string;
 }
@@ -47,7 +62,7 @@ export interface DeviceCommand {
   deviceId: string;
   commandType: string;
   payload?: string;
-  status: 'QUEUED' | 'DELIVERED' | 'RECEIVED' | 'EXECUTED' | 'FAILED' | 'EXPIRED';
+  status: 'QUEUED' | 'DELIVERED' | 'RECEIVED' | 'EXECUTING' | 'EXECUTED' | 'FAILED' | 'EXPIRED';
   result?: string;
   createdAt: string;
   executedAt?: string;

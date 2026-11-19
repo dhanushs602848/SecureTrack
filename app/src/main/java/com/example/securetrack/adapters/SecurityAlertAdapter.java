@@ -33,7 +33,8 @@ public class SecurityAlertAdapter extends RecyclerView.Adapter<SecurityAlertAdap
         SecurityEvent event = events.get(position);
         holder.binding.tvEventType.setText(event.getEventType());
         holder.binding.tvEventSeverity.setText(event.getSeverity() != null ? event.getSeverity() : "INFO");
-        holder.binding.tvEventDesc.setText(event.getDescription() != null ? event.getDescription() : "Security event logged");
+        String devicePrefix = event.getDeviceName() != null && !event.getDeviceName().isEmpty() ? "[" + event.getDeviceName() + "] " : "";
+        holder.binding.tvEventDesc.setText(devicePrefix + (event.getDescription() != null ? event.getDescription() : "Security event logged"));
         holder.binding.tvEventTime.setText(event.getTimestamp() != null ? event.getTimestamp() : "Recently");
     }
 
