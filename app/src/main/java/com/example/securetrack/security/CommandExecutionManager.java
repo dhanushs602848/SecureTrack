@@ -31,7 +31,7 @@ public class CommandExecutionManager {
     }
 
     private String getUid() {
-        String uid = sessionManager.getFirebaseUid();
+        String uid = sessionManager.getOwnerUid();
         if (uid == null && FirebaseAuth.getInstance().getCurrentUser() != null) {
             uid = FirebaseAuth.getInstance().getCurrentUser().getUid();
         }

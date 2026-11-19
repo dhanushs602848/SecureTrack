@@ -2,54 +2,97 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions for multi-device & multi-user ownership
-    function isOwner(userId) {
-      return request.auth != null && (
-        request.auth.uid == userId ||
-        (request.auth.token.role == 'device' && request.auth.token.ownerUid == userId)
-      );
+    // Helper functions for multi-device & multi-user ownership and security
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    function isDeviceForSelf(userId, deviceId) {
-      return request.auth != null && (
-        request.auth.uid == userId ||
-        (request.auth.token.role == 'device' && request.auth.token.ownerUid == userId && request.auth.token.deviceId == deviceId)
-      );
+    function isHumanOwner(userId) {
+      return isAuthenticated() &&
+             request.auth.uid == userId &&
+             request.auth.token.role != 'device' &&
+             request.auth.token.role != 'revoked' &&
+             request.auth.token.revoked != true;
+    }
+
+    function isDeviceActive(userId, deviceId) {
+      return get(/databases/$(database)/documents/users/$(userId)/devices/$(deviceId)).data.status != 'REVOKED';
+    }
+
+    function isActiveDevice(userId, deviceId) {
+      return isAuthenticated() &&
+             request.auth.token.role == 'device' &&
+             request.auth.token.revoked != true &&
+             request.auth.token.ownerUid == userId &&
+             request.auth.token.deviceId == deviceId &&
+             isDeviceActive(userId, deviceId);
     }
 
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // User root document is accessible only by the authenticated human owner
+      allow read, write: if isHumanOwner(userId);
 
       match /devices/{deviceId} {
-        // The owner can read and write all devices. A paired device can only read and write its own document.
-        allow read: if isDeviceForSelf(userId, deviceId);
-        allow write: if isDeviceForSelf(userId, deviceId);
+        // Read: Human owner can read all devices. Active paired device can read its own document.
+        allow read: if isHumanOwner(userId) || isActiveDevice(userId, deviceId);
+
+        // Create & Delete: Restricted strictly to the human owner
+        allow create: if isHumanOwner(userId);
+        allow delete: if isHumanOwner(userId);
+
+        // Update:
+        // - Owner has full update capability.
+        // - Active paired device can report telemetry, but cannot alter immutable identity fields and cannot revoke/un-revoke itself.
+        allow update: if isHumanOwner(userId) || (
+          isActiveDevice(userId, deviceId) &&
+          request.resource.data.id == resource.data.id &&
+          request.resource.data.ownerUid == resource.data.ownerUid &&
+          request.resource.data.installationId == resource.data.installationId &&
+          request.resource.data.status != 'REVOKED'
+        );
 
         match /locations/{locationId} {
-          allow read, write: if isDeviceForSelf(userId, deviceId);
+          allow read: if isHumanOwner(userId) || isActiveDevice(userId, deviceId);
+          allow create: if isHumanOwner(userId) || isActiveDevice(userId, deviceId);
+          allow update, delete: if isHumanOwner(userId);
         }
 
         match /commands/{commandId} {
-          allow read: if isDeviceForSelf(userId, deviceId);
-          allow write: if isDeviceForSelf(userId, deviceId);
+          allow read: if isHumanOwner(userId) || isActiveDevice(userId, deviceId);
+          // ONLY human owner can create or delete commands
+          allow create: if isHumanOwner(userId);
+          allow delete: if isHumanOwner(userId);
+
+          // Update: Owner can update, or active device can ONLY update execution status/result fields
+          allow update: if isHumanOwner(userId) || (
+            isActiveDevice(userId, deviceId) &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'result', 'executedAt', 'error', 'details', 'progress']) &&
+            request.resource.data.command == resource.data.command &&
+            request.resource.data.targetDeviceId == resource.data.targetDeviceId
+          );
         }
       }
 
       match /private_recovery/{deviceId} {
-        // Highly sensitive IMEI data: ONLY the human owner with password re-auth can read/write.
-        // Paired device tokens or third parties are strictly denied.
-        allow read, write: if request.auth != null && request.auth.uid == userId && request.auth.token.role != 'device';
+        // Highly sensitive IMEI and recovery credentials: ONLY the human owner
+        allow read, write: if isHumanOwner(userId);
       }
 
       match /alerts/{alertId} {
-        allow read: if request.auth != null && request.auth.uid == userId;
-        // Devices and owner can both create alerts under the user's alerts collection
-        allow create: if isOwner(userId);
-        allow update, delete: if request.auth != null && request.auth.uid == userId && request.auth.token.role != 'device';
+        allow read: if isHumanOwner(userId);
+        // Human owner or any active device owned by this user can create security alerts
+        allow create: if isHumanOwner(userId) || (
+          isAuthenticated() &&
+          request.auth.token.role == 'device' &&
+          request.auth.token.revoked != true &&
+          request.auth.token.ownerUid == userId &&
+          isDeviceActive(userId, request.auth.token.deviceId)
+        );
+        allow update, delete: if isHumanOwner(userId);
       }
 
       match /safe_zones/{zoneId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId && request.auth.token.role != 'device';
+        allow read, write: if isHumanOwner(userId);
       }
     }
 
@@ -57,6 +100,12 @@ service cloud.firestore {
     // Clients cannot read or list pairing codes directly to prevent enumeration/theft.
     // Privileged Cloud Functions handle creation and redemption using the Firebase Admin SDK.
     match /pairing_codes/{codeHash} {
+      allow read, write: if false;
+    }
+
+    // Rate limiting tracking collection:
+    // Managed exclusively by Cloud Functions
+    match /pairing_rate_limits/{hash} {
       allow read, write: if false;
     }
   }
