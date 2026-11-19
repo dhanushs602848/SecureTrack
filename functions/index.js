@@ -9,154 +9,221 @@ const db = admin.firestore();
 
 /**
  * Hash pairing code using SHA-256 for secure storage.
+ * Plaintext codes are never stored or logged.
  */
 function hashPairingCode(code) {
   return crypto.createHash('sha256').update(String(code).trim()).digest('hex');
 }
 
 /**
- * Hash installation ID using SHA-256 for rate limit tracking.
+ * Hash an identifier (IP address, installation ID, etc.) for rate limit tracking.
  */
-function hashInstallationId(id) {
-  return crypto.createHash('sha256').update(String(id).trim()).digest('hex');
+function hashIdentifier(identifier) {
+  return crypto.createHash('sha256').update(String(identifier).trim()).digest('hex');
+}
+
+/**
+ * Extract caller's IP address from raw request headers or connection.
+ */
+function getClientIp(context) {
+  if (context && context.rawRequest) {
+    const forwarded = context.rawRequest.headers && context.rawRequest.headers['x-forwarded-for'];
+    if (forwarded) {
+      const firstIp = String(forwarded).split(',')[0].trim();
+      if (firstIp) return firstIp;
+    }
+    if (context.rawRequest.ip) {
+      return String(context.rawRequest.ip).trim();
+    }
+  }
+  return 'unknown-ip';
+}
+
+/**
+ * Atomic check-and-increment rate limiter using Firestore transaction.
+ * Guarantees that concurrent requests cannot race past the attempt threshold.
+ */
+async function checkAndIncrementRateLimit(bucketKey, maxAttempts, windowMs) {
+  const docRef = db.collection('pairing_rate_limits').doc(bucketKey);
+  const now = Date.now();
+
+  return await db.runTransaction(async (transaction) => {
+    const doc = await transaction.get(docRef);
+    if (!doc.exists) {
+      transaction.set(docRef, {
+        attempts: 1,
+        firstAttemptAt: admin.firestore.Timestamp.fromMillis(now),
+        lastAttemptAt: admin.firestore.Timestamp.fromMillis(now)
+      });
+      return { allowed: true, attempts: 1 };
+    }
+
+    const data = doc.data();
+    const firstAttempt = data.firstAttemptAt ? data.firstAttemptAt.toMillis() : 0;
+    const elapsed = now - firstAttempt;
+
+    if (elapsed > windowMs) {
+      // Window expired, reset window atomically
+      transaction.set(docRef, {
+        attempts: 1,
+        firstAttemptAt: admin.firestore.Timestamp.fromMillis(now),
+        lastAttemptAt: admin.firestore.Timestamp.fromMillis(now)
+      });
+      return { allowed: true, attempts: 1 };
+    }
+
+    // Inside current window: if already at or above limit, reject
+    if ((data.attempts || 0) >= maxAttempts) {
+      return { allowed: false, attempts: data.attempts };
+    }
+
+    // Increment attempts atomically
+    const newAttempts = (data.attempts || 0) + 1;
+    transaction.update(docRef, {
+      attempts: newAttempts,
+      lastAttemptAt: admin.firestore.Timestamp.fromMillis(now)
+    });
+
+    return { allowed: true, attempts: newAttempts };
+  });
+}
+
+/**
+ * Reset rate limit bucket upon successful pairing.
+ */
+async function resetRateLimit(bucketKey) {
+  try {
+    await db.collection('pairing_rate_limits').doc(bucketKey).delete();
+  } catch (e) {
+    console.warn(`Could not reset rate limit bucket ${bucketKey}:`, e.message);
+  }
 }
 
 /**
  * Callable: Create a secure single-use 8-digit device pairing code.
- * Only authenticated owners can create codes.
+ * App Check enforced. Authenticated owner only.
  */
-exports.createDevicePairingCode = functions.https.onCall(async (data, context) => {
-  if (!context.auth || !context.auth.uid) {
-    throw new functions.https.HttpsError(
-      'unauthenticated',
-      'User must be authenticated to generate a pairing code.'
-    );
-  }
+exports.createDevicePairingCode = functions
+  .runWith({ enforceAppCheck: true })
+  .https.onCall(async (data, context) => {
+    // Defense-in-depth App Check validation
+    if (process.env.NODE_ENV === 'production' && !context.app) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'The function must be called from an App Check verified application.'
+      );
+    }
 
-  const ownerUid = context.auth.uid;
-  const now = Date.now();
+    if (!context.auth || !context.auth.uid) {
+      throw new functions.https.HttpsError(
+        'unauthenticated',
+        'User must be authenticated to generate a pairing code.'
+      );
+    }
 
-  // Rate limiting: check recent active codes created by this user
-  const recentCodes = await db.collection('pairing_codes')
-    .where('ownerUid', '==', ownerUid)
-    .where('status', '==', 'ACTIVE')
-    .get();
+    const ownerUid = context.auth.uid;
+    const now = Date.now();
 
-  if (recentCodes.size >= 5) {
-    throw new functions.https.HttpsError(
-      'resource-exhausted',
-      'Too many active pairing codes. Please wait or use an existing code.'
-    );
-  }
+    // Check active codes limit (max 5 active codes per user)
+    const recentCodes = await db.collection('pairing_codes')
+      .where('ownerUid', '==', ownerUid)
+      .where('status', '==', 'ACTIVE')
+      .get();
 
-  // Generate cryptographically random 8-digit code (10000000 to 99999999)
-  const codeNum = crypto.randomInt(10000000, 100000000);
-  const codeStr = codeNum.toString();
-  const codeHash = hashPairingCode(codeStr);
-  const expiresAtMillis = now + 10 * 60 * 1000; // 10 minutes
+    if (recentCodes.size >= 5) {
+      throw new functions.https.HttpsError(
+        'resource-exhausted',
+        'Too many active pairing codes. Please wait or use an existing code.'
+      );
+    }
 
-  await db.collection('pairing_codes').doc(codeHash).set({
-    ownerUid: ownerUid,
-    status: 'ACTIVE',
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    expiresAt: admin.firestore.Timestamp.fromMillis(expiresAtMillis),
-    attempts: 0
+    // Generate cryptographically random 8-digit code (10000000 to 99999999)
+    const codeNum = crypto.randomInt(10000000, 100000000);
+    const codeStr = codeNum.toString();
+    const codeHash = hashPairingCode(codeStr);
+    const expiresAtMillis = now + 10 * 60 * 1000; // 10 minutes
+
+    await db.collection('pairing_codes').doc(codeHash).set({
+      ownerUid: ownerUid,
+      status: 'ACTIVE',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: admin.firestore.Timestamp.fromMillis(expiresAtMillis),
+      attempts: 0
+    });
+
+    // Never log plaintext pairing code.
+    return {
+      code: codeStr,
+      expiresAt: new Date(expiresAtMillis).toISOString()
+    };
   });
-
-  return {
-    code: codeStr,
-    expiresAt: new Date(expiresAtMillis).toISOString()
-  };
-});
 
 /**
  * Callable: Claim a pairing code from an enrolling secondary phone.
  * Atomically consumes code and enrolls the phone under the owner's account.
- * Enforces per-installation rate limiting across codes to prevent brute-force attacks.
+ * App Check enforced. Rate limited on both server-derived IP and installation ID.
  */
-exports.claimDevicePairingCode = functions.https.onCall(async (data, context) => {
-  const { code, deviceName, model, androidVersion, installationId, batteryLevel } = data || {};
-
-  if (!installationId || typeof installationId !== 'string' || installationId.trim().length === 0) {
-    throw new functions.https.HttpsError(
-      'invalid-argument',
-      'Device installation ID is required.'
-    );
-  }
-
-  const cleanInstallationId = installationId.trim();
-  const instHash = hashInstallationId(cleanInstallationId);
-  const rateLimitRef = db.collection('pairing_rate_limits').doc(instHash);
-
-  const now = Date.now();
-  const WINDOW_MS = 15 * 60 * 1000; // 15-minute sliding window
-  const MAX_ATTEMPTS = 5;
-
-  // Check rate limit document across all attempted codes for this installation
-  const rateDoc = await rateLimitRef.get();
-  if (rateDoc.exists) {
-    const rateData = rateDoc.data();
-    const firstAttempt = rateData.firstAttemptAt ? rateData.firstAttemptAt.toMillis() : 0;
-    if (now - firstAttempt < WINDOW_MS) {
-      if ((rateData.attempts || 0) >= MAX_ATTEMPTS) {
-        throw new functions.https.HttpsError(
-          'resource-exhausted',
-          'Too many failed pairing attempts. Please wait 15 minutes before trying again.'
-        );
-      }
+exports.claimDevicePairingCode = functions
+  .runWith({ enforceAppCheck: true })
+  .https.onCall(async (data, context) => {
+    // Defense-in-depth App Check validation
+    if (process.env.NODE_ENV === 'production' && !context.app) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'The function must be called from an App Check verified application.'
+      );
     }
-  }
 
-  // Helper to record failed attempt for this installation
-  const recordFailure = async () => {
-    try {
-      await db.runTransaction(async (t) => {
-        const snap = await t.get(rateLimitRef);
-        if (!snap.exists) {
-          t.set(rateLimitRef, {
-            attempts: 1,
-            firstAttemptAt: admin.firestore.Timestamp.fromMillis(now),
-            lastAttemptAt: admin.firestore.Timestamp.fromMillis(now)
-          });
-        } else {
-          const data = snap.data();
-          const first = data.firstAttemptAt ? data.firstAttemptAt.toMillis() : 0;
-          if (now - first > WINDOW_MS) {
-            // Reset window after expiry
-            t.set(rateLimitRef, {
-              attempts: 1,
-              firstAttemptAt: admin.firestore.Timestamp.fromMillis(now),
-              lastAttemptAt: admin.firestore.Timestamp.fromMillis(now)
-            });
-          } else {
-            t.update(rateLimitRef, {
-              attempts: (data.attempts || 0) + 1,
-              lastAttemptAt: admin.firestore.Timestamp.fromMillis(now)
-            });
-          }
-        }
-      });
-    } catch (e) {
-      console.error('Failed to update rate limit record:', e);
+    const { code, deviceName, model, androidVersion, installationId, batteryLevel } = data || {};
+
+    if (!installationId || typeof installationId !== 'string' || installationId.trim().length === 0) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'Device installation ID is required.'
+      );
     }
-  };
 
-  if (!code || String(code).trim().length !== 8) {
-    await recordFailure();
-    throw new functions.https.HttpsError(
-      'invalid-argument',
-      'A valid 8-digit pairing code is required.'
-    );
-  }
+    const cleanInstallationId = installationId.trim();
+    const clientIp = getClientIp(context);
 
-  const cleanCode = String(code).trim();
-  const codeHash = hashPairingCode(cleanCode);
-  const codeRef = db.collection('pairing_codes').doc(codeHash);
+    // Multi-factor rate limit identities:
+    // 1. Caller installation identity
+    // 2. Server-derived client IP address
+    const instBucketKey = 'inst:' + hashIdentifier(cleanInstallationId);
+    const ipBucketKey = 'ip:' + hashIdentifier(clientIp);
 
-  let ownerUid = null;
-  const deviceId = cleanInstallationId;
+    const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+    const MAX_ATTEMPTS = 5;
 
-  try {
+    // Atomically increment and verify both rate limit buckets
+    // This prevents concurrent requests from bypassing the rate limit threshold
+    const [instRate, ipRate] = await Promise.all([
+      checkAndIncrementRateLimit(instBucketKey, MAX_ATTEMPTS, WINDOW_MS),
+      checkAndIncrementRateLimit(ipBucketKey, MAX_ATTEMPTS * 2, WINDOW_MS)
+    ]);
+
+    if (!instRate.allowed || !ipRate.allowed) {
+      throw new functions.https.HttpsError(
+        'resource-exhausted',
+        'Too many failed pairing attempts. Please wait 15 minutes before trying again.'
+      );
+    }
+
+    if (!code || String(code).trim().length !== 8) {
+      throw new functions.https.HttpsError(
+        'invalid-argument',
+        'A valid 8-digit pairing code is required.'
+      );
+    }
+
+    const cleanCode = String(code).trim();
+    const codeHash = hashPairingCode(cleanCode);
+    const codeRef = db.collection('pairing_codes').doc(codeHash);
+
+    let ownerUid = null;
+    const deviceId = cleanInstallationId;
+    const now = Date.now();
+
     await db.runTransaction(async (transaction) => {
       const codeDoc = await transaction.get(codeRef);
       if (!codeDoc.exists) {
@@ -168,7 +235,7 @@ exports.claimDevicePairingCode = functions.https.onCall(async (data, context) =>
 
       const codeData = codeDoc.data();
 
-      // Check attempts on the code itself
+      // Check attempts on the code document itself
       if (codeData.attempts && codeData.attempts >= MAX_ATTEMPTS) {
         transaction.update(codeRef, { status: 'LOCKED' });
         throw new functions.https.HttpsError(
@@ -199,7 +266,7 @@ exports.claimDevicePairingCode = functions.https.onCall(async (data, context) =>
 
       ownerUid = codeData.ownerUid;
 
-      // Mark code as claimed atomically
+      // Atomically claim the single-use code
       transaction.update(codeRef, {
         status: 'CLAIMED',
         claimedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -226,83 +293,111 @@ exports.claimDevicePairingCode = functions.https.onCall(async (data, context) =>
         trackingStatus: 'ACTIVE'
       }, { merge: true });
     });
-  } catch (err) {
-    // Record failed attempt on caller/installation
-    await recordFailure();
-    throw err;
-  }
 
-  // Reset rate limits for this installation upon successful claim
-  try {
-    await rateLimitRef.delete();
-  } catch (e) {
-    console.warn('Could not reset rate limit ref:', e);
-  }
+    // Reset rate limits on successful claim
+    await Promise.all([
+      resetRateLimit(instBucketKey),
+      resetRateLimit(ipBucketKey)
+    ]);
 
-  // Issue restricted custom token with claims: role = 'device', revoked = false, ownerUid, deviceId
-  const customToken = await admin.auth().createCustomToken(deviceId, {
-    role: 'device',
-    revoked: false,
-    ownerUid: ownerUid,
-    deviceId: deviceId
+    // Issue restricted custom token with claims: role = 'device', revoked = false, ownerUid, deviceId
+    const customToken = await admin.auth().createCustomToken(deviceId, {
+      role: 'device',
+      revoked: false,
+      ownerUid: ownerUid,
+      deviceId: deviceId
+    });
+
+    // Never log plaintext tokens or codes.
+    return {
+      success: true,
+      ownerUid: ownerUid,
+      deviceId: deviceId,
+      customToken: customToken
+    };
   });
-
-  return {
-    success: true,
-    ownerUid: ownerUid,
-    deviceId: deviceId,
-    customToken: customToken
-  };
-});
 
 /**
  * Callable: Revoke a paired device from the owner account.
- * Sets device status to REVOKED, revokes refresh tokens, and marks auth custom claims as revoked.
+ * App Check enforced.
+ * Unconditionally sets device status to REVOKED in Firestore to immediately cut off access,
+ * and records any token or claims revocation errors on the device document.
  */
-exports.revokePairedDevice = functions.https.onCall(async (data, context) => {
-  if (!context.auth || !context.auth.uid) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated.');
-  }
+exports.revokePairedDevice = functions
+  .runWith({ enforceAppCheck: true })
+  .https.onCall(async (data, context) => {
+    // Defense-in-depth App Check validation
+    if (process.env.NODE_ENV === 'production' && !context.app) {
+      throw new functions.https.HttpsError(
+        'failed-precondition',
+        'The function must be called from an App Check verified application.'
+      );
+    }
 
-  const { deviceId } = data || {};
-  if (!deviceId || typeof deviceId !== 'string') {
-    throw new functions.https.HttpsError('invalid-argument', 'Device ID required.');
-  }
+    if (!context.auth || !context.auth.uid) {
+      throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated.');
+    }
 
-  const ownerUid = context.auth.uid;
-  const cleanDeviceId = deviceId.trim();
-  const deviceRef = db.collection('users').doc(ownerUid).collection('devices').doc(cleanDeviceId);
-  const deviceDoc = await deviceRef.get();
+    const { deviceId } = data || {};
+    if (!deviceId || typeof deviceId !== 'string') {
+      throw new functions.https.HttpsError('invalid-argument', 'Device ID required.');
+    }
 
-  if (!deviceDoc.exists) {
-    throw new functions.https.HttpsError('not-found', 'Device not found.');
-  }
+    const ownerUid = context.auth.uid;
+    const cleanDeviceId = deviceId.trim();
+    const deviceRef = db.collection('users').doc(ownerUid).collection('devices').doc(cleanDeviceId);
+    const deviceDoc = await deviceRef.get();
 
-  await deviceRef.update({
-    status: 'REVOKED',
-    protectionEnabled: false,
-    trackingStatus: 'STOPPED',
-    revokedAt: admin.firestore.FieldValue.serverTimestamp()
-  });
+    if (!deviceDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'Device not found.');
+    }
 
-  // Revoke device refresh tokens
-  try {
-    await admin.auth().revokeRefreshTokens(cleanDeviceId);
-  } catch (e) {
-    console.warn('Could not revoke refresh tokens for device:', cleanDeviceId, e.message);
-  }
-
-  // Mark custom claims as revoked
-  try {
-    await admin.auth().setCustomUserClaims(cleanDeviceId, {
-      role: 'revoked',
-      revoked: true,
-      ownerUid: ownerUid,
-      deviceId: cleanDeviceId
+    // Step 1: Unconditionally mark device status as REVOKED in Firestore
+    // This immediately revokes all permissions in Firestore security rules
+    await deviceRef.update({
+      status: 'REVOKED',
+      protectionEnabled: false,
+      trackingStatus: 'STOPPED',
+      revokedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-  } catch (e) {
-    console.warn('Could not update custom user claims for revoked device:', cleanDeviceId, e.message);
-  }
 
-  return { success: true };
-});
+    const revocationErrors = [];
+
+    // Step 2: Revoke device refresh tokens
+    try {
+      await admin.auth().revokeRefreshTokens(cleanDeviceId);
+    } catch (e) {
+      const errMsg = `Refresh token revocation failed: ${e.message}`;
+      console.error(errMsg);
+      revocationErrors.push(errMsg);
+    }
+
+    // Step 3: Mark custom claims as revoked
+    try {
+      await admin.auth().setCustomUserClaims(cleanDeviceId, {
+        role: 'revoked',
+        revoked: true,
+        ownerUid: ownerUid,
+        deviceId: cleanDeviceId
+      });
+    } catch (e) {
+      const errMsg = `Custom user claims update failed: ${e.message}`;
+      console.error(errMsg);
+      revocationErrors.push(errMsg);
+    }
+
+    // Step 4: Record security errors on the device document if any secondary steps failed
+    if (revocationErrors.length > 0) {
+      await deviceRef.update({
+        revocationWarnings: revocationErrors,
+        revocationWarningRecordedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      return {
+        success: true,
+        deviceStatus: 'REVOKED',
+        warnings: revocationErrors
+      };
+    }
+
+    return { success: true, deviceStatus: 'REVOKED' };
+  });

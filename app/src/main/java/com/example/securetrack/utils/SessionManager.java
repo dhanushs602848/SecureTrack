@@ -61,12 +61,14 @@ public class SessionManager {
         return uid;
     }
 
+    /**
+     * Authenticated human owner UID.
+     * Guaranteed to return only the verified account owner UID.
+     * Fails closed by returning null if not authenticated, preventing paired devices
+     * from falling back to their own device Firebase UID.
+     */
     public String getOwnerUid() {
-        String uid = prefs.getString(KEY_OWNER_UID, null);
-        if (uid == null) {
-            uid = getFirebaseUid();
-        }
-        return uid;
+        return prefs.getString(KEY_OWNER_UID, null);
     }
 
     public void setOwnerUid(String ownerUid) {

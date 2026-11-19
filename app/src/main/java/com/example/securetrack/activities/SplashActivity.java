@@ -24,7 +24,10 @@ public class SplashActivity extends AppCompatActivity {
                 String uid = currentUser.getUid();
                 String email = currentUser.getEmail() != null ? currentUser.getEmail() : "";
                 String name = currentUser.getDisplayName() != null ? currentUser.getDisplayName() : email;
-                sessionManager.saveFirebaseAuthSession(uid, email, name);
+                String existingOwner = sessionManager.getOwnerUid();
+                if (existingOwner == null || existingOwner.isEmpty()) {
+                    sessionManager.saveFirebaseAuthSession(uid, email, name);
+                }
                 startActivity(new Intent(SplashActivity.this, MainActivity.class));
             } else if (sessionManager.isLoggedIn()) {
                 startActivity(new Intent(SplashActivity.this, MainActivity.class));

@@ -42,12 +42,14 @@ service cloud.firestore {
 
         // Update:
         // - Owner has full update capability.
-        // - Active paired device can report telemetry, but cannot alter immutable identity fields and cannot revoke/un-revoke itself.
+        // - Active paired device can ONLY update an explicit allowlist of telemetry fields.
+        // - Identity, ownership, pairing and protection-control fields (id, ownerUid, installationId, paired, protectionEnabled, deviceName, model, androidVersion) are strictly immutable to devices.
+        // - Devices cannot set their own status to REVOKED.
         allow update: if isHumanOwner(userId) || (
           isActiveDevice(userId, deviceId) &&
-          request.resource.data.id == resource.data.id &&
-          request.resource.data.ownerUid == resource.data.ownerUid &&
-          request.resource.data.installationId == resource.data.installationId &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'batteryLevel', 'lastSeen', 'locationStatus', 'trackingStatus', 'networkStatus', 'status'
+          ]) &&
           request.resource.data.status != 'REVOKED'
         );
 
@@ -66,7 +68,9 @@ service cloud.firestore {
           // Update: Owner can update, or active device can ONLY update execution status/result fields
           allow update: if isHumanOwner(userId) || (
             isActiveDevice(userId, deviceId) &&
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'result', 'executedAt', 'error', 'details', 'progress']) &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'status', 'result', 'executedAt', 'error', 'details', 'progress'
+            ]) &&
             request.resource.data.command == resource.data.command &&
             request.resource.data.targetDeviceId == resource.data.targetDeviceId
           );

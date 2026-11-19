@@ -44,11 +44,7 @@ public class DeviceRepository {
     }
 
     private String getUid() {
-        String uid = sessionManager.getOwnerUid();
-        if (uid == null && FirebaseAuth.getInstance().getCurrentUser() != null) {
-            uid = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        }
-        return uid;
+        return sessionManager.getOwnerUid();
     }
 
     public void registerDevice(Device device, ApiCallback<Device> callback) {
@@ -255,42 +251,61 @@ public class DeviceRepository {
                         if (customToken != null && !customToken.isEmpty()) {
                             FirebaseAuth.getInstance().signInWithCustomToken(customToken)
                                     .addOnSuccessListener(authResult -> {
-                                        sessionManager.setOwnerUid(ownerUid);
-                                        sessionManager.setCurrentDeviceId(deviceId);
-                                        sessionManager.setDeviceName(request.getDeviceName());
+                                        com.google.firebase.auth.FirebaseUser user = authResult.getUser();
+                                        if (user == null) {
+                                            callback.onError("Authentication failed: null user after custom token sign in");
+                                            return;
+                                        }
 
-                                        Device enrolledDevice = new Device(
-                                                deviceId,
-                                                request.getDeviceName(),
-                                                request.getModel(),
-                                                request.getAndroidVersion(),
-                                                DeviceUtils.getBatteryPercentage(context),
-                                                "ONLINE",
-                                                true,
-                                                installId
-                                        );
-                                        callback.onSuccess(enrolledDevice);
+                                        // Force token refresh and verify cryptographic custom claims
+                                        user.getIdToken(true).addOnSuccessListener(tokenResult -> {
+                                            Map<String, Object> claims = tokenResult.getClaims();
+                                            String roleClaim = claims != null ? (String) claims.get("role") : null;
+                                            String ownerUidClaim = claims != null ? (String) claims.get("ownerUid") : null;
+                                            String deviceIdClaim = claims != null ? (String) claims.get("deviceId") : null;
+                                            Boolean revokedClaim = claims != null ? (Boolean) claims.get("revoked") : null;
+
+                                            // Fail closed if claims do not match the expected owner and device
+                                            if (!"device".equals(roleClaim) ||
+                                                    ownerUidClaim == null || !ownerUidClaim.equals(ownerUid) ||
+                                                    deviceIdClaim == null || !deviceIdClaim.equals(deviceId) ||
+                                                    Boolean.TRUE.equals(revokedClaim)) {
+
+                                                Log.e(TAG, "Security claims mismatch! Claims: " + claims);
+                                                FirebaseAuth.getInstance().signOut();
+                                                sessionManager.logout();
+                                                callback.onError("Security violation: Token claims do not match pairing authorization");
+                                                return;
+                                            }
+
+                                            sessionManager.setOwnerUid(ownerUid);
+                                            sessionManager.setCurrentDeviceId(deviceId);
+                                            sessionManager.setDeviceName(request.getDeviceName());
+
+                                            Device enrolledDevice = new Device(
+                                                    deviceId,
+                                                    request.getDeviceName(),
+                                                    request.getModel(),
+                                                    request.getAndroidVersion(),
+                                                    DeviceUtils.getBatteryPercentage(context),
+                                                    "ONLINE",
+                                                    true,
+                                                    installId
+                                            );
+                                            callback.onSuccess(enrolledDevice);
+                                        }).addOnFailureListener(e -> {
+                                            Log.e(TAG, "Failed to retrieve and verify ID token claims", e);
+                                            FirebaseAuth.getInstance().signOut();
+                                            sessionManager.logout();
+                                            callback.onError("Failed to verify token claims: " + e.getMessage());
+                                        });
                                     })
                                     .addOnFailureListener(e -> {
                                         Log.e(TAG, "Failed to sign in with device custom token", e);
                                         callback.onError("Failed to authenticate device credentials: " + e.getMessage());
                                     });
                         } else {
-                            sessionManager.setOwnerUid(ownerUid);
-                            sessionManager.setCurrentDeviceId(deviceId);
-                            sessionManager.setDeviceName(request.getDeviceName());
-
-                            Device enrolledDevice = new Device(
-                                    deviceId,
-                                    request.getDeviceName(),
-                                    request.getModel(),
-                                    request.getAndroidVersion(),
-                                    DeviceUtils.getBatteryPercentage(context),
-                                    "ONLINE",
-                                    true,
-                                    installId
-                            );
-                            callback.onSuccess(enrolledDevice);
+                            callback.onError("Security violation: Missing custom token from pairing response.");
                         }
                     } else {
                         callback.onError("Pairing failed: invalid response from server.");

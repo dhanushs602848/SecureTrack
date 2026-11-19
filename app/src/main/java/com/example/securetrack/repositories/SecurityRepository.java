@@ -32,11 +32,7 @@ public class SecurityRepository {
     }
 
     private String getUid() {
-        String uid = sessionManager.getOwnerUid();
-        if (uid == null && FirebaseAuth.getInstance().getCurrentUser() != null) {
-            uid = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        }
-        return uid;
+        return sessionManager.getOwnerUid();
     }
 
     public void recordSecurityEvent(SecurityEvent event, ApiCallback<SecurityEvent> callback) {
