@@ -23,7 +23,8 @@ import {
   onSnapshot,
   Timestamp
 } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { httpsCallable } from 'firebase/functions';
+import { auth, db, functions } from './firebase';
 import { Device, DeviceCommand, LocationRecord, SecurityEvent, User, SafeZone } from '../types';
 
 const convertTimestamp = (ts: any): string => {
@@ -248,35 +249,17 @@ export const deviceService = {
     const uid = auth.currentUser?.uid;
     if (!uid) throw new Error('User not authenticated');
 
-    const code = Math.floor(10000000 + Math.random() * 90000000).toString();
-    const expiresAtMillis = Date.now() + 10 * 60 * 1000;
-    const codeId = code;
-
-    await setDoc(doc(db, 'pairing_codes', codeId), {
-      code: code,
-      ownerUid: uid,
-      status: 'ACTIVE',
-      createdAt: serverTimestamp(),
-      expiresAt: Timestamp.fromMillis(expiresAtMillis),
-      attempts: 0
-    });
-
-    return {
-      code,
-      expiresAt: new Date(expiresAtMillis).toISOString()
-    };
+    const fn = httpsCallable<any, { code: string; expiresAt: string }>(functions, 'createDevicePairingCode');
+    const result = await fn();
+    return result.data;
   },
 
   revokePairedDevice: async (deviceId: string): Promise<void> => {
     const uid = auth.currentUser?.uid;
     if (!uid) throw new Error('User not authenticated');
 
-    const devRef = doc(db, 'users', uid, 'devices', deviceId);
-    await updateDoc(devRef, {
-      status: 'REVOKED',
-      protectionEnabled: false,
-      revokedAt: serverTimestamp()
-    });
+    const fn = httpsCallable<{ deviceId: string }, any>(functions, 'revokePairedDevice');
+    await fn({ deviceId });
   }
 };
 
