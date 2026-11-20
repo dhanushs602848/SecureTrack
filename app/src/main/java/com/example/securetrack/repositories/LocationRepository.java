@@ -61,6 +61,7 @@ public class LocationRepository {
 
         Map<String, Object> map = new HashMap<>();
         map.put("clientUuid", locationId);
+        map.put("requestId", locationId);
         map.put("latitude", record.getLatitude());
         map.put("longitude", record.getLongitude());
         map.put("accuracy", record.getAccuracy());

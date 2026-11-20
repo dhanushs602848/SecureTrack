@@ -319,6 +319,8 @@ public class SecurityRepository {
                             command.getPayload(),
                             command.getResult()
                     );
+                    created.setId(commandId);
+                    created.setDeviceId(targetDeviceId);
                     callback.onSuccess(created);
                 })
                 .addOnFailureListener(e -> callback.onError("Firestore command dispatch error: " + e.getMessage()));

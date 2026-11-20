@@ -86,46 +86,59 @@ public class LocationPriorityManager {
             return;
         }
 
-        DeviceCommand cmd = new DeviceCommand("LOCATE_NOW", "QUEUED", "Location Priority Manager trigger", "");
-        final boolean[] responded = {false};
+        final String requestId = java.util.UUID.randomUUID().toString();
+        final long commandTime = System.currentTimeMillis();
+        org.json.JSONObject payloadJson = new org.json.JSONObject();
+        try {
+            payloadJson.put("requestId", requestId);
+            payloadJson.put("requestedAt", commandTime);
+        } catch (Exception ignored) {}
+
+        DeviceCommand cmd = new DeviceCommand("LOCATE_NOW", "QUEUED", payloadJson.toString(), "");
+        final java.util.concurrent.atomic.AtomicBoolean responded = new java.util.concurrent.atomic.AtomicBoolean(false);
 
         securityRepository.createCommand(targetDeviceId, cmd, new SecurityRepository.ApiCallback<DeviceCommand>() {
             @Override
             public void onSuccess(DeviceCommand createdCmd) {
-                // Listen to location collection for fresh location timestamped after command creation
-                long commandTime = System.currentTimeMillis();
-
                 final ListenerRegistration[] locListener = new ListenerRegistration[1];
                 locListener[0] = db.collection("users").document(uid)
                         .collection("devices").document(targetDeviceId)
                         .collection("locations")
                         .orderBy("timestamp", Query.Direction.DESCENDING)
-                        .limit(1)
+                        .limit(5)
                         .addSnapshotListener((snapshots, e) -> {
                             if (e != null || snapshots == null || snapshots.isEmpty()) return;
-                            DocumentSnapshot doc = snapshots.getDocuments().get(0);
-                            Double lat = doc.getDouble("latitude");
-                            Double lng = doc.getDouble("longitude");
-                            Double acc = doc.getDouble("accuracy");
-                            com.google.firebase.Timestamp ts = doc.getTimestamp("timestamp");
+                            for (DocumentSnapshot doc : snapshots.getDocuments()) {
+                                Double lat = doc.getDouble("latitude");
+                                Double lng = doc.getDouble("longitude");
+                                Double acc = doc.getDouble("accuracy");
+                                com.google.firebase.Timestamp ts = doc.getTimestamp("timestamp");
+                                String docReqId = doc.getString("requestId");
+                                if (docReqId == null) {
+                                    docReqId = doc.getString("clientUuid");
+                                }
 
-                            long locTime = ts != null ? ts.toDate().getTime() : 0;
-                            // Check if this location is genuinely fresh (within 15 seconds of command)
-                            if (lat != null && lng != null && (locTime >= (commandTime - 15000))) {
-                                synchronized (responded) {
-                                    if (!responded[0]) {
-                                        responded[0] = true;
+                                long locTime = ts != null ? ts.toDate().getTime() : 0;
+                                boolean matchesRequest = (requestId.equals(docReqId));
+                                boolean isFreshAndValidCoords = (lat != null && lng != null
+                                        && lat >= -90.0 && lat <= 90.0
+                                        && lng >= -180.0 && lng <= 180.0
+                                        && (acc == null || acc >= 0));
+
+                                // Correlate location: matches requestId or freshly generated at or after command time
+                                if (isFreshAndValidCoords && (matchesRequest || locTime >= commandTime)) {
+                                    if (responded.compareAndSet(false, true)) {
                                         if (locListener[0] != null) locListener[0].remove();
 
                                         SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy • HH:mm:ss", Locale.getDefault());
-                                        String formatted = sdf.format(new Date(locTime));
+                                        String formatted = sdf.format(new Date(locTime > 0 ? locTime : System.currentTimeMillis()));
 
                                         ResolvedLocation res = new ResolvedLocation(
                                                 ResolvedLocation.Pathway.CLOUD_LIVE,
                                                 lat,
                                                 lng,
                                                 acc != null ? acc.floatValue() : 10.0f,
-                                                locTime,
+                                                locTime > 0 ? locTime : System.currentTimeMillis(),
                                                 formatted,
                                                 "GPS / Fused Provider (Live Cloud)",
                                                 true,
@@ -135,6 +148,7 @@ public class LocationPriorityManager {
                                         mainHandler.post(() -> {
                                             if (callback != null) callback.onLocationResolved(res);
                                         });
+                                        return;
                                     }
                                 }
                             }
@@ -142,13 +156,10 @@ public class LocationPriorityManager {
 
                 // Cloud timeout handler
                 mainHandler.postDelayed(() -> {
-                    synchronized (responded) {
-                        if (!responded[0]) {
-                            responded[0] = true;
-                            if (locListener[0] != null) locListener[0].remove();
-                            Log.i(TAG, "Cloud locate timed out. Falling back to BLE nearby scanning.");
-                            attemptBleFallback(targetDeviceId, callback);
-                        }
+                    if (responded.compareAndSet(false, true)) {
+                        if (locListener[0] != null) locListener[0].remove();
+                        Log.i(TAG, "Cloud locate timed out. Falling back to BLE nearby scanning.");
+                        attemptBleFallback(targetDeviceId, callback);
                     }
                 }, CLOUD_TIMEOUT_MS);
             }

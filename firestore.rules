@@ -45,18 +45,21 @@ service cloud.firestore {
         // - Owner has full update capability.
         // - Authorized device can ONLY update an explicit allowlist of telemetry fields.
         // - Identity, ownership, pairing and protection-control fields are strictly immutable to devices.
-        // - Devices cannot set their own status to REVOKED.
+        // - Devices cannot set their own status to REVOKED or anything other than explicit telemetry status (ONLINE/OFFLINE).
         allow update: if isHumanOwner(userId) || (
           isAuthorizedDevice(userId, deviceId) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'batteryLevel', 'lastSeen', 'locationStatus', 'trackingStatus', 'networkStatus', 'status'
           ]) &&
-          request.resource.data.status != 'REVOKED'
+          request.resource.data.status in ['ONLINE', 'OFFLINE']
         );
 
         match /locations/{locationId} {
           allow read: if isHumanOwner(userId) || isAuthorizedDevice(userId, deviceId);
-          allow create: if isHumanOwner(userId) || isAuthorizedDevice(userId, deviceId);
+          allow create: if (isHumanOwner(userId) || isAuthorizedDevice(userId, deviceId)) &&
+                        request.resource.data.latitude >= -90.0 && request.resource.data.latitude <= 90.0 &&
+                        request.resource.data.longitude >= -180.0 && request.resource.data.longitude <= 180.0 &&
+                        (!('accuracy' in request.resource.data) || request.resource.data.accuracy >= 0);
           allow update, delete: if isHumanOwner(userId);
         }
 
@@ -67,13 +70,17 @@ service cloud.firestore {
           allow delete: if isHumanOwner(userId);
 
           // Update: Owner can update, or active device can ONLY update execution status/result fields
+          // Device cannot alter command identity, target ID, requesting user, or command type/payload
           allow update: if isHumanOwner(userId) || (
             isAuthorizedDevice(userId, deviceId) &&
             request.resource.data.diff(resource.data).affectedKeys().hasOnly([
               'status', 'result', 'executedAt', 'error', 'details', 'progress'
             ]) &&
-            request.resource.data.command == resource.data.command &&
-            request.resource.data.targetDeviceId == resource.data.targetDeviceId
+            request.resource.data.status in ['RECEIVED', 'ACKNOWLEDGED', 'EXECUTING', 'EXECUTED', 'FAILED'] &&
+            request.resource.data.targetDeviceId == resource.data.targetDeviceId &&
+            (!('command' in resource.data) || request.resource.data.command == resource.data.command) &&
+            (!('commandType' in resource.data) || request.resource.data.commandType == resource.data.commandType) &&
+            (!('payload' in resource.data) || request.resource.data.payload == resource.data.payload)
           );
         }
       }
@@ -91,7 +98,12 @@ service cloud.firestore {
           request.resource.data.ownerUid == userId &&
           isAuthorizedDevice(userId, request.resource.data.deviceId)
         );
-        allow update, delete: if isHumanOwner(userId);
+        allow update: if isHumanOwner(userId) &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                        'status', 'dismissedAt', 'dismissedBy', 'resolvedAt'
+                      ]) &&
+                      request.resource.data.status in ['ACTIVE', 'ACKNOWLEDGED', 'RESOLVED', 'DISMISSED'];
+        allow delete: if isHumanOwner(userId);
       }
 
       match /safe_zones/{zoneId} {

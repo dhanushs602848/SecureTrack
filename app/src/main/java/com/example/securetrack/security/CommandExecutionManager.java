@@ -172,7 +172,7 @@ public class CommandExecutionManager {
 
         // Dispatch based on command type
         if ("LOCATE_NOW".equalsIgnoreCase(type)) {
-            handleLocateCommand(uid, deviceId, commandId);
+            handleLocateCommand(uid, deviceId, commandId, doc);
         } else if ("LOCK_DEVICE".equalsIgnoreCase(type)) {
             handleLockCommand(uid, deviceId, commandId);
         } else if ("ALARM_ALERT".equalsIgnoreCase(type)) {
@@ -185,22 +185,37 @@ public class CommandExecutionManager {
     }
 
     @SuppressLint("MissingPermission")
-    private void handleLocateCommand(String uid, String deviceId, String commandId) {
+    private void handleLocateCommand(String uid, String deviceId, String commandId, DocumentSnapshot doc) {
         if (!PermissionUtils.hasForegroundLocationPermission(context)) {
             updateCommandStatus(uid, deviceId, commandId, "FAILED", "Location permission not granted on target device");
             return;
         }
 
+        String reqId = doc.getString("requestId");
+        if (reqId == null || reqId.isEmpty()) {
+            String payload = doc.getString("payload");
+            if (payload != null && !payload.isEmpty()) {
+                try {
+                    org.json.JSONObject json = new org.json.JSONObject(payload);
+                    reqId = json.optString("requestId", null);
+                } catch (Exception ignored) {}
+            }
+        }
+        if (reqId == null || reqId.isEmpty()) {
+            reqId = commandId;
+        }
+        final String finalRequestId = reqId;
+
         try {
             fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
                     .addOnSuccessListener(location -> {
                         if (location != null) {
-                            recordAndCompleteLocate(uid, deviceId, commandId, location);
+                            recordAndCompleteLocate(uid, deviceId, commandId, finalRequestId, location);
                         } else {
                             // Fallback to last known location
                             fusedLocationClient.getLastLocation().addOnSuccessListener(lastLoc -> {
                                 if (lastLoc != null) {
-                                    recordAndCompleteLocate(uid, deviceId, commandId, lastLoc);
+                                    recordAndCompleteLocate(uid, deviceId, commandId, finalRequestId, lastLoc);
                                 } else {
                                     updateCommandStatus(uid, deviceId, commandId, "FAILED", "GPS/Network location provider returned null");
                                 }
@@ -217,15 +232,14 @@ public class CommandExecutionManager {
         }
     }
 
-    private void recordAndCompleteLocate(String uid, String deviceId, String commandId, Location location) {
+    private void recordAndCompleteLocate(String uid, String deviceId, String commandId, String requestId, Location location) {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
         sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
         String timestampStr = sdf.format(new Date(location.getTime()));
 
-        String clientUuid = UUID.randomUUID().toString();
         LocationRecord record = new LocationRecord(
                 deviceId,
-                clientUuid,
+                requestId,
                 location.getLatitude(),
                 location.getLongitude(),
                 location.getAccuracy(),
@@ -234,7 +248,7 @@ public class CommandExecutionManager {
                 timestampStr
         );
 
-        // Save to Firestore location history
+        // Save to Firestore location history with exact requestId correlation
         locationRepository.recordLocation(record, new LocationRepository.ApiCallback<LocationRecord>() {
             @Override
             public void onSuccess(LocationRecord result) {
@@ -246,23 +260,39 @@ public class CommandExecutionManager {
                 devUpdates.put("lastLatitude", location.getLatitude());
                 devUpdates.put("lastLongitude", location.getLongitude());
                 devUpdates.put("lastAccuracy", location.getAccuracy());
+                devUpdates.put("lastRequestId", requestId);
 
                 db.collection("users").document(uid)
                         .collection("devices").document(deviceId)
                         .set(devUpdates, SetOptions.merge());
 
-                String resultMsg = String.format(Locale.US, "Location: (%.5f, %.5f) ±%.1fm",
-                        location.getLatitude(), location.getLongitude(), location.getAccuracy());
-                updateCommandStatus(uid, deviceId, commandId, "EXECUTED", resultMsg);
+                String resultMsg = String.format(Locale.US, "Location: (%.5f, %.5f) ±%.1fm [req:%s]",
+                        location.getLatitude(), location.getLongitude(), location.getAccuracy(), requestId);
+                updateCommandStatusWithRequestId(uid, deviceId, commandId, "EXECUTED", resultMsg, requestId);
             }
 
             @Override
             public void onError(String errorMessage) {
-                String resultMsg = String.format(Locale.US, "Location: (%.5f, %.5f) ±%.1fm (Local only)",
-                        location.getLatitude(), location.getLongitude(), location.getAccuracy());
-                updateCommandStatus(uid, deviceId, commandId, "EXECUTED", resultMsg);
+                String resultMsg = String.format(Locale.US, "Location: (%.5f, %.5f) ±%.1fm (Local only) [req:%s]",
+                        location.getLatitude(), location.getLongitude(), location.getAccuracy(), requestId);
+                updateCommandStatusWithRequestId(uid, deviceId, commandId, "EXECUTED", resultMsg, requestId);
             }
         });
+    }
+
+    private void updateCommandStatusWithRequestId(String uid, String deviceId, String commandId, String status, String result, String requestId) {
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("status", status);
+        updates.put("result", result);
+        if (requestId != null) {
+            updates.put("requestId", requestId);
+        }
+        updates.put("executedAt", FieldValue.serverTimestamp());
+
+        db.collection("users").document(uid)
+                .collection("devices").document(deviceId)
+                .collection("commands").document(commandId)
+                .set(updates, SetOptions.merge());
     }
 
     private void handleLockCommand(String uid, String deviceId, String commandId) {

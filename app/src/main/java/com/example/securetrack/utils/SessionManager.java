@@ -150,7 +150,7 @@ public class SessionManager {
     }
 
     public String getBaseUrl() {
-        return prefs.getString(KEY_BASE_URL, "http://127.0.0.1:8080/");
+        return prefs.getString(KEY_BASE_URL, "https://track-99c90.web.app/");
     }
 
     public void setBaseUrl(String url) {

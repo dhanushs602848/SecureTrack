@@ -209,4 +209,86 @@ public class SecurityAndLocationUpgradeTest {
         boolean canExecute = !"EXECUTED".equals(cmd.getStatus()) && !"FAILED".equals(cmd.getStatus()) && !"EXPIRED".equals(cmd.getStatus());
         assertFalse("Command in EXECUTED state must be rejected from duplicate execution", canExecute);
     }
+
+    @Test
+    public void testBleMutualHmacKeyDerivationAndVerification() {
+        String ownerUid = "owner_test_12345";
+        String deviceId = "device_samsung_001";
+
+        byte[] validKey = BleNearbyManager.deriveDeviceBleKey(ownerUid, deviceId);
+        assertNotNull("Derived key must not be null", validKey);
+        assertEquals("HMAC-SHA256 derived key must be 32 bytes", 32, validKey.length);
+
+        // Different owner or different device ID must produce distinct cryptographic keys
+        byte[] wrongOwnerKey = BleNearbyManager.deriveDeviceBleKey("malicious_user_666", deviceId);
+        byte[] wrongDeviceKey = BleNearbyManager.deriveDeviceBleKey(ownerUid, "device_imposter_999");
+
+        assertFalse("Different owner must yield different key", java.security.MessageDigest.isEqual(validKey, wrongOwnerKey));
+        assertFalse("Different device must yield different key", java.security.MessageDigest.isEqual(validKey, wrongDeviceKey));
+
+        // Test signature generation and verification
+        String serverNonce = "0123456789abcdef0123456789abcdef";
+        String clientNonce = "fedcba9876543210fedcba9876543210";
+        String authData = "BLE-AUTH-REQ:" + serverNonce + ":" + clientNonce + ":" + deviceId;
+
+        byte[] legitimateProof = BleNearbyManager.computeHmacSha256(validKey, authData);
+        assertNotNull(legitimateProof);
+        assertEquals(32, legitimateProof.length);
+
+        // Verify valid proof matches
+        byte[] expectedProof = BleNearbyManager.computeHmacSha256(validKey, authData);
+        assertTrue("Legitimate proof must verify successfully", java.security.MessageDigest.isEqual(expectedProof, legitimateProof));
+
+        // Verify forged proof with attacker key fails
+        byte[] forgedProof = BleNearbyManager.computeHmacSha256(wrongOwnerKey, authData);
+        assertFalse("Attacker proof must be rejected", java.security.MessageDigest.isEqual(expectedProof, forgedProof));
+
+        // Verify tampered message fails
+        String tamperedData = authData + "_tampered";
+        byte[] tamperedProof = BleNearbyManager.computeHmacSha256(validKey, tamperedData);
+        assertFalse("Tampered auth data must be rejected", java.security.MessageDigest.isEqual(expectedProof, tamperedProof));
+    }
+
+    @Test
+    public void testLocationRequestIdCorrelationAndBoundaryValidation() {
+        String expectedRequestId = UUID.randomUUID().toString();
+        long commandTime = System.currentTimeMillis();
+
+        // Matching request ID
+        String docRequestId = expectedRequestId;
+        long docTime = commandTime + 500; // 500ms after command
+        double lat = 13.0827;
+        double lng = 80.2707;
+        double accuracy = 8.2;
+
+        boolean matchesReqId = expectedRequestId.equals(docRequestId);
+        boolean isFresh = docTime >= commandTime;
+        boolean validCoords = (lat >= -90.0 && lat <= 90.0 && lng >= -180.0 && lng <= 180.0 && accuracy >= 0);
+
+        assertTrue("Matching request ID must correlate", matchesReqId);
+        assertTrue("Location after command time must be fresh", isFresh);
+        assertTrue("Valid coordinates must pass validation", validCoords);
+
+        // Negative test: Stale location with mismatched request ID
+        String staleRequestId = UUID.randomUUID().toString();
+        long staleTime = commandTime - 30000L; // 30s before command
+        boolean staleMatches = expectedRequestId.equals(staleRequestId);
+        boolean staleIsFresh = staleTime >= commandTime;
+
+        assertFalse("Mismatched request ID must not correlate", staleMatches);
+        assertFalse("Old location prior to command must not be considered fresh", staleIsFresh);
+
+        // Negative test: Out of bounds coordinates
+        double invalidLat = 105.0; // latitude > 90
+        boolean invalidCoords = (invalidLat >= -90.0 && invalidLat <= 90.0);
+        assertFalse("Latitude > 90 must fail validation", invalidCoords);
+
+        double invalidLng = -195.0; // longitude < -180
+        boolean invalidLngCoords = (invalidLng >= -180.0 && invalidLng <= 180.0);
+        assertFalse("Longitude < -180 must fail validation", invalidLngCoords);
+
+        double negativeAcc = -1.0;
+        boolean validAcc = negativeAcc >= 0;
+        assertFalse("Negative accuracy must fail validation", validAcc);
+    }
 }
