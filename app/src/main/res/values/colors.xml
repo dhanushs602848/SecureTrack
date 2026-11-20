@@ -23,6 +23,21 @@
     <color name="nav_selected">#152C4F</color>
     <color name="nav_unselected">#62666D</color>
 
+    <!-- Modern Dark Midnight & Electric Accents -->
+    <color name="midnight_dark">#0B132B</color>
+    <color name="midnight_card">#1C2541</color>
+    <color name="midnight_card_secondary">#243256</color>
+    <color name="midnight_border">#2E3D66</color>
+    <color name="electric_cyan">#00D2FF</color>
+    <color name="electric_blue">#3A86FF</color>
+    <color name="mint_green">#10B981</color>
+    <color name="amber_warning">#F59E0B</color>
+    <color name="coral_error">#EF4444</color>
+    <color name="purple_ble">#8B5CF6</color>
+    <color name="slate_400">#94A3B8</color>
+    <color name="slate_300">#CBD5E1</color>
+    <color name="slate_100">#F1F5F9</color>
+
     <!-- High-Visibility Input Specifications -->
     <color name="input_text">#152C4F</color>
     <color name="input_hint">#64748B</color>

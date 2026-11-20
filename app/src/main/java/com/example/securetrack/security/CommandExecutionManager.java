@@ -1,40 +1,78 @@
 package com.example.securetrack.security;
 
+import android.annotation.SuppressLint;
 import android.app.admin.DevicePolicyManager;
 import android.content.Context;
-import android.media.Ringtone;
-import android.media.RingtoneManager;
-import android.net.Uri;
+import android.location.Location;
 import android.util.Log;
+import com.example.securetrack.ble.BleNearbyManager;
+import com.example.securetrack.database.AppDatabase;
+import com.example.securetrack.database.CommandEntity;
+import com.example.securetrack.database.LocationEntity;
+import com.example.securetrack.models.LocationRecord;
+import com.example.securetrack.repositories.LocationRepository;
+import com.example.securetrack.utils.DeviceUtils;
+import com.example.securetrack.utils.PermissionUtils;
 import com.example.securetrack.utils.SessionManager;
-import com.google.firebase.auth.FirebaseAuth;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.Priority;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.SetOptions;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.TimeZone;
+import java.util.UUID;
 
+/**
+ * Robust, duplicate-safe command execution engine for SecureTrack.
+ * Handles:
+ * - Real GPS location acquisition for LOCATE_NOW
+ * - Secure force-lock via DevicePolicyManager for LOCK_DEVICE
+ * - Loud 5-second auto-stopping alarm via AlarmSoundManager for ALARM_ALERT
+ * - Command expiration verification (15-min limit for security commands)
+ * - Duplicate execution prevention
+ * - Local Room command audit tracking
+ */
 public class CommandExecutionManager {
 
     private static final String TAG = "CommandExecutionMgr";
 
+    // Command-specific expiration windows
+    private static final long EXPIRY_LOCK_ALARM_MS = 15 * 60 * 1000L; // 15 mins
+    private static final long EXPIRY_LOCATE_MS = 30 * 60 * 1000L;     // 30 mins
+
     private final Context context;
     private final FirebaseFirestore db;
     private final SessionManager sessionManager;
+    private final LocationRepository locationRepository;
+    private final FusedLocationProviderClient fusedLocationClient;
+    private final AppDatabase appDatabase;
+    private final Set<String> processedCommandIds = new HashSet<>();
     private ListenerRegistration commandListener;
 
     public CommandExecutionManager(Context context) {
         this.context = context.getApplicationContext();
         this.db = FirebaseFirestore.getInstance();
         this.sessionManager = new SessionManager(this.context);
+        this.locationRepository = new LocationRepository(this.context);
+        this.fusedLocationClient = LocationServices.getFusedLocationProviderClient(this.context);
+        this.appDatabase = AppDatabase.getInstance(this.context);
     }
 
     private String getUid() {
         return sessionManager.getOwnerUid();
     }
 
-    public void startListeningToCommands() {
+    public synchronized void startListeningToCommands() {
         stopListeningToCommands();
 
         String uid = getUid();
@@ -44,6 +82,9 @@ public class CommandExecutionManager {
             Log.w(TAG, "Cannot listen to commands: UID or Device ID missing");
             return;
         }
+
+        // Start BLE peripheral advertising so nearby controller can find this device if offline
+        BleNearbyManager.getInstance(context).startAdvertisingAsTarget();
 
         commandListener = db.collection("users").document(uid)
                 .collection("devices").document(deviceId)
@@ -66,81 +107,217 @@ public class CommandExecutionManager {
         startListeningToCommands();
     }
 
-    private void executeSingleCommand(String uid, String deviceId, DocumentSnapshot doc) {
+    private synchronized void executeSingleCommand(String uid, String deviceId, DocumentSnapshot doc) {
         String commandId = doc.getId();
+
+        // Duplicate-execution prevention
+        if (processedCommandIds.contains(commandId)) {
+            Log.i(TAG, "Command already processed in this session: " + commandId);
+            return;
+        }
+        processedCommandIds.add(commandId);
+
         String type = doc.getString("commandType");
+        if (type == null) {
+            type = doc.getString("command");
+        }
 
         if (type == null) {
             updateCommandStatus(uid, deviceId, commandId, "FAILED", "Missing command type");
             return;
         }
 
-        // Prevent execution of expired commands (older than 2 hours)
+        // Calculate age and check command expiration
         com.google.firebase.Timestamp createdAt = doc.getTimestamp("createdAt");
+        long maxAge = ("LOCK_DEVICE".equalsIgnoreCase(type) || "ALARM_ALERT".equalsIgnoreCase(type))
+                ? EXPIRY_LOCK_ALARM_MS : EXPIRY_LOCATE_MS;
+
         if (createdAt != null) {
             long ageMillis = System.currentTimeMillis() - createdAt.toDate().getTime();
-            if (ageMillis > 2 * 60 * 60 * 1000) {
-                updateCommandStatus(uid, deviceId, commandId, "EXPIRED", "Command expired before delivery");
+            if (ageMillis > maxAge) {
+                Log.w(TAG, "Expiring stale command: " + type + ", age=" + (ageMillis / 1000) + "s");
+                updateCommandStatus(uid, deviceId, commandId, "EXPIRED",
+                        "Command expired before execution (exceeded " + (maxAge / 60000) + " min validity window)");
                 return;
             }
         }
 
-        // Atomically transition status to EXECUTING to avoid duplicate concurrent execution
+        // Atomically transition status to EXECUTING in Firestore
         db.collection("users").document(uid)
                 .collection("devices").document(deviceId)
                 .collection("commands").document(commandId)
                 .update("status", "EXECUTING");
 
-        if ("LOCK_DEVICE".equalsIgnoreCase(type)) {
-            if (SecureAdminReceiver.isAdminActive(context)) {
-                try {
-                    DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
-                    if (dpm != null) {
-                        dpm.lockNow();
-                        updateCommandStatus(uid, deviceId, commandId, "EXECUTED", "Device locked successfully");
-                    } else {
-                        updateCommandStatus(uid, deviceId, commandId, "FAILED", "DevicePolicyManager unavailable");
-                    }
-                } catch (Exception e) {
-                    updateCommandStatus(uid, deviceId, commandId, "FAILED", e.getMessage());
-                }
-            } else {
-                updateCommandStatus(uid, deviceId, commandId, "FAILED", "Device Policy Admin privileges not activated by user");
-            }
+        // Record locally in Room
+        final String finalType = type;
+        new Thread(() -> {
+            CommandEntity entity = new CommandEntity(
+                    commandId,
+                    deviceId,
+                    finalType,
+                    uid,
+                    "",
+                    CommandEntity.STATE_EXECUTING,
+                    "Executing on target device",
+                    CommandEntity.TRANSPORT_CLOUD,
+                    createdAt != null ? createdAt.toDate().getTime() : System.currentTimeMillis(),
+                    System.currentTimeMillis() + maxAge,
+                    System.currentTimeMillis(),
+                    0,
+                    "SYNCED",
+                    0
+            );
+            appDatabase.commandDao().insertOrUpdate(entity);
+        }).start();
+
+        // Dispatch based on command type
+        if ("LOCATE_NOW".equalsIgnoreCase(type)) {
+            handleLocateCommand(uid, deviceId, commandId);
+        } else if ("LOCK_DEVICE".equalsIgnoreCase(type)) {
+            handleLockCommand(uid, deviceId, commandId);
         } else if ("ALARM_ALERT".equalsIgnoreCase(type)) {
-            try {
-                Uri alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
-                if (alarmUri == null) {
-                    alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-                }
-                Ringtone ringtone = RingtoneManager.getRingtone(context, alarmUri);
-                if (ringtone != null) {
-                    ringtone.play();
-                }
-                updateCommandStatus(uid, deviceId, commandId, "EXECUTED", "Alarm alert triggered successfully");
-            } catch (Exception e) {
-                updateCommandStatus(uid, deviceId, commandId, "FAILED", "Alarm trigger failed: " + e.getMessage());
-            }
+            handleAlarmCommand(uid, deviceId, commandId);
         } else if ("WIPE_DEVICE".equalsIgnoreCase(type)) {
-            if (SecureAdminReceiver.isAdminActive(context)) {
-                try {
-                    DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
-                    if (dpm != null) {
-                        updateCommandStatus(uid, deviceId, commandId, "EXECUTED", "Wipe initiated");
-                        dpm.wipeData(0);
-                    } else {
-                        updateCommandStatus(uid, deviceId, commandId, "FAILED", "DevicePolicyManager unavailable");
-                    }
-                } catch (Exception e) {
-                    updateCommandStatus(uid, deviceId, commandId, "FAILED", "Wipe failed: " + e.getMessage());
-                }
-            } else {
-                updateCommandStatus(uid, deviceId, commandId, "FAILED", "Device Policy Admin privileges not activated");
-            }
-        } else if ("LOCATE_NOW".equalsIgnoreCase(type)) {
-            updateCommandStatus(uid, deviceId, commandId, "EXECUTED", "Instant location request dispatched");
+            handleWipeCommand(uid, deviceId, commandId);
         } else {
             updateCommandStatus(uid, deviceId, commandId, "FAILED", "Unsupported command type: " + type);
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private void handleLocateCommand(String uid, String deviceId, String commandId) {
+        if (!PermissionUtils.hasForegroundLocationPermission(context)) {
+            updateCommandStatus(uid, deviceId, commandId, "FAILED", "Location permission not granted on target device");
+            return;
+        }
+
+        try {
+            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                    .addOnSuccessListener(location -> {
+                        if (location != null) {
+                            recordAndCompleteLocate(uid, deviceId, commandId, location);
+                        } else {
+                            // Fallback to last known location
+                            fusedLocationClient.getLastLocation().addOnSuccessListener(lastLoc -> {
+                                if (lastLoc != null) {
+                                    recordAndCompleteLocate(uid, deviceId, commandId, lastLoc);
+                                } else {
+                                    updateCommandStatus(uid, deviceId, commandId, "FAILED", "GPS/Network location provider returned null");
+                                }
+                            }).addOnFailureListener(e -> {
+                                updateCommandStatus(uid, deviceId, commandId, "FAILED", "Location retrieval failed: " + e.getMessage());
+                            });
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        updateCommandStatus(uid, deviceId, commandId, "FAILED", "High accuracy location failed: " + e.getMessage());
+                    });
+        } catch (SecurityException e) {
+            updateCommandStatus(uid, deviceId, commandId, "FAILED", "SecurityException: " + e.getMessage());
+        }
+    }
+
+    private void recordAndCompleteLocate(String uid, String deviceId, String commandId, Location location) {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
+        sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+        String timestampStr = sdf.format(new Date(location.getTime()));
+
+        String clientUuid = UUID.randomUUID().toString();
+        LocationRecord record = new LocationRecord(
+                deviceId,
+                clientUuid,
+                location.getLatitude(),
+                location.getLongitude(),
+                location.getAccuracy(),
+                location.getAltitude(),
+                location.getSpeed(),
+                timestampStr
+        );
+
+        // Save to Firestore location history
+        locationRepository.recordLocation(record, new LocationRepository.ApiCallback<LocationRecord>() {
+            @Override
+            public void onSuccess(LocationRecord result) {
+                // Update device document with live location & battery
+                Map<String, Object> devUpdates = new HashMap<>();
+                devUpdates.put("lastSeen", FieldValue.serverTimestamp());
+                devUpdates.put("batteryLevel", DeviceUtils.getBatteryLevel(context));
+                devUpdates.put("locationStatus", "ACTIVE");
+                devUpdates.put("lastLatitude", location.getLatitude());
+                devUpdates.put("lastLongitude", location.getLongitude());
+                devUpdates.put("lastAccuracy", location.getAccuracy());
+
+                db.collection("users").document(uid)
+                        .collection("devices").document(deviceId)
+                        .set(devUpdates, SetOptions.merge());
+
+                String resultMsg = String.format(Locale.US, "Location: (%.5f, %.5f) ±%.1fm",
+                        location.getLatitude(), location.getLongitude(), location.getAccuracy());
+                updateCommandStatus(uid, deviceId, commandId, "EXECUTED", resultMsg);
+            }
+
+            @Override
+            public void onError(String errorMessage) {
+                String resultMsg = String.format(Locale.US, "Location: (%.5f, %.5f) ±%.1fm (Local only)",
+                        location.getLatitude(), location.getLongitude(), location.getAccuracy());
+                updateCommandStatus(uid, deviceId, commandId, "EXECUTED", resultMsg);
+            }
+        });
+    }
+
+    private void handleLockCommand(String uid, String deviceId, String commandId) {
+        if (!PermissionUtils.isDeviceAdminActive(context)) {
+            updateCommandStatus(uid, deviceId, commandId, "FAILED",
+                    "Device Policy Administrator privilege not activated by user in system settings");
+            return;
+        }
+
+        try {
+            DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
+            if (dpm != null) {
+                dpm.lockNow();
+                updateCommandStatus(uid, deviceId, commandId, "EXECUTED", "Screen locked immediately via DevicePolicyManager");
+            } else {
+                updateCommandStatus(uid, deviceId, commandId, "FAILED", "DevicePolicyManager service unavailable");
+            }
+        } catch (SecurityException e) {
+            updateCommandStatus(uid, deviceId, commandId, "FAILED", "SecurityException during lockNow: " + e.getMessage());
+        } catch (Exception e) {
+            updateCommandStatus(uid, deviceId, commandId, "FAILED", "Lock error: " + e.getMessage());
+        }
+    }
+
+    private void handleAlarmCommand(String uid, String deviceId, String commandId) {
+        AlarmSoundManager alarmManager = AlarmSoundManager.getInstance(context);
+
+        alarmManager.playFiveSecondAlarm(new AlarmSoundManager.AlarmCallback() {
+            @Override
+            public void onAlarmStarted() {
+                Log.i(TAG, "5-second anti-theft alarm playing");
+            }
+
+            @Override
+            public void onAlarmCompleted(String reason) {
+                updateCommandStatus(uid, deviceId, commandId, "EXECUTED", reason);
+            }
+        });
+    }
+
+    private void handleWipeCommand(String uid, String deviceId, String commandId) {
+        // Safe check: Wipe must only be executed if Device Admin is active and policy explicitly supports it
+        if (!PermissionUtils.isDeviceAdminActive(context)) {
+            updateCommandStatus(uid, deviceId, commandId, "FAILED", "Device Admin privilege required for wipe");
+            return;
+        }
+
+        updateCommandStatus(uid, deviceId, commandId, "EXECUTED", "Wipe request authorized");
+        try {
+            DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
+            if (dpm != null) {
+                dpm.wipeData(0);
+            }
+        } catch (Exception e) {
+            updateCommandStatus(uid, deviceId, commandId, "FAILED", "Wipe execution error: " + e.getMessage());
         }
     }
 
@@ -153,13 +330,21 @@ public class CommandExecutionManager {
         db.collection("users").document(uid)
                 .collection("devices").document(deviceId)
                 .collection("commands").document(commandId)
-                .update(updates);
+                .update(updates)
+                .addOnSuccessListener(aVoid -> Log.i(TAG, "Command " + commandId + " updated to " + status))
+                .addOnFailureListener(e -> Log.e(TAG, "Failed to update command " + commandId, e));
+
+        // Update local Room command status
+        new Thread(() -> {
+            appDatabase.commandDao().updateExecutionStatus(commandId, status, result, System.currentTimeMillis());
+        }).start();
     }
 
-    public void stopListeningToCommands() {
+    public synchronized void stopListeningToCommands() {
         if (commandListener != null) {
             commandListener.remove();
             commandListener = null;
         }
+        BleNearbyManager.getInstance(context).stopAdvertising();
     }
 }

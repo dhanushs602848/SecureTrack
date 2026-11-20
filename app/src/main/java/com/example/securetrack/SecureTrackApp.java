@@ -23,5 +23,7 @@ public class SecureTrackApp extends Application {
                     PlayIntegrityAppCheckProviderFactory.getInstance()
             );
         }
+
+        com.example.securetrack.sync.DurableSyncManager.initializePeriodicSync(this);
     }
 }

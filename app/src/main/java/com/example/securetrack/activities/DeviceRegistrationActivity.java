@@ -226,6 +226,8 @@ public class DeviceRegistrationActivity extends AppCompatActivity {
     private void showApprovalPanel(PairingInvitation updated) {
         currentInvitation = updated;
         binding.layoutPendingApproval.setVisibility(View.VISIBLE);
+        binding.btnApproveDevice.setEnabled(true);
+        binding.btnRejectDevice.setEnabled(true);
 
         Map<String, Object> dev = updated.getDeviceInfo();
         String info = "Device: " + (dev != null && dev.get("deviceName") != null ? dev.get("deviceName") : "Android")

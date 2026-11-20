@@ -15,6 +15,15 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
+    <!-- Bluetooth Low Energy (BLE) Permissions -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+
     <application
         android:name=".SecureTrackApp"
         android:allowBackup="true"
@@ -49,6 +58,7 @@
         <activity android:name=".activities.DeviceRegistrationActivity" android:exported="false" />
         <activity android:name=".activities.LocationHistoryActivity" android:exported="false" />
         <activity android:name=".activities.DeviceSecurityActivity" android:exported="false" />
+        <activity android:name=".activities.LostDeviceActivity" android:exported="false" />
         <activity android:name=".activities.SettingsActivity" android:exported="false" />
 
         <!-- Foreground Tracking Service -->

@@ -123,6 +123,49 @@ public class DeviceRepository {
             return;
         }
 
+        String firebaseUid = sessionManager.getFirebaseUid();
+        boolean isSecondary = firebaseUid != null && !firebaseUid.equals(uid);
+
+        if (isSecondary) {
+            String currentDeviceId = sessionManager.getCurrentDeviceId();
+            if (currentDeviceId == null) {
+                currentDeviceId = sessionManager.getInstallationId();
+            }
+
+            db.collection("users").document(uid)
+                    .collection("devices").document(currentDeviceId)
+                    .get()
+                    .addOnSuccessListener(doc -> {
+                        List<Device> list = new ArrayList<>();
+                        if (doc.exists()) {
+                            String id = doc.getString("id");
+                            if (id == null) id = doc.getId();
+                            String name = doc.getString("deviceName");
+                            String model = doc.getString("model");
+                            String androidVersion = doc.getString("androidVersion");
+                            Long battery = doc.getLong("batteryLevel");
+                            String status = doc.getString("status");
+                            Boolean protection = doc.getBoolean("protectionEnabled");
+                            String installId = doc.getString("installationId");
+
+                            Device d = new Device(
+                                    id,
+                                    name != null ? name : "Android Device",
+                                    model != null ? model : "Generic",
+                                    androidVersion != null ? androidVersion : "14",
+                                    battery != null ? battery.intValue() : 100,
+                                    status != null ? status : "ONLINE",
+                                    protection != null && protection,
+                                    installId != null ? installId : id
+                            );
+                            list.add(d);
+                        }
+                        callback.onSuccess(list);
+                    })
+                    .addOnFailureListener(e -> callback.onError("Firestore query error: " + e.getMessage()));
+            return;
+        }
+
         db.collection("users").document(uid)
                 .collection("devices")
                 .get()

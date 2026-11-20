@@ -426,6 +426,15 @@ export const deviceService = {
       enhancedError.originalError = err;
       throw enhancedError;
     }
+  },
+
+  setLostMode: async (deviceId: string, isLostMode: boolean): Promise<void> => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) throw new Error('Not authenticated');
+    await updateDoc(doc(db, 'users', uid, 'devices', deviceId), {
+      isLostMode: isLostMode,
+      updatedAt: serverTimestamp()
+    });
   }
 };
 
@@ -490,13 +499,61 @@ export const securityService = {
             timestamp: convertTimestamp(data.timestamp),
             locationStatus: data.locationStatus,
             zoneId: data.zoneId,
-            zoneName: data.zoneName
+            zoneName: data.zoneName,
+            status: data.status || 'ACTIVE',
+            dismissedAt: convertTimestamp(data.dismissedAt),
+            dismissedBy: data.dismissedBy,
+            resolvedAt: convertTimestamp(data.resolvedAt)
           });
         }
       });
       callback(events);
     });
   },
+
+  dismissAlert: async (alertId: string): Promise<void> => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) throw new Error('User not authenticated');
+    await updateDoc(doc(db, 'users', uid, 'alerts', alertId), {
+      status: 'DISMISSED',
+      dismissedAt: serverTimestamp(),
+      dismissedBy: uid
+    });
+  },
+
+  restoreAlert: async (alertId: string): Promise<void> => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) throw new Error('User not authenticated');
+    await updateDoc(doc(db, 'users', uid, 'alerts', alertId), {
+      status: 'ACTIVE',
+      dismissedAt: null,
+      dismissedBy: null
+    });
+  },
+
+  bulkDismissResolvedAlerts: async (): Promise<number> => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) throw new Error('User not authenticated');
+    const q = query(collection(db, 'users', uid, 'alerts'));
+    const snap = await getDocs(q);
+    const batch = writeBatch(db);
+    let count = 0;
+    snap.forEach((d) => {
+      const data = d.data();
+      if (data.status === 'RESOLVED' || data.severity === 'INFO') {
+        batch.update(doc(db, 'users', uid, 'alerts', d.id), {
+          status: 'DISMISSED',
+          dismissedAt: serverTimestamp(),
+          dismissedBy: uid
+        });
+        count++;
+      }
+    });
+    if (count > 0) {
+      await batch.commit();
+    }
+    return count;
+  }
 };
 
 export const commandService = {
@@ -521,6 +578,7 @@ export const commandService = {
           payload: data.payload,
           status: data.status || 'QUEUED',
           result: data.result,
+          transport: data.transport || 'CLOUD',
           createdAt: convertTimestamp(data.createdAt),
           executedAt: convertTimestamp(data.executedAt)
         });
@@ -537,8 +595,11 @@ export const commandService = {
       collection(db, 'users', uid, 'devices', deviceId, 'commands'),
       {
         commandType,
+        command: commandType,
+        targetDeviceId: deviceId,
         payload: payload || '',
         status: 'QUEUED',
+        transport: 'CLOUD',
         result: '',
         createdAt: serverTimestamp()
       }
@@ -550,6 +611,7 @@ export const commandService = {
       commandType: commandType,
       payload: payload,
       status: 'QUEUED',
+      transport: 'CLOUD',
       createdAt: new Date().toISOString()
     };
   },

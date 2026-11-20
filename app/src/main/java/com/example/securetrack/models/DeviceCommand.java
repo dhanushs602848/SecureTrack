@@ -9,6 +9,7 @@ public class DeviceCommand {
     private String result;
     private String createdAt;
     private String executedAt;
+    private String transport = "CLOUD";
 
     public DeviceCommand() {}
 
@@ -49,4 +50,7 @@ public class DeviceCommand {
 
     public String getExecutedAt() { return executedAt; }
     public void setExecutedAt(String executedAt) { this.executedAt = executedAt; }
+
+    public String getTransport() { return transport != null ? transport : "CLOUD"; }
+    public void setTransport(String transport) { this.transport = transport; }
 }

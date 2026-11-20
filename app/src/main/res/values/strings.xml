@@ -92,10 +92,19 @@
     <string name="security_center">Security Center</string>
     <string name="device_security">Device Security &amp; Admin</string>
     <string name="device_admin_status">Device Admin Privilege</string>
+    <string name="device_admin_desc">Enables authorized remote lock capability</string>
     <string name="remote_lock">Remote Lock Device</string>
     <string name="sim_monitoring">SIM Card Change Monitoring</string>
     <string name="command_history">Command History</string>
     <string name="send_command">Send Command</string>
+    <string name="remote_actions">Remote Actions</string>
+    <string name="revoke_device_access">Revoke Device Access</string>
+    <string name="no_commands_recorded">No commands recorded yet</string>
+    <string name="target_device_format">Target: %1$s</string>
+    <string name="btn_locate">Locate</string>
+    <string name="btn_lock">Lock</string>
+    <string name="btn_alarm">Alarm</string>
+    <string name="btn_wipe">Wipe</string>
 
     <!-- Profile & Settings -->
     <string name="profile">User Profile</string>

@@ -90,6 +90,8 @@ public class HomeFragment extends Fragment {
             public void onError(String errorMessage) {
                 if (binding != null) {
                     binding.swipeRefresh.setRefreshing(false);
+                    binding.tvPrimaryDeviceName.setText(sessionManager.getDeviceName());
+                    binding.tvProtectionStatus.setText("Tap to Refresh");
                     Toast.makeText(requireContext(), "Failed to load devices: " + errorMessage, Toast.LENGTH_SHORT).show();
                 }
             }

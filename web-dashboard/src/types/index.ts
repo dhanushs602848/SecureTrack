@@ -27,6 +27,7 @@ export interface Device {
   locationAccuracy?: number;
   locationSource?: 'GPS' | 'LAST_KNOWN' | 'NETWORK_ESTIMATE';
   locationTimestamp?: string;
+  isLostMode?: boolean;
   paired?: boolean;
   ownerUid?: string;
 }
@@ -41,7 +42,7 @@ export interface LocationRecord {
   altitude: number;
   speed: number;
   timestamp: string;
-  source?: 'GPS' | 'LAST_KNOWN' | 'NETWORK_ESTIMATE';
+  source?: 'GPS' | 'LAST_KNOWN' | 'NETWORK_ESTIMATE' | 'BLE_NEARBY';
 }
 
 export interface SecurityEvent {
@@ -55,6 +56,10 @@ export interface SecurityEvent {
   locationStatus?: 'ENABLED' | 'DISABLED';
   zoneId?: string;
   zoneName?: string;
+  status?: 'ACTIVE' | 'ACKNOWLEDGED' | 'RESOLVED' | 'DISMISSED';
+  dismissedAt?: string;
+  dismissedBy?: string;
+  resolvedAt?: string;
 }
 
 export interface DeviceCommand {
@@ -64,6 +69,7 @@ export interface DeviceCommand {
   payload?: string;
   status: 'QUEUED' | 'DELIVERED' | 'RECEIVED' | 'EXECUTING' | 'EXECUTED' | 'FAILED' | 'EXPIRED';
   result?: string;
+  transport?: 'CLOUD' | 'BLE';
   createdAt: string;
   executedAt?: string;
 }
