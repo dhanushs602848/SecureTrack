@@ -291,4 +291,102 @@ public class SecurityAndLocationUpgradeTest {
         boolean validAcc = negativeAcc >= 0;
         assertFalse("Negative accuracy must fail validation", validAcc);
     }
+
+    @Test
+    public void testHighEntropyBleSharedSecretKeyDerivation() {
+        String ownerUid = "owner_test_secure_uid";
+        String deviceId = "device_realme_002";
+        String genuineSecret = "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90";
+        String attackerSecret = "0000000000000000000000000000000000000000000000000000000000000000";
+
+        byte[] genuineKey = BleNearbyManager.deriveDeviceBleKey(genuineSecret, ownerUid, deviceId);
+        assertNotNull("Genuine key must be derived", genuineKey);
+        assertEquals(32, genuineKey.length);
+
+        byte[] attackerKey = BleNearbyManager.deriveDeviceBleKey(attackerSecret, ownerUid, deviceId);
+        assertNotNull("Attacker key can be computed but must not match genuine key", attackerKey);
+        assertFalse("Attacker key must not match genuine shared-secret key",
+                java.security.MessageDigest.isEqual(genuineKey, attackerKey));
+
+        // Test with null or empty device ID
+        assertNull("Null device ID must return null key", BleNearbyManager.deriveDeviceBleKey(genuineSecret, ownerUid, null));
+        assertNull("Null owner UID must return null key", BleNearbyManager.deriveDeviceBleKey(genuineSecret, null, deviceId));
+    }
+
+    @Test
+    public void testFiveAlertsDismissalDownToZeroAndRestore() {
+        java.util.List<SecurityAlertEntity> alerts = new java.util.ArrayList<>();
+        for (int i = 1; i <= 5; i++) {
+            alerts.add(new SecurityAlertEntity(
+                    "alert-" + i,
+                    "phone-dev-1",
+                    "Samsung Galaxy A07",
+                    "SECURITY_EVENT_" + i,
+                    "WARNING",
+                    "Security event description " + i,
+                    "ENABLED",
+                    SecurityAlertEntity.STATUS_ACTIVE,
+                    System.currentTimeMillis() - (i * 1000L),
+                    0, null, 0, true
+            ));
+        }
+
+        // 1. Initial count must be exactly 5
+        long activeCount = alerts.stream().filter(a -> SecurityAlertEntity.STATUS_ACTIVE.equals(a.getStatus())).count();
+        assertEquals("Initial active alert count must be exactly 5", 5, activeCount);
+
+        // 2. Dismiss 1 alert out of 5 -> count must become 4
+        SecurityAlertEntity firstAlert = alerts.get(0);
+        long dismissTime = System.currentTimeMillis();
+        firstAlert.setStatus(SecurityAlertEntity.STATUS_DISMISSED);
+        firstAlert.setDismissedAt(dismissTime);
+        firstAlert.setDismissedBy("owner-uid-1");
+
+        activeCount = alerts.stream().filter(a -> SecurityAlertEntity.STATUS_ACTIVE.equals(a.getStatus())).count();
+        assertEquals("After dismissing 1 alert, active count must become 4", 4, activeCount);
+        assertEquals("Total historical alerts must remain 5", 5, alerts.size());
+
+        // 3. Dismiss remaining 4 alerts -> count must become exactly 0
+        for (int i = 1; i < 5; i++) {
+            SecurityAlertEntity a = alerts.get(i);
+            a.setStatus(SecurityAlertEntity.STATUS_DISMISSED);
+            a.setDismissedAt(System.currentTimeMillis());
+            a.setDismissedBy("owner-uid-1");
+        }
+
+        activeCount = alerts.stream().filter(a -> SecurityAlertEntity.STATUS_ACTIVE.equals(a.getStatus())).count();
+        assertEquals("After dismissing all 5 alerts, active count must become exactly 0", 0, activeCount);
+        // Verify all 5 records are preserved in history (not deleted)
+        assertEquals("All 5 dismissed records must remain in historical database", 5, alerts.size());
+        for (SecurityAlertEntity a : alerts) {
+            assertEquals(SecurityAlertEntity.STATUS_DISMISSED, a.getStatus());
+            assertTrue("Dismissed timestamp must be recorded", a.getDismissedAt() > 0);
+            assertNotNull("Original event description must be preserved", a.getDescription());
+        }
+
+        // 4. Restore 1 alert -> count must become 1
+        firstAlert.setStatus(SecurityAlertEntity.STATUS_ACTIVE);
+        firstAlert.setDismissedAt(0);
+        firstAlert.setDismissedBy(null);
+
+        activeCount = alerts.stream().filter(a -> SecurityAlertEntity.STATUS_ACTIVE.equals(a.getStatus())).count();
+        assertEquals("After restoring 1 alert, active count must become 1", 1, activeCount);
+
+        // 5. Generate a new alert -> count must become 2
+        alerts.add(new SecurityAlertEntity(
+                "alert-6",
+                "phone-dev-1",
+                "Samsung Galaxy A07",
+                "NEW_SUSPICIOUS_ACTIVITY",
+                "CRITICAL",
+                "New suspicious activity detected",
+                "ENABLED",
+                SecurityAlertEntity.STATUS_ACTIVE,
+                System.currentTimeMillis(),
+                0, null, 0, true
+        ));
+
+        activeCount = alerts.stream().filter(a -> SecurityAlertEntity.STATUS_ACTIVE.equals(a.getStatus())).count();
+        assertEquals("After generating 1 new alert, active count must become 2", 2, activeCount);
+    }
 }

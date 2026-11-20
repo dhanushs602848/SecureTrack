@@ -1,6 +1,8 @@
 package com.example.securetrack.repositories;
 
 import android.content.Context;
+import android.util.Log;
+import androidx.lifecycle.LiveData;
 import com.example.securetrack.database.AppDatabase;
 import com.example.securetrack.database.SecurityAlertEntity;
 import com.example.securetrack.models.*;
@@ -18,6 +20,7 @@ import java.util.UUID;
 
 public class SecurityRepository {
 
+    private static final String TAG = "SecurityRepository";
     private final FirebaseFirestore db;
     private final SessionManager sessionManager;
     private final AppDatabase appDatabase;
@@ -37,12 +40,41 @@ public class SecurityRepository {
         return sessionManager.getOwnerUid();
     }
 
+    private final java.util.concurrent.ConcurrentHashMap<String, Long> recentEventDebounce = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public LiveData<Integer> getActiveAlertCountLiveData() {
+        return appDatabase.securityAlertDao().getActiveAlertCountLiveData();
+    }
+
+    public LiveData<Integer> getDismissedAlertCountLiveData() {
+        return appDatabase.securityAlertDao().getDismissedAlertCountLiveData();
+    }
+
+    public LiveData<List<SecurityAlertEntity>> getActiveAlertsLiveData() {
+        return appDatabase.securityAlertDao().getActiveAlertsLiveData();
+    }
+
+    public LiveData<List<SecurityAlertEntity>> getAllAlertsLiveData() {
+        return appDatabase.securityAlertDao().getAllAlertsLiveData();
+    }
+
     public void recordSecurityEvent(SecurityEvent event, ApiCallback<SecurityEvent> callback) {
         String uid = getUid();
         if (uid == null) {
             callback.onError("User not authenticated");
             return;
         }
+
+        // Duplicate-alert prevention: debounce same device & eventType within 30 seconds
+        String debounceKey = (event.getDeviceId() != null ? event.getDeviceId() : "device") + ":" + event.getEventType();
+        long now = System.currentTimeMillis();
+        Long lastTime = recentEventDebounce.get(debounceKey);
+        if (lastTime != null && (now - lastTime < 30000L)) {
+            Log.i(TAG, "Suppressed duplicate security alert: " + debounceKey);
+            callback.onSuccess(event);
+            return;
+        }
+        recentEventDebounce.put(debounceKey, now);
 
         String eventId = UUID.randomUUID().toString();
         Map<String, Object> map = new HashMap<>();

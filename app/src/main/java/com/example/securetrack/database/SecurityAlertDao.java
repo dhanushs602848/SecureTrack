@@ -20,11 +20,23 @@ public interface SecurityAlertDao {
     @Update
     void update(SecurityAlertEntity alert);
 
-    @Query("SELECT * FROM security_alerts WHERE status != 'DISMISSED' AND status != 'ARCHIVED' ORDER BY timestamp DESC")
+    @Query("SELECT COUNT(*) FROM security_alerts WHERE status = 'ACTIVE'")
+    LiveData<Integer> getActiveAlertCountLiveData();
+
+    @Query("SELECT COUNT(*) FROM security_alerts WHERE status = 'ACTIVE'")
+    int getActiveAlertCountSync();
+
+    @Query("SELECT COUNT(*) FROM security_alerts WHERE status = 'DISMISSED'")
+    LiveData<Integer> getDismissedAlertCountLiveData();
+
+    @Query("SELECT * FROM security_alerts WHERE status = 'ACTIVE' ORDER BY timestamp DESC")
     LiveData<List<SecurityAlertEntity>> getActiveAlertsLiveData();
 
-    @Query("SELECT * FROM security_alerts WHERE status != 'DISMISSED' AND status != 'ARCHIVED' ORDER BY timestamp DESC")
+    @Query("SELECT * FROM security_alerts WHERE status = 'ACTIVE' ORDER BY timestamp DESC")
     List<SecurityAlertEntity> getActiveAlertsSync();
+
+    @Query("SELECT * FROM security_alerts WHERE status = 'DISMISSED' ORDER BY dismissedAt DESC, timestamp DESC")
+    LiveData<List<SecurityAlertEntity>> getDismissedAlertsLiveData();
 
     @Query("SELECT * FROM security_alerts ORDER BY timestamp DESC")
     LiveData<List<SecurityAlertEntity>> getAllAlertsLiveData();

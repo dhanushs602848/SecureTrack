@@ -8,6 +8,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import com.example.securetrack.R;
 import com.example.securetrack.databinding.FragmentHomeBinding;
 import com.example.securetrack.models.Device;
 import com.example.securetrack.models.SecurityEvent;
@@ -39,6 +40,19 @@ public class HomeFragment extends Fragment {
         sessionManager = new SessionManager(requireContext());
 
         binding.tvUserName.setText("Hello, " + sessionManager.getUserName());
+
+        // Observe active alert count reactively from Room source of truth
+        securityRepository.getActiveAlertCountLiveData().observe(getViewLifecycleOwner(), count -> {
+            if (binding != null) {
+                int activeAlerts = count != null ? count : 0;
+                binding.tvAlertsCount.setText(String.valueOf(activeAlerts));
+                if (activeAlerts == 0) {
+                    binding.tvAlertsCount.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.status_success));
+                } else {
+                    binding.tvAlertsCount.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), R.color.status_error));
+                }
+            }
+        });
 
         binding.swipeRefresh.setOnRefreshListener(this::loadDashboardData);
 
@@ -104,7 +118,15 @@ public class HomeFragment extends Fragment {
             public void onSuccess(List<SecurityEvent> events) {
                 if (binding != null) {
                     binding.swipeRefresh.setRefreshing(false);
-                    binding.tvAlertsCount.setText(String.valueOf(events.size()));
+                    int activeCount = 0;
+                    if (events != null) {
+                        for (SecurityEvent ev : events) {
+                            if ("ACTIVE".equalsIgnoreCase(ev.getStatus())) {
+                                activeCount++;
+                            }
+                        }
+                    }
+                    binding.tvAlertsCount.setText(String.valueOf(activeCount));
                 }
             }
 

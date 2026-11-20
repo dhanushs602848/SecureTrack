@@ -1,30 +1,38 @@
 import React from 'react';
-import { Shield, LogOut, User } from 'lucide-react';
+import { Shield, LogOut, User, Radio } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
 
   return (
-    <header className="bg-[#152C4F] text-white border-b border-[#255DA8] px-6 py-4 flex items-center justify-between shadow-md">
+    <header className="bg-[#0F172A] text-white border-b border-[#1E293B] px-6 py-3.5 flex items-center justify-between shadow-lg sticky top-0 z-50">
       <div className="flex items-center gap-3">
-        <Shield className="w-8 h-8 text-[#D8E6FF]" />
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-cyan-500/20 border border-cyan-500/40 flex items-center justify-center shadow-[0_0_15px_rgba(0,210,255,0.2)]">
+          <Shield className="w-5 h-5 text-cyan-400" />
+        </div>
         <div>
-          <h1 className="text-xl font-bold tracking-wide">SecureTrack</h1>
-          <p className="text-xs text-[#D8E6FF] opacity-80">Smart Mobile Tracking &amp; Anti-Theft System</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold tracking-tight text-white font-mono">SecureTrack<span className="text-cyan-400">.io</span></h1>
+            <span className="text-[10px] font-bold bg-cyan-950/60 text-cyan-400 border border-cyan-800/50 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+              v1.2 ACTIVE
+            </span>
+          </div>
+          <p className="text-xs text-slate-400">Zero-Trust Telemetry &amp; Anti-Theft Defense</p>
         </div>
       </div>
 
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-2 text-sm bg-[#1e3a66] px-3 py-1.5 rounded-full border border-blue-400/20">
-          <User className="w-4 h-4 text-blue-300" />
+      <div className="flex items-center gap-4">
+        <div className="hidden sm:flex items-center gap-2 text-xs bg-[#162032] text-slate-300 px-3 py-1.5 rounded-xl border border-slate-700/60">
+          <User className="w-3.5 h-3.5 text-cyan-400" />
           <span className="font-medium">{user?.fullName || user?.email}</span>
         </div>
         <button
           onClick={logout}
-          className="flex items-center gap-2 text-sm text-red-300 hover:text-red-100 transition-colors bg-red-950/40 px-3 py-1.5 rounded-lg border border-red-800/30"
+          className="flex items-center gap-1.5 text-xs text-rose-300 hover:text-white transition-colors bg-rose-950/30 hover:bg-rose-900/50 px-3 py-1.5 rounded-xl border border-rose-800/40 font-medium"
         >
-          <LogOut className="w-4 h-4" />
+          <LogOut className="w-3.5 h-3.5" />
           Sign Out
         </button>
       </div>

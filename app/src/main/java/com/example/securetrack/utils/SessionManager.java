@@ -228,6 +228,32 @@ public class SessionManager {
         prefs.edit().putBoolean(KEY_LOW_BATTERY_ALERT, enabled).apply();
     }
 
+    private static final String KEY_BLE_SHARED_SECRET = "ble_shared_secret";
+    private static final String KEY_BLE_DEVICE_SECRETS_PREFIX = "ble_secret_dev_";
+
+    public String getBleSharedSecret() {
+        return prefs.getString(KEY_BLE_SHARED_SECRET, null);
+    }
+
+    public void setBleSharedSecret(String secret) {
+        prefs.edit().putString(KEY_BLE_SHARED_SECRET, secret).apply();
+    }
+
+    public String getBleDeviceSecret(String deviceId) {
+        if (deviceId == null) return null;
+        String secret = prefs.getString(KEY_BLE_DEVICE_SECRETS_PREFIX + deviceId, null);
+        if (secret == null) {
+            // Fallback to primary shared secret
+            return getBleSharedSecret();
+        }
+        return secret;
+    }
+
+    public void saveBleDeviceSecret(String deviceId, String secret) {
+        if (deviceId == null || secret == null) return;
+        prefs.edit().putString(KEY_BLE_DEVICE_SECRETS_PREFIX + deviceId, secret).apply();
+    }
+
     public void logout() {
         try {
             FirebaseAuth.getInstance().signOut();

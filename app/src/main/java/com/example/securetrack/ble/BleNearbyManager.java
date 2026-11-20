@@ -167,13 +167,20 @@ public class BleNearbyManager {
     // =========================================================================
 
     public static byte[] deriveDeviceBleKey(String ownerUid, String deviceId) {
+        return deriveDeviceBleKey(null, ownerUid, deviceId);
+    }
+
+    public static byte[] deriveDeviceBleKey(String sharedSecret, String ownerUid, String deviceId) {
         if (ownerUid == null || ownerUid.trim().isEmpty() || deviceId == null || deviceId.trim().isEmpty()) {
             return null;
         }
+        String keyMaterial = (sharedSecret != null && !sharedSecret.trim().isEmpty())
+                ? sharedSecret
+                : ("SecureTrack:SharedSecretSalt:" + ownerUid);
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(ownerUid.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            return mac.doFinal(("SecureTrack:BLE:PairingKey:v1:" + deviceId).getBytes(StandardCharsets.UTF_8));
+            mac.init(new SecretKeySpec(keyMaterial.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            return mac.doFinal(("SecureTrack:BLE:PairingKey:v2:" + ownerUid + ":" + deviceId).getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
             Log.e(TAG, "Error deriving pairing key", e);
             return null;
@@ -462,7 +469,11 @@ public class BleNearbyManager {
             }
 
             String myDeviceId = sessionManager.getCurrentDeviceId();
-            byte[] pairingKey = deriveDeviceBleKey(ownerUid, myDeviceId);
+            String sharedSecret = sessionManager.getBleSharedSecret();
+            if (sharedSecret == null || sharedSecret.isEmpty()) {
+                sharedSecret = sessionManager.getBleDeviceSecret(callerDeviceId);
+            }
+            byte[] pairingKey = deriveDeviceBleKey(sharedSecret, ownerUid, myDeviceId);
             if (pairingKey == null) {
                 session.failureCount++;
                 return null;
@@ -736,7 +747,11 @@ public class BleNearbyManager {
                         // Step 2: Compute mutual HMAC authentication proof
                         String ownerUid = sessionManager.getOwnerUid();
                         String callerDeviceId = sessionManager.getCurrentDeviceId();
-                        byte[] pairingKey = deriveDeviceBleKey(ownerUid, targetDeviceId != null ? targetDeviceId : reportedTarget);
+                        String sharedSecret = sessionManager.getBleDeviceSecret(targetDeviceId != null ? targetDeviceId : reportedTarget);
+                        if (sharedSecret == null || sharedSecret.isEmpty()) {
+                            sharedSecret = sessionManager.getBleSharedSecret();
+                        }
+                        byte[] pairingKey = deriveDeviceBleKey(sharedSecret, ownerUid, targetDeviceId != null ? targetDeviceId : reportedTarget);
 
                         if (pairingKey == null) {
                             if (callback != null) callback.onError("No approved pairing key found for target device");

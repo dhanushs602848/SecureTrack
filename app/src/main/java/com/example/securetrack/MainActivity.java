@@ -63,6 +63,22 @@ public class MainActivity extends AppCompatActivity {
                     .replace(R.id.nav_host_container, new HomeFragment())
                     .commit();
         }
+
+        // Reactive Active Security Alert Badge on Bottom Navigation
+        com.example.securetrack.repositories.SecurityRepository securityRepo = new com.example.securetrack.repositories.SecurityRepository(this);
+        securityRepo.getActiveAlertCountLiveData().observe(this, activeCount -> {
+            int count = activeCount != null ? activeCount : 0;
+            com.google.android.material.badge.BadgeDrawable badge = binding.bottomNavigation.getOrCreateBadge(R.id.navigation_security);
+            if (count > 0) {
+                badge.setVisible(true);
+                badge.setNumber(count);
+                badge.setBackgroundColor(androidx.core.content.ContextCompat.getColor(this, R.color.status_error));
+                badge.setBadgeTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.white));
+            } else {
+                badge.setVisible(false);
+                badge.clearNumber();
+            }
+        });
     }
 
     @Override

@@ -328,6 +328,21 @@ public class SecurityFragment extends Fragment {
     }
 
     private void applyFilter() {
+        int activeCount = 0;
+        int dismissedCount = 0;
+        int resolvedCount = 0;
+        for (SecurityEvent ev : allEvents) {
+            String status = ev.getStatus() != null ? ev.getStatus().toUpperCase() : "ACTIVE";
+            if ("ACTIVE".equals(status)) activeCount++;
+            else if ("DISMISSED".equals(status)) dismissedCount++;
+            else if ("RESOLVED".equals(status)) resolvedCount++;
+        }
+
+        binding.chipFilterActive.setText("ACTIVE (" + activeCount + ")");
+        binding.chipFilterDismissed.setText("DISMISSED (" + dismissedCount + ")");
+        binding.chipFilterResolved.setText("RESOLVED (" + resolvedCount + ")");
+        binding.chipFilterAll.setText("ALL (" + (activeCount + resolvedCount) + ")");
+
         List<SecurityEvent> filtered = new ArrayList<>();
         for (SecurityEvent ev : allEvents) {
             String status = ev.getStatus() != null ? ev.getStatus().toUpperCase() : "ACTIVE";
@@ -345,6 +360,13 @@ public class SecurityFragment extends Fragment {
         if (filtered.isEmpty()) {
             binding.tvEmptyState.setVisibility(View.VISIBLE);
             binding.rvSecurityAlerts.setVisibility(View.GONE);
+            if ("ACTIVE".equals(currentFilter) || "ALL".equals(currentFilter)) {
+                binding.tvEmptyState.setText("All caught up • 0 active security alerts\nTap 'Dismissed' to view alert history");
+            } else if ("DISMISSED".equals(currentFilter)) {
+                binding.tvEmptyState.setText("No dismissed alerts in history");
+            } else {
+                binding.tvEmptyState.setText("No alerts matching current filter");
+            }
         } else {
             binding.tvEmptyState.setVisibility(View.GONE);
             binding.rvSecurityAlerts.setVisibility(View.VISIBLE);

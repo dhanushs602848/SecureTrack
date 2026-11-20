@@ -368,6 +368,17 @@ public class DeviceRepository {
         deviceMap.put("trackingStatus", "ACTIVE");
         deviceMap.put("networkStatus", "CONNECTED");
 
+        // Generate cryptographically secure 256-bit high-entropy BLE shared secret
+        byte[] secretBytes = new byte[32];
+        new java.security.SecureRandom().nextBytes(secretBytes);
+        StringBuilder sb = new StringBuilder();
+        for (byte b : secretBytes) {
+            sb.append(String.format("%02x", b));
+        }
+        String bleSharedSecret = sb.toString();
+        deviceMap.put("bleSharedSecret", bleSharedSecret);
+        sessionManager.saveBleDeviceSecret(deviceId, bleSharedSecret);
+
         WriteBatch batch = db.batch();
         DocumentReference devRef = db.collection("users").document(uid).collection("devices").document(deviceId);
         batch.set(devRef, deviceMap, SetOptions.merge());
@@ -376,6 +387,7 @@ public class DeviceRepository {
         Map<String, Object> invUpdate = new HashMap<>();
         invUpdate.put("status", "APPROVED");
         invUpdate.put("approvedAt", FieldValue.serverTimestamp());
+        invUpdate.put("bleSharedSecret", bleSharedSecret);
         batch.update(invRef, invUpdate);
 
         batch.commit()
@@ -466,6 +478,11 @@ public class DeviceRepository {
                                 sessionManager.setOwnerUid(ownerUid);
                                 sessionManager.setCurrentDeviceId(installId);
                                 sessionManager.setDeviceName(deviceName);
+
+                                String bleSecret = snapshot.getString("bleSharedSecret");
+                                if (bleSecret != null && !bleSecret.isEmpty()) {
+                                    sessionManager.setBleSharedSecret(bleSecret);
+                                }
 
                                 Device enrolled = new Device(
                                         installId,

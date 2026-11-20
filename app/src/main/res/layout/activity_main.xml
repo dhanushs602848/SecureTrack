@@ -17,10 +17,11 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
-        android:background="@color/card_bg"
+        android:background="#0F172A"
         app:elevation="8dp"
-        app:itemIconTint="@color/nav_selected"
-        app:itemTextColor="@color/nav_selected"
+        app:itemIconTint="@color/nav_item_tint"
+        app:itemTextColor="@color/nav_item_tint"
+        app:itemRippleColor="#2000D2FF"
         app:menu="@menu/bottom_nav_menu" />
 
 </RelativeLayout>

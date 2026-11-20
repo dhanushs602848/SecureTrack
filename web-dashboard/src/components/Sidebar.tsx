@@ -15,8 +15,8 @@ export const Sidebar: React.FC = () => {
   ];
 
   return (
-    <aside className="w-64 bg-white border-r border-[#DFE2E7] min-h-[calc(100vh-73px)] p-4 flex flex-col">
-      <nav className="space-y-1">
+    <aside className="w-64 bg-[#0D131F] border-r border-[#1E293B] min-h-[calc(100vh-65px)] p-4 flex flex-col shadow-inner">
+      <nav className="space-y-1.5">
         {navItems.map((item) => {
           const Icon = item.icon;
           return (
@@ -25,15 +25,15 @@ export const Sidebar: React.FC = () => {
               to={item.to}
               end={item.to === '/'}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-all ${
+                `flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-xs tracking-wide transition-all ${
                   isActive
-                    ? 'bg-[#152C4F] text-white shadow-sm'
-                    : 'text-[#62666D] hover:bg-[#F0F2F5] hover:text-[#1A1C1E]'
+                    ? 'bg-gradient-to-r from-cyan-950/70 to-indigo-950/40 text-cyan-400 border border-cyan-800/60 shadow-[0_0_12px_rgba(0,210,255,0.15)]'
+                    : 'text-slate-400 hover:bg-[#162032] hover:text-slate-200 border border-transparent'
                 }`
               }
             >
-              <Icon className="w-5 h-5" />
-              {item.label}
+              <Icon className="w-4 h-4 flex-shrink-0" />
+              <span>{item.label}</span>
             </NavLink>
           );
         })}

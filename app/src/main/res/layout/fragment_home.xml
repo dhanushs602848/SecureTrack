@@ -3,7 +3,8 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/swipe_refresh"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/bg_app">
 
     <ScrollView
         android:layout_width="match_parent"
@@ -15,156 +16,190 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="24dp">
+            android:padding="20dp">
 
-            <TextView
-                android:id="@+id/tv_user_name"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Hello, User"
-                android:textColor="@color/primary_navy"
-                android:textSize="26sp"
-                android:textStyle="bold" />
+            <!-- Hero Welcome Header with Pulse Beacon -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Here is your device overview"
-                android:textColor="@color/text_secondary"
-                android:textSize="14sp" />
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentStart="true"
+                    android:layout_centerVertical="true"
+                    android:orientation="vertical">
 
-            <!-- Summary Cards -->
+                    <TextView
+                        android:id="@+id/tv_user_name"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Hello, Operator"
+                        android:textColor="@color/text_primary"
+                        android:textSize="24sp"
+                        android:fontFamily="sans-serif-black" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="SecureTrack 1.2 • Fleet Defense Active"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tv_system_shield_pill"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:background="@drawable/bg_chip_live"
+                    android:paddingStart="12dp"
+                    android:paddingTop="6dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="6dp"
+                    android:text="● SHIELD ON"
+                    android:textColor="@color/status_success"
+                    android:textSize="11sp"
+                    android:textStyle="bold" />
+            </RelativeLayout>
+
+            <!-- Metrics Grid -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
+                android:layout_marginTop="20dp"
                 android:orientation="horizontal"
-                android:weightSum="2">
+                android:weightSum="3">
 
                 <!-- Total Devices -->
                 <androidx.cardview.widget.CardView
                     style="@style/Widget.SecureTrack.Card"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
+                    android:layout_marginEnd="6dp"
                     android:layout_weight="1"
-                    app:cardBackgroundColor="@color/white">
+                    app:cardBackgroundColor="@color/card_bg">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:gravity="center"
                         android:orientation="vertical"
-                        android:padding="16dp">
+                        android:padding="14dp">
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/total_devices"
+                            android:text="TOTAL FLEET"
                             android:textColor="@color/text_secondary"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
+                            android:textSize="10sp"
+                            android:fontFamily="sans-serif-medium"
+                            android:letterSpacing="0.05" />
 
                         <TextView
                             android:id="@+id/tv_total_devices"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
+                            android:layout_marginTop="6dp"
                             android:text="0"
-                            android:textColor="@color/primary_navy"
-                            android:textSize="32sp"
-                            android:textStyle="bold" />
+                            android:textColor="@color/electric_cyan"
+                            android:textSize="26sp"
+                            android:fontFamily="sans-serif-black" />
                     </LinearLayout>
                 </androidx.cardview.widget.CardView>
 
-                <!-- Alerts -->
+                <!-- Online Peers -->
                 <androidx.cardview.widget.CardView
                     style="@style/Widget.SecureTrack.Card"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
+                    android:layout_marginStart="3dp"
+                    android:layout_marginEnd="3dp"
                     android:layout_weight="1"
-                    app:cardBackgroundColor="@color/white">
+                    app:cardBackgroundColor="@color/card_bg">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:gravity="center"
                         android:orientation="vertical"
-                        android:padding="16dp">
+                        android:padding="14dp">
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Online Devices"
+                            android:text="ONLINE"
                             android:textColor="@color/text_secondary"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
+                            android:textSize="10sp"
+                            android:fontFamily="sans-serif-medium"
+                            android:letterSpacing="0.05" />
 
                         <TextView
                             android:id="@+id/tv_online_devices"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
+                            android:layout_marginTop="6dp"
                             android:text="0"
-                            android:textColor="@color/primary_blue"
-                            android:textSize="32sp"
-                            android:textStyle="bold" />
+                            android:textColor="@color/status_success"
+                            android:textSize="26sp"
+                            android:fontFamily="sans-serif-black" />
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <!-- Active Alerts (0 when all dismissed) -->
+                <androidx.cardview.widget.CardView
+                    style="@style/Widget.SecureTrack.Card"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    app:cardBackgroundColor="@color/card_bg">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="14dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="ACTIVE ALERTS"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="10sp"
+                            android:fontFamily="sans-serif-medium"
+                            android:letterSpacing="0.05" />
+
+                        <TextView
+                            android:id="@+id/tv_alerts_count"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="0"
+                            android:textColor="@color/status_error"
+                            android:textSize="26sp"
+                            android:fontFamily="sans-serif-black" />
                     </LinearLayout>
                 </androidx.cardview.widget.CardView>
             </LinearLayout>
 
-            <androidx.cardview.widget.CardView
-                style="@style/Widget.SecureTrack.Card"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                app:cardBackgroundColor="@color/white">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:padding="16dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Security Alerts"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tv_alerts_count"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="0"
-                        android:textColor="#D32F2F"
-                        android:textSize="32sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
-            </androidx.cardview.widget.CardView>
-
-            <!-- Primary Device Status -->
+            <!-- Active Device Focus Card -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="32dp"
-                android:text="@string/primary_device"
-                android:textColor="@color/primary_navy"
-                android:textSize="18sp"
-                android:textStyle="bold" />
+                android:layout_marginTop="28dp"
+                android:text="PRIMARY DEVICE TELEMETRY"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.08" />
 
             <androidx.cardview.widget.CardView
                 style="@style/Widget.SecureTrack.Card"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                app:cardBackgroundColor="@color/white">
+                android:layout_marginTop="10dp"
+                app:cardBackgroundColor="@color/card_bg">
 
                 <RelativeLayout
                     android:layout_width="match_parent"
@@ -190,20 +225,20 @@
                             android:id="@+id/tv_primary_device_name"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Loading..."
+                            android:text="Samsung Galaxy A07 5G"
                             android:textColor="@color/text_primary"
-                            android:textSize="16sp"
-                            android:textStyle="bold" />
+                            android:textSize="17sp"
+                            android:fontFamily="sans-serif-bold" />
 
                         <TextView
                             android:id="@+id/tv_protection_status"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:text="Checking status..."
-                            android:textColor="@color/primary_blue"
+                            android:text="● Telemetry Synchronized • Cloud Live"
+                            android:textColor="@color/status_success"
                             android:textSize="13sp"
-                            android:textStyle="bold" />
+                            android:fontFamily="sans-serif-medium" />
                     </LinearLayout>
                 </RelativeLayout>
             </androidx.cardview.widget.CardView>
