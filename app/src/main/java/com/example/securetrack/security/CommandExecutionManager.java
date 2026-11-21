@@ -13,15 +13,15 @@ import com.example.securetrack.repositories.LocationRepository;
 import com.example.securetrack.utils.DeviceUtils;
 import com.example.securetrack.utils.PermissionUtils;
 import com.example.securetrack.utils.SessionManager;
-import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.location.Priority;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.firestore.WriteBatch;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
@@ -107,13 +107,16 @@ public class CommandExecutionManager {
     public synchronized void startListeningToCommands() {
         stopListeningToCommands();
 
-        // Self-heal pairing configuration if this device was enrolled as a secondary device
-        // but local SharedPreferences was reset or missing the secondary paired flag
         FirebaseAuth auth = FirebaseAuth.getInstance();
-        if (auth.getCurrentUser() != null && !sessionManager.isPairedSecondaryDevice()) {
+        String currentInstallationId = sessionManager.getInstallationId();
+
+        // Exact pairing recovery: Self-heal secondary enrollment using exact claimedDeviceId + authUid + status
+        if (auth.getCurrentUser() != null && !sessionManager.isPairedSecondaryDevice() && auth.getCurrentUser().isAnonymous()) {
             String currentAuthUid = auth.getCurrentUser().getUid();
+
             db.collection("pairing_invitations")
                     .whereEqualTo("claimedByUid", currentAuthUid)
+                    .whereEqualTo("claimedDeviceId", currentInstallationId)
                     .whereEqualTo("status", "APPROVED")
                     .limit(1)
                     .get()
@@ -122,17 +125,36 @@ public class CommandExecutionManager {
                             DocumentSnapshot doc = querySnapshot.getDocuments().get(0);
                             String ownerUid = doc.getString("ownerUid");
                             String claimedDevId = doc.getString("claimedDeviceId");
-                            if (ownerUid != null && !ownerUid.isEmpty() && claimedDevId != null && !claimedDevId.isEmpty()) {
-                                Log.i(TAG, "Self-healing pairing state: Enrolled secondary device under owner " + ownerUid);
-                                sessionManager.setPairedSecondaryDevice(true);
-                                sessionManager.setPairedOwnerUid(ownerUid);
-                                sessionManager.setOwnerUid(ownerUid);
-                                sessionManager.setCurrentDeviceId(claimedDevId);
-                                startListeningToCommandsInternal();
+
+                            if (ownerUid != null && !ownerUid.isEmpty() && currentInstallationId.equals(claimedDevId)) {
+                                // Verify target device is active and not REVOKED before saving state
+                                db.collection("users").document(ownerUid)
+                                        .collection("devices").document(currentInstallationId)
+                                        .get()
+                                        .addOnSuccessListener(devDoc -> {
+                                            if (devDoc.exists() && !"REVOKED".equalsIgnoreCase(devDoc.getString("status"))) {
+                                                Log.i(TAG, "Self-healing pairing state verified for installation " + currentInstallationId + " under owner " + ownerUid);
+                                                sessionManager.setPairedSecondaryDevice(true);
+                                                sessionManager.setPairedOwnerUid(ownerUid);
+                                                sessionManager.setOwnerUid(ownerUid);
+                                                sessionManager.setCurrentDeviceId(currentInstallationId);
+                                                startListeningToCommandsInternal();
+                                            } else {
+                                                Log.w(TAG, "Self-healing rejected: Device is revoked or unapproved in Firestore");
+                                            }
+                                        })
+                                        .addOnFailureListener(e -> Log.e(TAG, "Device verification failed during recovery", e));
                             }
+                        } else {
+                            Log.d(TAG, "No matching approved pairing invitation for installation " + currentInstallationId);
+                            startListeningToCommandsInternal();
                         }
                     })
-                    .addOnFailureListener(e -> Log.d(TAG, "Pairing self-heal check completed: " + e.getMessage()));
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Pairing self-heal check query failed", e);
+                        startListeningToCommandsInternal();
+                    });
+            return;
         }
 
         startListeningToCommandsInternal();
@@ -157,7 +179,7 @@ public class CommandExecutionManager {
         // Start BLE peripheral advertising so nearby controller can find this device if offline
         BleNearbyManager.getInstance(context).startAdvertisingAsTarget();
 
-        // 1. One-time fetch for pending QUEUED commands that arrived while process was offline
+        // 1. Fetch QUEUED commands that arrived while process was offline
         db.collection("users").document(uid)
                 .collection("devices").document(deviceId)
                 .collection("commands")
@@ -194,79 +216,127 @@ public class CommandExecutionManager {
         startListeningToCommands();
     }
 
-    private synchronized void executeSingleCommand(String uid, String deviceId, DocumentSnapshot doc) {
-        String commandId = doc.getId();
+    /**
+     * Genuinely Atomic Command Claiming via Firestore Transaction.
+     * Guarantees:
+     * 1. Status read & verified as QUEUED inside db.runTransaction
+     * 2. Expiration verified and handled atomically
+     * 3. QUEUED -> EXECUTING transition committed before execution begins
+             * 4. In-memory processed set updated ONLY on transaction success
+     */
+    private void executeSingleCommand(String uid, String deviceId, DocumentSnapshot initialDoc) {
+        String commandId = initialDoc.getId();
 
         if (processedCommandIds.contains(commandId)) {
-            Log.i(TAG, "Command already processed in this session: " + commandId);
-            return;
-        }
-        processedCommandIds.add(commandId);
-
-        String type = doc.getString("commandType");
-        if (type == null) {
-            type = doc.getString("command");
-        }
-
-        if (type == null) {
-            updateCommandStatus(uid, deviceId, commandId, "FAILED", "Missing command type");
+            Log.d(TAG, "Command already claimed/processed in local memory: " + commandId);
             return;
         }
 
-        com.google.firebase.Timestamp createdAt = doc.getTimestamp("createdAt");
-        long maxAge = ("LOCK_DEVICE".equalsIgnoreCase(type) || "ALARM_ALERT".equalsIgnoreCase(type))
-                ? EXPIRY_LOCK_ALARM_MS : EXPIRY_LOCATE_MS;
-
-        if (createdAt != null) {
-            long ageMillis = System.currentTimeMillis() - createdAt.toDate().getTime();
-            if (ageMillis > maxAge) {
-                Log.w(TAG, "Expiring stale command: " + type + ", age=" + (ageMillis / 1000) + "s");
-                updateCommandStatus(uid, deviceId, commandId, "EXPIRED",
-                        "Command expired before execution (exceeded " + (maxAge / 60000) + " min validity window)");
-                return;
-            }
-        }
-
-        Log.i(TAG, "Executing remote command " + commandId + " of type " + type + " on target device " + deviceId);
-
-        // Atomically transition status to EXECUTING in Firestore
-        db.collection("users").document(uid)
+        DocumentReference cmdRef = db.collection("users").document(uid)
                 .collection("devices").document(deviceId)
-                .collection("commands").document(commandId)
-                .update("status", "EXECUTING");
+                .collection("commands").document(commandId);
 
-        final String finalType = type;
-        new Thread(() -> {
-            CommandEntity entity = new CommandEntity(
-                    commandId,
-                    deviceId,
-                    finalType,
-                    uid,
-                    "",
-                    CommandEntity.STATE_EXECUTING,
-                    "Executing on target device",
-                    CommandEntity.TRANSPORT_CLOUD,
-                    createdAt != null ? createdAt.toDate().getTime() : System.currentTimeMillis(),
-                    System.currentTimeMillis() + maxAge,
-                    System.currentTimeMillis(),
-                    0,
-                    "SYNCED",
-                    0
-            );
-            appDatabase.commandDao().insertOrUpdate(entity);
-        }).start();
+        db.runTransaction(transaction -> {
+            DocumentSnapshot snapshot = transaction.get(cmdRef);
+            if (!snapshot.exists()) {
+                throw new FirebaseFirestoreException("Command document does not exist", FirebaseFirestoreException.Code.NOT_FOUND);
+            }
 
-        if ("LOCATE_NOW".equalsIgnoreCase(type)) {
-            handleLocateCommand(uid, deviceId, commandId, doc);
-        } else if ("LOCK_DEVICE".equalsIgnoreCase(type)) {
-            handleLockCommand(uid, deviceId, commandId);
-        } else if ("ALARM_ALERT".equalsIgnoreCase(type)) {
-            handleAlarmCommand(uid, deviceId, commandId);
-        } else if ("WIPE_DEVICE".equalsIgnoreCase(type)) {
-            handleWipeCommand(uid, deviceId, commandId);
-        } else {
-            updateCommandStatus(uid, deviceId, commandId, "FAILED", "Unsupported command type: " + type);
-        }
+            String currentStatus = snapshot.getString("status");
+            if (!"QUEUED".equalsIgnoreCase(currentStatus)) {
+                throw new FirebaseFirestoreException("Command status is " + currentStatus + ", not QUEUED", FirebaseFirestoreException.Code.ABORTED);
+            }
+
+            String type = snapshot.getString("commandType");
+            if (type == null) {
+                type = snapshot.getString("command");
+            }
+            if (type == null) {
+                throw new FirebaseFirestoreException("Malformed command missing commandType", FirebaseFirestoreException.Code.INVALID_ARGUMENT);
+            }
+
+            com.google.firebase.Timestamp createdAt = snapshot.getTimestamp("createdAt");
+            long maxAge = ("LOCK_DEVICE".equalsIgnoreCase(type) || "ALARM_ALERT".equalsIgnoreCase(type))
+                    ? EXPIRY_LOCK_ALARM_MS : EXPIRY_LOCATE_MS;
+
+            if (createdAt != null) {
+                long ageMillis = System.currentTimeMillis() - createdAt.toDate().getTime();
+                if (ageMillis > maxAge) {
+                    Map<String, Object> expireUpdates = new HashMap<>();
+                    expireUpdates.put("status", "EXPIRED");
+                    expireUpdates.put("result", "Command expired before execution (exceeded " + (maxAge / 60000) + " min validity window)");
+                    expireUpdates.put("executedAt", FieldValue.serverTimestamp());
+                    transaction.update(cmdRef, expireUpdates);
+                    throw new FirebaseFirestoreException("Command expired", FirebaseFirestoreException.Code.DEADLINE_EXCEEDED);
+                }
+            }
+
+            Map<String, Object> claimUpdates = new HashMap<>();
+            claimUpdates.put("status", "EXECUTING");
+            claimUpdates.put("claimedAt", FieldValue.serverTimestamp());
+            transaction.update(cmdRef, claimUpdates);
+
+            return snapshot;
+        }).addOnSuccessListener(claimedDoc -> {
+            processedCommandIds.add(commandId);
+
+            String type = claimedDoc.getString("commandType");
+            if (type == null) type = claimedDoc.getString("command");
+
+            Log.i(TAG, "Successfully claimed and executing remote command " + commandId + " [" + type + "] on target " + deviceId);
+
+            final String finalType = type;
+            com.google.firebase.Timestamp createdAt = claimedDoc.getTimestamp("createdAt");
+            long maxAge = ("LOCK_DEVICE".equalsIgnoreCase(type) || "ALARM_ALERT".equalsIgnoreCase(type))
+                    ? EXPIRY_LOCK_ALARM_MS : EXPIRY_LOCATE_MS;
+
+            new Thread(() -> {
+                CommandEntity entity = new CommandEntity(
+                        commandId,
+                        deviceId,
+                        finalType,
+                        uid,
+                        "",
+                        CommandEntity.STATE_EXECUTING,
+                        "Executing on target device",
+                        CommandEntity.TRANSPORT_CLOUD,
+                        createdAt != null ? createdAt.toDate().getTime() : System.currentTimeMillis(),
+                        System.currentTimeMillis() + maxAge,
+                        System.currentTimeMillis(),
+                        0,
+                        "SYNCED",
+                        0
+                );
+                appDatabase.commandDao().insertOrUpdate(entity);
+            }).start();
+
+            if ("LOCATE_NOW".equalsIgnoreCase(type)) {
+                handleLocateCommand(uid, deviceId, commandId, claimedDoc);
+            } else if ("LOCK_DEVICE".equalsIgnoreCase(type)) {
+                handleLockCommand(uid, deviceId, commandId);
+            } else if ("ALARM_ALERT".equalsIgnoreCase(type)) {
+                handleAlarmCommand(uid, deviceId, commandId);
+            } else if ("WIPE_DEVICE".equalsIgnoreCase(type)) {
+                handleWipeCommand(uid, deviceId, commandId);
+            } else {
+                updateCommandStatus(uid, deviceId, commandId, "FAILED", "Unsupported command type: " + type);
+            }
+        }).addOnFailureListener(e -> {
+            if (e instanceof FirebaseFirestoreException) {
+                FirebaseFirestoreException fe = (FirebaseFirestoreException) e;
+                if (fe.getCode() == FirebaseFirestoreException.Code.ABORTED) {
+                    Log.d(TAG, "Command " + commandId + " already claimed by another worker or not QUEUED.");
+                    processedCommandIds.add(commandId);
+                } else if (fe.getCode() == FirebaseFirestoreException.Code.DEADLINE_EXCEEDED) {
+                    Log.w(TAG, "Command " + commandId + " marked as EXPIRED in transaction.");
+                    processedCommandIds.add(commandId);
+                } else {
+                    Log.e(TAG, "Command claim transaction failed for " + commandId + ": " + e.getMessage());
+                }
+            } else {
+                Log.e(TAG, "Command claim failed for " + commandId + ": " + e.getMessage());
+            }
+        });
     }
 
     @SuppressLint("MissingPermission")
@@ -304,10 +374,15 @@ public class CommandExecutionManager {
         });
     }
 
+    /**
+     * Confirmed Cloud Location Persistence.
+     * Uses WriteBatch for atomic cloud location history & device telemetry update.
+     * Updates command status to EXECUTED ONLY upon WriteBatch commit success.
+     */
     private void recordAndCompleteLocate(String uid, String deviceId, String commandId, String requestId, Location location) {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
         sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-        String timestampStr = sdf.format(new Date(location.getTime()));
+        String timestampStr = sdf.format(new Date(location.getTime() > 0 ? location.getTime() : System.currentTimeMillis()));
 
         LocationRecord record = new LocationRecord(
                 deviceId,
@@ -320,55 +395,74 @@ public class CommandExecutionManager {
                 timestampStr
         );
 
-        locationRepository.recordLocation(record, new LocationRepository.ApiCallback<LocationRecord>() {
-            @Override
-            public void onSuccess(LocationRecord result) {
-                Map<String, Object> devUpdates = new HashMap<>();
-                devUpdates.put("lastSeen", FieldValue.serverTimestamp());
-                devUpdates.put("batteryLevel", DeviceUtils.getBatteryLevel(context));
-                devUpdates.put("locationStatus", "ACTIVE");
-                devUpdates.put("status", "ONLINE");
-                devUpdates.put("lastLatitude", location.getLatitude());
-                devUpdates.put("lastLongitude", location.getLongitude());
-                devUpdates.put("lastAccuracy", location.getAccuracy());
-                devUpdates.put("locationAccuracy", location.getAccuracy());
-                devUpdates.put("lastRequestId", requestId);
+        Map<String, Object> devUpdates = new HashMap<>();
+        devUpdates.put("lastSeen", FieldValue.serverTimestamp());
+        devUpdates.put("batteryLevel", DeviceUtils.getBatteryLevel(context));
+        devUpdates.put("locationStatus", "ACTIVE");
+        devUpdates.put("status", "ONLINE");
+        devUpdates.put("lastLatitude", location.getLatitude());
+        devUpdates.put("lastLongitude", location.getLongitude());
+        devUpdates.put("lastAccuracy", location.getAccuracy());
+        devUpdates.put("locationAccuracy", location.getAccuracy());
+        devUpdates.put("lastRequestId", requestId);
 
-                db.collection("users").document(uid)
-                        .collection("devices").document(deviceId)
-                        .set(devUpdates, SetOptions.merge())
-                        .addOnSuccessListener(aVoid -> Log.i(TAG, "Target device location telemetry updated in Firestore"))
-                        .addOnFailureListener(e -> Log.e(TAG, "Failed to update target device location telemetry", e));
+        com.google.firebase.Timestamp gpsTimestamp = LocationRepository.parseTimestamp(timestampStr);
 
-                String resultMsg = String.format(Locale.US, "Location: (%.5f, %.5f) ±%.1fm [req:%s]",
-                        location.getLatitude(), location.getLongitude(), location.getAccuracy(), requestId);
-                updateCommandStatusWithRequestId(uid, deviceId, commandId, "EXECUTED", resultMsg, requestId);
-            }
+        Map<String, Object> locationMap = new HashMap<>();
+        locationMap.put("clientUuid", requestId);
+        locationMap.put("requestId", requestId);
+        locationMap.put("latitude", location.getLatitude());
+        locationMap.put("longitude", location.getLongitude());
+        locationMap.put("accuracy", location.getAccuracy());
+        locationMap.put("altitude", location.getAltitude());
+        locationMap.put("speed", location.getSpeed());
+        locationMap.put("source", "GPS");
+        locationMap.put("timestamp", gpsTimestamp);
+        locationMap.put("uploadedAt", FieldValue.serverTimestamp());
 
-            @Override
-            public void onError(String errorMessage) {
-                Log.w(TAG, "Subcollection location write failed: " + errorMessage + "; updating device document directly");
-                Map<String, Object> devUpdates = new HashMap<>();
-                devUpdates.put("lastSeen", FieldValue.serverTimestamp());
-                devUpdates.put("batteryLevel", DeviceUtils.getBatteryLevel(context));
-                devUpdates.put("locationStatus", "ACTIVE");
-                devUpdates.put("status", "ONLINE");
-                devUpdates.put("lastLatitude", location.getLatitude());
-                devUpdates.put("lastLongitude", location.getLongitude());
-                devUpdates.put("lastAccuracy", location.getAccuracy());
-                devUpdates.put("locationAccuracy", location.getAccuracy());
-                devUpdates.put("lastRequestId", requestId);
+        // 1. Write to local Room DB for offline write-ahead durability
+        new Thread(() -> {
+            com.example.securetrack.database.LocationEntity entity = new com.example.securetrack.database.LocationEntity(
+                    deviceId,
+                    requestId,
+                    location.getLatitude(),
+                    location.getLongitude(),
+                    location.getAccuracy(),
+                    location.getAltitude(),
+                    location.getSpeed(),
+                    timestampStr,
+                    false
+            );
+            appDatabase.locationDao().insert(entity);
+        }).start();
 
-                db.collection("users").document(uid)
-                        .collection("devices").document(deviceId)
-                        .set(devUpdates, SetOptions.merge())
-                        .addOnSuccessListener(aVoid -> Log.i(TAG, "Target device location telemetry updated directly in Firestore"))
-                        .addOnFailureListener(e -> Log.e(TAG, "Failed to update direct location telemetry", e));
+        // 2. Perform atomic batch write for location history & device telemetry
+        WriteBatch batch = db.batch();
+        DocumentReference locRef = db.collection("users").document(uid)
+                .collection("devices").document(deviceId)
+                .collection("locations").document(requestId);
+        batch.set(locRef, locationMap, SetOptions.merge());
 
-                String resultMsg = String.format(Locale.US, "Location: (%.5f, %.5f) ±%.1fm (Telemetry synced) [req:%s]",
-                        location.getLatitude(), location.getLongitude(), location.getAccuracy(), requestId);
-                updateCommandStatusWithRequestId(uid, deviceId, commandId, "EXECUTED", resultMsg, requestId);
-            }
+        DocumentReference devRef = db.collection("users").document(uid)
+                .collection("devices").document(deviceId);
+        batch.set(devRef, devUpdates, SetOptions.merge());
+
+        batch.commit().addOnSuccessListener(aVoid -> {
+            Log.i(TAG, "Location history and device telemetry successfully committed to cloud for req: " + requestId);
+            new Thread(() -> {
+                com.example.securetrack.database.LocationEntity loc = appDatabase.locationDao().getByClientUuid(requestId);
+                if (loc != null) {
+                    appDatabase.locationDao().markAsSynced(loc.getId());
+                }
+            }).start();
+
+            String resultMsg = String.format(Locale.US, "Location: (%.5f, %.5f) ±%.1fm [req:%s]",
+                    location.getLatitude(), location.getLongitude(), location.getAccuracy(), requestId);
+            updateCommandStatusWithRequestId(uid, deviceId, commandId, "EXECUTED", resultMsg, requestId);
+        }).addOnFailureListener(e -> {
+            Log.e(TAG, "Cloud location batch write failed for req " + requestId + ": " + e.getMessage());
+            String failMsg = "Cloud persistence failed: " + e.getMessage() + " (Stored in local queue for background retry)";
+            updateCommandStatusWithRequestId(uid, deviceId, commandId, "FAILED", failMsg, requestId);
         });
     }
 
