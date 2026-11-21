@@ -42,6 +42,10 @@ public class SessionManager {
         prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
     }
 
+    public SessionManager(SharedPreferences prefs) {
+        this.prefs = prefs;
+    }
+
     public void saveAuthSession(String accessToken, String refreshToken, long userId, String email, String fullName) {
         prefs.edit()
                 .putString(KEY_TOKEN, accessToken)
@@ -69,8 +73,12 @@ public class SessionManager {
 
     public String getFirebaseUid() {
         String uid = prefs.getString(KEY_FIREBASE_UID, null);
-        if (uid == null && FirebaseAuth.getInstance().getCurrentUser() != null) {
-            uid = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        if (uid == null) {
+            try {
+                if (FirebaseAuth.getInstance().getCurrentUser() != null) {
+                    uid = FirebaseAuth.getInstance().getCurrentUser().getUid();
+                }
+            } catch (Exception ignored) {}
         }
         return uid;
     }
@@ -119,7 +127,11 @@ public class SessionManager {
     }
 
     public boolean isLoggedIn() {
-        boolean hasFirebaseUser = FirebaseAuth.getInstance().getCurrentUser() != null || getFirebaseUid() != null;
+        boolean hasFirebaseUser = false;
+        try {
+            hasFirebaseUser = (FirebaseAuth.getInstance().getCurrentUser() != null);
+        } catch (Exception ignored) {}
+        hasFirebaseUser = hasFirebaseUser || (getFirebaseUid() != null);
         boolean hasBackendToken = getToken() != null && !getToken().isEmpty();
         return hasFirebaseUser || hasBackendToken;
     }
@@ -130,8 +142,12 @@ public class SessionManager {
 
     public String getUserEmail() {
         String email = prefs.getString(KEY_USER_EMAIL, "");
-        if (email.isEmpty() && FirebaseAuth.getInstance().getCurrentUser() != null) {
-            email = FirebaseAuth.getInstance().getCurrentUser().getEmail();
+        if (email.isEmpty()) {
+            try {
+                if (FirebaseAuth.getInstance().getCurrentUser() != null) {
+                    email = FirebaseAuth.getInstance().getCurrentUser().getEmail();
+                }
+            } catch (Exception ignored) {}
             if (email == null) email = "";
         }
         return email;
@@ -139,8 +155,12 @@ public class SessionManager {
 
     public String getUserName() {
         String name = prefs.getString(KEY_USER_NAME, "");
-        if (name.isEmpty() && FirebaseAuth.getInstance().getCurrentUser() != null) {
-            name = FirebaseAuth.getInstance().getCurrentUser().getDisplayName();
+        if (name.isEmpty()) {
+            try {
+                if (FirebaseAuth.getInstance().getCurrentUser() != null) {
+                    name = FirebaseAuth.getInstance().getCurrentUser().getDisplayName();
+                }
+            } catch (Exception ignored) {}
             if (name == null || name.isEmpty()) {
                 name = getUserEmail();
             }
@@ -159,6 +179,10 @@ public class SessionManager {
             prefs.edit().putString(KEY_INSTALLATION_ID, id).apply();
         }
         return id;
+    }
+
+    public void setInstallationId(String id) {
+        prefs.edit().putString(KEY_INSTALLATION_ID, id).apply();
     }
 
     /**
@@ -345,5 +369,9 @@ public class SessionManager {
                 .remove(KEY_IS_PAIRED_DEVICE)
                 .remove(KEY_PAIRED_OWNER_UID)
                 .apply();
+    }
+
+    public void clearAll() {
+        prefs.edit().clear().apply();
     }
 }

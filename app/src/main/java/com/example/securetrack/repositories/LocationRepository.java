@@ -62,25 +62,36 @@ public class LocationRepository {
         executor.execute(() -> {
             long localRowId = -1;
             if (deviceId != null) {
-                LocationEntity existing = locationDao.getByClientUuid(locationId);
-                if (existing != null) {
-                    localRowId = existing.getId();
-                } else {
-                    LocationEntity entity = new LocationEntity(
-                            deviceId,
-                            locationId,
-                            record.getLatitude(),
-                            record.getLongitude(),
-                            record.getAccuracy() != null ? record.getAccuracy() : 0.0f,
-                            record.getAltitude() != null ? record.getAltitude() : 0.0,
-                            record.getSpeed() != null ? record.getSpeed() : 0.0f,
-                            record.getTimestamp(),
-                            false
-                    );
-                    localRowId = locationDao.insert(entity);
+                try {
+                    LocationEntity existing = locationDao.getByClientUuid(locationId);
+                    if (existing != null) {
+                        localRowId = existing.getId();
+                    } else {
+                        LocationEntity entity = new LocationEntity(
+                                deviceId,
+                                locationId,
+                                record.getLatitude(),
+                                record.getLongitude(),
+                                record.getAccuracy() != null ? record.getAccuracy() : 0.0f,
+                                record.getAltitude() != null ? record.getAltitude() : 0.0,
+                                record.getSpeed() != null ? record.getSpeed() : 0.0f,
+                                record.getTimestamp(),
+                                false
+                        );
+                        localRowId = locationDao.insert(entity);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Local Room database insertion failed for " + locationId, e);
+                    localRowId = -1;
                 }
             }
             final long insertedId = localRowId;
+
+            if (insertedId <= 0) {
+                Log.e(TAG, "Local database insertion failed for location " + locationId);
+                if (callback != null) callback.onError("Local database insertion failed: cloud persistence aborted");
+                return;
+            }
 
             // 2. If unauthenticated, exit after confirming durable local storage
             if (uid == null || deviceId == null) {

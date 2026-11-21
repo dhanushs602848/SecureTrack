@@ -139,6 +139,41 @@ public class DurableSyncWorker extends Worker {
                 }
             }
 
+            // 4. Sync pending terminal command status updates to Firestore
+            boolean hasPendingCommandSyncFailures = false;
+            List<CommandEntity> pendingCommands = db.commandDao().getPendingSyncCommands();
+            if (pendingCommands != null && !pendingCommands.isEmpty()) {
+                Log.i(TAG, "Syncing " + pendingCommands.size() + " pending command status updates to cloud");
+                for (CommandEntity cmd : pendingCommands) {
+                    String targetDevId = cmd.getTargetDeviceId() != null && !cmd.getTargetDeviceId().isEmpty()
+                            ? cmd.getTargetDeviceId() : deviceId;
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("status", cmd.getStatus());
+                    updates.put("result", cmd.getResult());
+                    updates.put("executedAt", FieldValue.serverTimestamp());
+
+                    try {
+                        Tasks.await(
+                                firestore.collection("users").document(uid)
+                                        .collection("devices").document(targetDevId)
+                                        .collection("commands").document(cmd.getCommandId())
+                                        .update(updates),
+                                5, TimeUnit.SECONDS
+                        );
+                        db.commandDao().updateSyncStatus(cmd.getCommandId(), "SYNCED");
+                        Log.i(TAG, "Successfully synced terminal status for command " + cmd.getCommandId() + " to cloud");
+                    } catch (Exception e) {
+                        hasPendingCommandSyncFailures = true;
+                        Log.w(TAG, "Command status sync delayed for " + cmd.getCommandId() + ": " + e.getMessage());
+                    }
+                }
+            }
+
+            if (hasPendingCommandSyncFailures) {
+                Log.w(TAG, "Some pending command status updates could not be synced; returning Result.retry()");
+                return Result.retry();
+            }
+
             Log.i(TAG, "Durable synchronization cycle completed successfully");
             return Result.success();
 
