@@ -183,7 +183,6 @@ public class BleNearbyManager {
             mac.init(new SecretKeySpec(keyMaterial.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             return mac.doFinal(("SecureTrack:BLE:PairingKey:v2:" + ownerUid + ":" + deviceId).getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
-            Log.e(TAG, "Error deriving pairing key", e);
             return null;
         }
     }
@@ -195,7 +194,6 @@ public class BleNearbyManager {
             mac.init(new SecretKeySpec(key, "HmacSHA256"));
             return mac.doFinal(message.getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
-            Log.e(TAG, "Error computing HMAC", e);
             return null;
         }
     }
