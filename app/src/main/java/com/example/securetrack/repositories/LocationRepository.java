@@ -66,7 +66,7 @@ public class LocationRepository {
                 if (date != null) return new com.google.firebase.Timestamp(date);
             } catch (Exception ignored) {}
         }
-        return com.google.firebase.Timestamp.now();
+        return new com.google.firebase.Timestamp(new java.util.Date());
     }
 
     public void recordLocation(LocationRecord record, ApiCallback<LocationRecord> callback) {
