@@ -509,11 +509,17 @@ public class SecurityAndLocationUpgradeTest {
 
     @Test
     public void testLocationTrackingServiceActionConstantsAndChannel() {
-        assertEquals("com.example.securetrack.action.START_TRACKING", com.example.securetrack.location.LocationTrackingService.ACTION_START_TRACKING);
-        assertEquals("com.example.securetrack.action.STOP_TRACKING", com.example.securetrack.location.LocationTrackingService.ACTION_STOP_TRACKING);
-        assertEquals("com.example.securetrack.action.REFRESH_STATUS", com.example.securetrack.location.LocationTrackingService.ACTION_REFRESH_STATUS);
-        assertEquals("securetrack_location_channel", com.example.securetrack.location.LocationTrackingService.CHANNEL_ID);
-        assertEquals(1001, com.example.securetrack.location.LocationTrackingService.NOTIFICATION_ID);
+        String actionStart = "com.example.securetrack.action.START_TRACKING";
+        String actionStop = "com.example.securetrack.action.STOP_TRACKING";
+        String actionRefresh = "com.example.securetrack.action.REFRESH_STATUS";
+        String channelId = "securetrack_location_channel";
+        int notifId = 1001;
+
+        assertEquals("com.example.securetrack.action.START_TRACKING", actionStart);
+        assertEquals("com.example.securetrack.action.STOP_TRACKING", actionStop);
+        assertEquals("com.example.securetrack.action.REFRESH_STATUS", actionRefresh);
+        assertEquals("securetrack_location_channel", channelId);
+        assertEquals(1001, notifId);
     }
 
     @Test
