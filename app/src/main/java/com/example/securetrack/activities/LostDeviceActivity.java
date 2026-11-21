@@ -54,19 +54,30 @@ public class LostDeviceActivity extends AppCompatActivity {
             startActivity(browserIntent);
         });
 
-        // 5s Alarm Button
+        // 5s Alarm Button with manual STOP control
         binding.btnTrigger5sAlarm.setOnClickListener(v -> {
             boolean isLocal = targetDeviceId != null && targetDeviceId.equals(sessionManager.getCurrentDeviceId());
+            AlarmSoundManager alarmManager = AlarmSoundManager.getInstance(this);
+
+            if (alarmManager.isPlaying()) {
+                alarmManager.stopAlarm();
+                binding.btnTrigger5sAlarm.setText("Sound 5s Siren");
+                Toast.makeText(LostDeviceActivity.this, "Panic siren stopped manually", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
             if (isLocal) {
-                AlarmSoundManager.getInstance(this).playFiveSecondAlarm(new AlarmSoundManager.AlarmCallback() {
+                binding.btnTrigger5sAlarm.setText("Stop Siren");
+                alarmManager.playFiveSecondAlarm(new AlarmSoundManager.AlarmCallback() {
                     @Override
                     public void onAlarmStarted() {
-                        Toast.makeText(LostDeviceActivity.this, "5-Second loud alarm playing...", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(LostDeviceActivity.this, "5-Second panic security siren playing...", Toast.LENGTH_SHORT).show();
                     }
 
                     @Override
                     public void onAlarmCompleted(String reason) {
-                        Toast.makeText(LostDeviceActivity.this, "Alarm ended: " + reason, Toast.LENGTH_SHORT).show();
+                        runOnUiThread(() -> binding.btnTrigger5sAlarm.setText("Sound 5s Siren"));
+                        Toast.makeText(LostDeviceActivity.this, "Siren ended: " + reason, Toast.LENGTH_SHORT).show();
                     }
                 });
             } else {

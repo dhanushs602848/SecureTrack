@@ -5,7 +5,7 @@
     android:id="@+id/swipe_refresh"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/midnight_dark">
+    android:background="@color/bg_app">
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
@@ -35,7 +35,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/security_center"
-                        android:textColor="@color/white"
+                        android:textColor="@color/text_primary"
                         android:textSize="24sp"
                         android:textStyle="bold" />
 
@@ -45,7 +45,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:text="Multi-device telemetry &amp; anti-theft hub"
-                        android:textColor="@color/slate_400"
+                        android:textColor="@color/text_secondary"
                         android:textSize="13sp" />
                 </LinearLayout>
 
@@ -64,10 +64,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="18dp"
-                app:cardBackgroundColor="@color/midnight_card"
+                app:cardBackgroundColor="@color/card_bg"
                 app:cardCornerRadius="16dp"
-                app:cardElevation="4dp"
-                app:strokeColor="@color/midnight_border"
+                app:cardElevation="2dp"
+                app:strokeColor="@color/border_color"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
@@ -88,7 +88,7 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:text="Primary Device"
-                            android:textColor="@color/white"
+                            android:textColor="@color/text_primary"
                             android:textSize="16sp"
                             android:textStyle="bold" />
 
@@ -126,7 +126,7 @@
                             android:layout_marginStart="8dp"
                             android:layout_weight="1"
                             android:text="Acquiring coordinates..."
-                            android:textColor="@color/slate_100"
+                            android:textColor="@color/text_primary"
                             android:textSize="13sp" />
 
                         <TextView
@@ -134,7 +134,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="±12m"
-                            android:textColor="@color/slate_400"
+                            android:textColor="@color/text_secondary"
                             android:textSize="12sp" />
                     </LinearLayout>
 
@@ -144,7 +144,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="Last checked: Just now"
-                        android:textColor="@color/slate_400"
+                        android:textColor="@color/text_secondary"
                         android:textSize="11sp" />
 
                     <LinearLayout
@@ -175,7 +175,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="42dp"
                             android:layout_marginStart="8dp"
-                            android:backgroundTint="@color/midnight_card_secondary"
+                            android:backgroundTint="@color/secondary_surface"
                             android:insetTop="0dp"
                             android:insetBottom="0dp"
                             android:text="Lost Mode"
@@ -198,7 +198,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="22dp"
                 android:text="Quick Defense Actions"
-                android:textColor="@color/white"
+                android:textColor="@color/text_primary"
                 android:textSize="16sp"
                 android:textStyle="bold" />
 
@@ -216,7 +216,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="6dp"
                     android:layout_weight="1"
-                    android:background="@drawable/bg_midnight_card"
+                    android:background="@drawable/bg_card"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center"
@@ -235,7 +235,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
                         android:text="5s Alarm"
-                        android:textColor="@color/white"
+                        android:textColor="@color/text_primary"
                         android:textSize="13sp"
                         android:textStyle="bold" />
 
@@ -243,7 +243,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Max Loudness"
-                        android:textColor="@color/slate_400"
+                        android:textColor="@color/text_secondary"
                         android:textSize="10sp" />
                 </LinearLayout>
 
@@ -254,7 +254,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="3dp"
                     android:layout_weight="1"
-                    android:background="@drawable/bg_midnight_card"
+                    android:background="@drawable/bg_card"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center"
@@ -273,7 +273,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
                         android:text="Lock Device"
-                        android:textColor="@color/white"
+                        android:textColor="@color/text_primary"
                         android:textSize="13sp"
                         android:textStyle="bold" />
 
@@ -281,7 +281,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Immediate Lock"
-                        android:textColor="@color/slate_400"
+                        android:textColor="@color/text_secondary"
                         android:textSize="10sp" />
                 </LinearLayout>
 
@@ -292,7 +292,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="6dp"
                     android:layout_weight="1"
-                    android:background="@drawable/bg_midnight_card"
+                    android:background="@drawable/bg_card"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center"
@@ -311,7 +311,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
                         android:text="BLE Nearby"
-                        android:textColor="@color/white"
+                        android:textColor="@color/text_primary"
                         android:textSize="13sp"
                         android:textStyle="bold" />
 
@@ -320,7 +320,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Offline Beacon"
-                        android:textColor="@color/slate_400"
+                        android:textColor="@color/text_secondary"
                         android:textSize="10sp" />
                 </LinearLayout>
             </LinearLayout>
@@ -330,10 +330,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp"
-                app:cardBackgroundColor="@color/midnight_card"
+                app:cardBackgroundColor="@color/card_bg"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="2dp"
-                app:strokeColor="@color/midnight_border"
+                app:strokeColor="@color/border_color"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
@@ -346,7 +346,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Protection Readiness"
-                        android:textColor="@color/white"
+                        android:textColor="@color/text_primary"
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
@@ -364,7 +364,7 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:text="• Precise Location Access"
-                            android:textColor="@color/slate_100"
+                            android:textColor="@color/text_primary"
                             android:textSize="12.5sp" />
 
                         <TextView
@@ -390,7 +390,7 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:text="• Background Location Tracking"
-                            android:textColor="@color/slate_100"
+                            android:textColor="@color/text_primary"
                             android:textSize="12.5sp" />
 
                         <TextView
@@ -416,7 +416,7 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:text="• Device Admin &amp; Remote Lock"
-                            android:textColor="@color/slate_100"
+                            android:textColor="@color/text_primary"
                             android:textSize="12.5sp" />
 
                         <TextView
@@ -442,7 +442,7 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:text="• Bluetooth BLE Scanning &amp; Beacon"
-                            android:textColor="@color/slate_100"
+                            android:textColor="@color/text_primary"
                             android:textSize="12.5sp" />
 
                         <TextView
@@ -470,7 +470,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="@string/security_alerts"
-                    android:textColor="@color/white"
+                    android:textColor="@color/text_primary"
                     android:textSize="16sp"
                     android:textStyle="bold" />
 
@@ -519,7 +519,7 @@
                     android:paddingHorizontal="14dp"
                     android:paddingVertical="6dp"
                     android:text="Active"
-                    android:textColor="@color/slate_400"
+                    android:textColor="@color/text_secondary"
                     android:textSize="12sp" />
 
                 <TextView
@@ -533,7 +533,7 @@
                     android:paddingHorizontal="14dp"
                     android:paddingVertical="6dp"
                     android:text="Resolved"
-                    android:textColor="@color/slate_400"
+                    android:textColor="@color/text_secondary"
                     android:textSize="12sp" />
 
                 <TextView
@@ -547,21 +547,50 @@
                     android:paddingHorizontal="14dp"
                     android:paddingVertical="6dp"
                     android:text="Dismissed"
-                    android:textColor="@color/slate_400"
+                    android:textColor="@color/text_secondary"
                     android:textSize="12sp" />
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/tv_empty_state"
+            <!-- Styled Empty State Card -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/tv_empty_state_card"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
-                android:gravity="center"
-                android:padding="20dp"
-                android:text="No security alerts found"
-                android:textColor="@color/slate_400"
-                android:textSize="13sp"
-                android:visibility="gone" />
+                android:layout_marginTop="16dp"
+                app:cardBackgroundColor="@color/card_bg"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="1dp"
+                app:strokeColor="@color/border_color"
+                app:strokeWidth="1dp"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:padding="24dp">
+
+                    <ImageView
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:contentDescription="All Clear"
+                        android:src="@drawable/ic_check_circle"
+                        app:tint="@color/mint_green" />
+
+                    <TextView
+                        android:id="@+id/tv_empty_state"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:gravity="center"
+                        android:lineSpacingExtra="4dp"
+                        android:text="No active alerts\nYou're all clear. Your dismissed alerts remain available in history."
+                        android:textColor="@color/text_primary"
+                        android:textSize="13.5sp"
+                        android:fontFamily="sans-serif-medium" />
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rv_security_alerts"

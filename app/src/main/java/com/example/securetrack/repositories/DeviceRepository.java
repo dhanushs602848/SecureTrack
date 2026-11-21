@@ -48,11 +48,32 @@ public class DeviceRepository {
     }
 
     private String getUid() {
+        if (sessionManager.isPairedSecondaryDevice()) {
+            String pairedOwnerUid = sessionManager.getPairedOwnerUid();
+            if (pairedOwnerUid != null && !pairedOwnerUid.isEmpty()) {
+                return pairedOwnerUid;
+            }
+        }
+        FirebaseAuth auth = FirebaseAuth.getInstance();
+        if (auth.getCurrentUser() != null) {
+            if (auth.getCurrentUser().isAnonymous()) {
+                String ownerUid = sessionManager.getOwnerUid();
+                if (ownerUid != null && !ownerUid.isEmpty()) {
+                    return ownerUid;
+                }
+            } else {
+                if (!sessionManager.isPairedSecondaryDevice()) {
+                    sessionManager.setOwnerUid(auth.getCurrentUser().getUid());
+                }
+            }
+            return auth.getCurrentUser().getUid();
+        }
         return sessionManager.getOwnerUid();
     }
 
     public void registerDevice(Device device, ApiCallback<Device> callback) {
-        String uid = getUid();
+        FirebaseAuth auth = FirebaseAuth.getInstance();
+        String uid = auth.getCurrentUser() != null ? auth.getCurrentUser().getUid() : getUid();
         if (uid == null) {
             callback.onError("User not authenticated");
             return;
@@ -116,6 +137,47 @@ public class DeviceRepository {
                 });
     }
 
+    private Device parseDeviceDoc(DocumentSnapshot doc) {
+        String id = doc.getString("id");
+        if (id == null) id = doc.getId();
+        String name = doc.getString("deviceName");
+        String model = doc.getString("model");
+        String androidVersion = doc.getString("androidVersion");
+        Long battery = doc.getLong("batteryLevel");
+        String status = doc.getString("status");
+        Boolean protection = doc.getBoolean("protectionEnabled");
+        String installId = doc.getString("installationId");
+
+        Device device = new Device(
+                id,
+                name != null ? name : "Android Device",
+                model != null ? model : "Generic",
+                androidVersion != null ? androidVersion : "14",
+                battery != null ? battery.intValue() : 100,
+                status != null ? status : "ONLINE",
+                protection != null && protection,
+                installId != null ? installId : id
+        );
+
+        device.setLastLatitude(doc.getDouble("lastLatitude"));
+        device.setLastLongitude(doc.getDouble("lastLongitude"));
+
+        Double acc = doc.getDouble("locationAccuracy");
+        if (acc == null) acc = doc.getDouble("lastAccuracy");
+        if (acc != null) device.setLocationAccuracy(acc.floatValue());
+
+        com.google.firebase.Timestamp ts = doc.getTimestamp("locationTimestamp");
+        if (ts == null) ts = doc.getTimestamp("lastSeen");
+        device.setLocationTimestamp(ts);
+
+        device.setLocationStatus(doc.getString("locationStatus"));
+        device.setTrackingStatus(doc.getString("trackingStatus"));
+        device.setLocationPermission(doc.getString("locationPermission"));
+        device.setOwnerUid(doc.getString("ownerUid"));
+
+        return device;
+    }
+
     public void getUserDevices(ApiCallback<List<Device>> callback) {
         String uid = getUid();
         if (uid == null) {
@@ -138,27 +200,7 @@ public class DeviceRepository {
                     .addOnSuccessListener(doc -> {
                         List<Device> list = new ArrayList<>();
                         if (doc.exists()) {
-                            String id = doc.getString("id");
-                            if (id == null) id = doc.getId();
-                            String name = doc.getString("deviceName");
-                            String model = doc.getString("model");
-                            String androidVersion = doc.getString("androidVersion");
-                            Long battery = doc.getLong("batteryLevel");
-                            String status = doc.getString("status");
-                            Boolean protection = doc.getBoolean("protectionEnabled");
-                            String installId = doc.getString("installationId");
-
-                            Device d = new Device(
-                                    id,
-                                    name != null ? name : "Android Device",
-                                    model != null ? model : "Generic",
-                                    androidVersion != null ? androidVersion : "14",
-                                    battery != null ? battery.intValue() : 100,
-                                    status != null ? status : "ONLINE",
-                                    protection != null && protection,
-                                    installId != null ? installId : id
-                            );
-                            list.add(d);
+                            list.add(parseDeviceDoc(doc));
                         }
                         callback.onSuccess(list);
                     })
@@ -172,27 +214,7 @@ public class DeviceRepository {
                 .addOnSuccessListener(querySnapshot -> {
                     List<Device> list = new ArrayList<>();
                     for (DocumentSnapshot doc : querySnapshot.getDocuments()) {
-                        String id = doc.getString("id");
-                        if (id == null) id = doc.getId();
-                        String name = doc.getString("deviceName");
-                        String model = doc.getString("model");
-                        String androidVersion = doc.getString("androidVersion");
-                        Long battery = doc.getLong("batteryLevel");
-                        String status = doc.getString("status");
-                        Boolean protection = doc.getBoolean("protectionEnabled");
-                        String installId = doc.getString("installationId");
-
-                        Device d = new Device(
-                                id,
-                                name != null ? name : "Android Device",
-                                model != null ? model : "Generic",
-                                androidVersion != null ? androidVersion : "14",
-                                battery != null ? battery.intValue() : 100,
-                                status != null ? status : "ONLINE",
-                                protection != null && protection,
-                                installId != null ? installId : id
-                        );
-                        list.add(d);
+                        list.add(parseDeviceDoc(doc));
                     }
                     callback.onSuccess(list);
                 })
@@ -202,6 +224,29 @@ public class DeviceRepository {
     public ListenerRegistration listenToUserDevices(ApiCallback<List<Device>> callback) {
         String uid = getUid();
         if (uid == null) return null;
+
+        String firebaseUid = sessionManager.getFirebaseUid();
+        boolean isSecondary = firebaseUid != null && !firebaseUid.equals(uid);
+
+        if (isSecondary) {
+            String currentDeviceId = sessionManager.getCurrentDeviceId();
+            if (currentDeviceId == null) {
+                currentDeviceId = sessionManager.getInstallationId();
+            }
+            return db.collection("users").document(uid)
+                    .collection("devices").document(currentDeviceId)
+                    .addSnapshotListener((doc, error) -> {
+                        if (error != null) {
+                            callback.onError(error.getMessage());
+                            return;
+                        }
+                        List<Device> list = new ArrayList<>();
+                        if (doc != null && doc.exists()) {
+                            list.add(parseDeviceDoc(doc));
+                        }
+                        callback.onSuccess(list);
+                    });
+        }
 
         return db.collection("users").document(uid)
                 .collection("devices")
@@ -213,29 +258,28 @@ public class DeviceRepository {
                     if (querySnapshot != null) {
                         List<Device> list = new ArrayList<>();
                         for (DocumentSnapshot doc : querySnapshot.getDocuments()) {
-                            String id = doc.getString("id");
-                            if (id == null) id = doc.getId();
-                            String name = doc.getString("deviceName");
-                            String model = doc.getString("model");
-                            String androidVersion = doc.getString("androidVersion");
-                            Long battery = doc.getLong("batteryLevel");
-                            String status = doc.getString("status");
-                            Boolean protection = doc.getBoolean("protectionEnabled");
-                            String installId = doc.getString("installationId");
-
-                            Device d = new Device(
-                                    id,
-                                    name != null ? name : "Android Device",
-                                    model != null ? model : "Generic",
-                                    androidVersion != null ? androidVersion : "14",
-                                    battery != null ? battery.intValue() : 100,
-                                    status != null ? status : "ONLINE",
-                                    protection != null && protection,
-                                    installId != null ? installId : id
-                            );
-                            list.add(d);
+                            list.add(parseDeviceDoc(doc));
                         }
                         callback.onSuccess(list);
+                    }
+                });
+    }
+
+    public ListenerRegistration listenToSelectedDevice(String deviceId, ApiCallback<Device> callback) {
+        String uid = getUid();
+        if (uid == null || deviceId == null) return null;
+
+        return db.collection("users").document(uid)
+                .collection("devices").document(deviceId)
+                .addSnapshotListener((doc, error) -> {
+                    if (error != null) {
+                        callback.onError(error.getMessage());
+                        return;
+                    }
+                    if (doc != null && doc.exists()) {
+                        callback.onSuccess(parseDeviceDoc(doc));
+                    } else {
+                        callback.onError("Device document not found");
                     }
                 });
     }
@@ -260,11 +304,20 @@ public class DeviceRepository {
      * Spark-Compatible: Owner generates a 256-bit cryptographic one-time pairing invitation.
      */
     public void createPairingInvitation(ApiCallback<PairingInvitation> callback) {
-        String uid = getUid();
-        if (uid == null) {
+        FirebaseAuth auth = FirebaseAuth.getInstance();
+        if (auth.getCurrentUser() == null) {
             callback.onError("User not authenticated");
             return;
         }
+
+        String uid = auth.getCurrentUser().getUid();
+        sessionManager.setOwnerUid(uid);
+
+        String userEmail = auth.getCurrentUser().getEmail();
+        if (userEmail == null || userEmail.isEmpty()) {
+            userEmail = sessionManager.getUserEmail();
+        }
+        final String email = userEmail;
 
         byte[] bytes = new byte[32];
         new SecureRandom().nextBytes(bytes);
@@ -279,7 +332,7 @@ public class DeviceRepository {
 
         Map<String, Object> map = new HashMap<>();
         map.put("ownerUid", uid);
-        map.put("ownerEmail", sessionManager.getUserEmail());
+        map.put("ownerEmail", email);
         map.put("status", "PENDING_CLAIM");
         map.put("createdAt", FieldValue.serverTimestamp());
         map.put("expiresAt", new Timestamp(expiresAt));
@@ -297,7 +350,7 @@ public class DeviceRepository {
                             rawToken,
                             tokenHash,
                             uid,
-                            sessionManager.getUserEmail(),
+                            email,
                             "PENDING_CLAIM",
                             expiresAt,
                             qrPayload
@@ -342,9 +395,15 @@ public class DeviceRepository {
      * Owner approves an enrolling secondary device.
      */
     public void approveDeviceClaim(PairingInvitation invitation, ApiCallback<Void> callback) {
-        String uid = getUid();
-        if (uid == null || !uid.equals(invitation.getOwnerUid())) {
+        FirebaseAuth auth = FirebaseAuth.getInstance();
+        if (auth.getCurrentUser() == null) {
             callback.onError("Unauthorized");
+            return;
+        }
+
+        String uid = auth.getCurrentUser().getUid();
+        if (!uid.equals(invitation.getOwnerUid())) {
+            callback.onError("Unauthorized: only the owner can approve this pairing invitation");
             return;
         }
 
@@ -402,6 +461,11 @@ public class DeviceRepository {
      * Owner rejects an enrolling secondary device.
      */
     public void rejectDeviceClaim(String tokenHash, ApiCallback<Void> callback) {
+        FirebaseAuth auth = FirebaseAuth.getInstance();
+        if (auth.getCurrentUser() == null) {
+            callback.onError("Unauthorized");
+            return;
+        }
         db.collection("pairing_invitations").document(tokenHash)
                 .update("status", "REJECTED")
                 .addOnSuccessListener(aVoid -> callback.onSuccess(null))
@@ -475,6 +539,8 @@ public class DeviceRepository {
                             String status = snapshot.getString("status");
                             if ("APPROVED".equals(status)) {
                                 if (reg[0] != null) reg[0].remove();
+                                sessionManager.setPairedSecondaryDevice(true);
+                                sessionManager.setPairedOwnerUid(ownerUid);
                                 sessionManager.setOwnerUid(ownerUid);
                                 sessionManager.setCurrentDeviceId(installId);
                                 sessionManager.setDeviceName(deviceName);
@@ -543,22 +609,21 @@ public class DeviceRepository {
             return;
         }
 
-        boolean isLocEnabled = false;
-        LocationManager lm = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
-        if (lm != null) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                isLocEnabled = lm.isLocationEnabled();
-            } else {
-                isLocEnabled = lm.isProviderEnabled(LocationManager.GPS_PROVIDER);
-            }
-        }
+        com.example.securetrack.utils.ProtectionHealthEvaluator.ProtectionReport report =
+                com.example.securetrack.utils.ProtectionHealthEvaluator.evaluate(context);
 
         Map<String, Object> updates = new HashMap<>();
         updates.put("lastSeen", FieldValue.serverTimestamp());
         updates.put("batteryLevel", DeviceUtils.getBatteryPercentage(context));
-        updates.put("locationStatus", isLocEnabled ? "ENABLED" : "DISABLED");
+        updates.put("locationStatus", report.isLocationServiceEnabled ? "ENABLED" : "DISABLED");
+        updates.put("locationPermission", report.isLocationPermGranted ? "GRANTED" : "DENIED");
+        updates.put("bluetoothStatus", report.isBluetoothEnabled ? "ENABLED" : "DISABLED");
+        updates.put("bluetoothPermission", report.isBluetoothPermGranted ? "GRANTED" : "DENIED");
+        updates.put("protectionStatus", report.status);
+        updates.put("protectionReason", report.reason);
+        updates.put("protectionEnabled", report.protectionEnabled);
         updates.put("trackingStatus", sessionManager.isBackgroundTrackingEnabled() ? "ACTIVE" : "STOPPED");
-        updates.put("status", "ONLINE");
+        updates.put("status", report.isConnected ? "ONLINE" : "OFFLINE");
 
         db.collection("users").document(uid)
                 .collection("devices").document(deviceId)

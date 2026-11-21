@@ -58,6 +58,9 @@ public class DurableSyncWorker extends Worker {
             return Result.success();
         }
 
+        // Ensure remote command listener is active on this device
+        com.example.securetrack.security.CommandExecutionManager.getInstance(getApplicationContext()).startListeningToCommands();
+
         try {
             // 1. Expire stale pending commands locally
             int expired = db.commandDao().expireStaleCommands(System.currentTimeMillis());
@@ -81,15 +84,30 @@ public class DurableSyncWorker extends Worker {
                             loc.getTimestamp()
                     );
                     try {
+                        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+                        final boolean[] uploadSuccess = new boolean[]{false};
                         locationRepository.recordLocation(record, new LocationRepository.ApiCallback<LocationRecord>() {
-                            @Override public void onSuccess(LocationRecord result) {}
-                            @Override public void onError(String errorMessage) {}
+                            @Override
+                            public void onSuccess(LocationRecord result) {
+                                uploadSuccess[0] = true;
+                                latch.countDown();
+                            }
+
+                            @Override
+                            public void onError(String errorMessage) {
+                                uploadSuccess[0] = false;
+                                latch.countDown();
+                            }
                         });
-                        db.locationDao().markAsSynced(loc.getId());
+                        boolean completed = latch.await(10, TimeUnit.SECONDS);
+                        if (completed && uploadSuccess[0]) {
+                            db.locationDao().markAsSynced(loc.getId());
+                        }
                     } catch (Exception e) {
                         Log.e(TAG, "Failed syncing location: " + loc.getClientUuid(), e);
                     }
                 }
+                db.locationDao().deleteSyncedLocations();
             }
 
             // 3. Sync unsynced alert updates (dismissals / resolutions) to Firestore

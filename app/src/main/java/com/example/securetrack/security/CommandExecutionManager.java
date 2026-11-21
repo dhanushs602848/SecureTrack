@@ -8,7 +8,6 @@ import android.util.Log;
 import com.example.securetrack.ble.BleNearbyManager;
 import com.example.securetrack.database.AppDatabase;
 import com.example.securetrack.database.CommandEntity;
-import com.example.securetrack.database.LocationEntity;
 import com.example.securetrack.models.LocationRecord;
 import com.example.securetrack.repositories.LocationRepository;
 import com.example.securetrack.utils.DeviceUtils;
@@ -17,6 +16,7 @@ import com.example.securetrack.utils.SessionManager;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.Priority;
+import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -25,67 +25,154 @@ import com.google.firebase.firestore.SetOptions;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
-import java.util.UUID;
 
-/**
- * Robust, duplicate-safe command execution engine for SecureTrack.
- * Handles:
- * - Real GPS location acquisition for LOCATE_NOW
- * - Secure force-lock via DevicePolicyManager for LOCK_DEVICE
- * - Loud 5-second auto-stopping alarm via AlarmSoundManager for ALARM_ALERT
- * - Command expiration verification (15-min limit for security commands)
- * - Duplicate execution prevention
- * - Local Room command audit tracking
- */
 public class CommandExecutionManager {
 
     private static final String TAG = "CommandExecutionMgr";
 
-    // Command-specific expiration windows
     private static final long EXPIRY_LOCK_ALARM_MS = 15 * 60 * 1000L; // 15 mins
     private static final long EXPIRY_LOCATE_MS = 30 * 60 * 1000L;     // 30 mins
+
+    private static volatile CommandExecutionManager instance;
 
     private final Context context;
     private final FirebaseFirestore db;
     private final SessionManager sessionManager;
     private final LocationRepository locationRepository;
-    private final FusedLocationProviderClient fusedLocationClient;
+    private com.example.securetrack.location.ISecureLocationProvider locationProvider;
     private final AppDatabase appDatabase;
-    private final Set<String> processedCommandIds = new HashSet<>();
+    private final Set<String> processedCommandIds = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
     private ListenerRegistration commandListener;
+
+    public static CommandExecutionManager getInstance(Context context) {
+        if (instance == null) {
+            synchronized (CommandExecutionManager.class) {
+                if (instance == null) {
+                    instance = new CommandExecutionManager(context.getApplicationContext());
+                }
+            }
+        }
+        return instance;
+    }
 
     public CommandExecutionManager(Context context) {
         this.context = context.getApplicationContext();
         this.db = FirebaseFirestore.getInstance();
         this.sessionManager = new SessionManager(this.context);
         this.locationRepository = new LocationRepository(this.context);
-        this.fusedLocationClient = LocationServices.getFusedLocationProviderClient(this.context);
+        this.locationProvider = new com.example.securetrack.location.FusedLocationProviderImpl(this.context);
         this.appDatabase = AppDatabase.getInstance(this.context);
     }
 
+    public void setLocationProvider(com.example.securetrack.location.ISecureLocationProvider provider) {
+        this.locationProvider = provider;
+    }
+
     private String getUid() {
+        if (sessionManager.isPairedSecondaryDevice()) {
+            String pairedOwnerUid = sessionManager.getPairedOwnerUid();
+            if (pairedOwnerUid != null && !pairedOwnerUid.isEmpty()) {
+                return pairedOwnerUid;
+            }
+        }
+        FirebaseAuth auth = FirebaseAuth.getInstance();
+        if (auth.getCurrentUser() != null) {
+            if (auth.getCurrentUser().isAnonymous()) {
+                String ownerUid = sessionManager.getOwnerUid();
+                if (ownerUid != null && !ownerUid.isEmpty()) {
+                    return ownerUid;
+                }
+            } else {
+                if (!sessionManager.isPairedSecondaryDevice()) {
+                    sessionManager.setOwnerUid(auth.getCurrentUser().getUid());
+                    return auth.getCurrentUser().getUid();
+                }
+            }
+        }
         return sessionManager.getOwnerUid();
+    }
+
+    private String getDeviceId() {
+        String deviceId = sessionManager.getCurrentDeviceId();
+        if (deviceId == null || deviceId.isEmpty()) {
+            deviceId = sessionManager.getInstallationId();
+        }
+        return deviceId;
     }
 
     public synchronized void startListeningToCommands() {
         stopListeningToCommands();
 
+        // Self-heal pairing configuration if this device was enrolled as a secondary device
+        // but local SharedPreferences was reset or missing the secondary paired flag
+        FirebaseAuth auth = FirebaseAuth.getInstance();
+        if (auth.getCurrentUser() != null && !sessionManager.isPairedSecondaryDevice()) {
+            String currentAuthUid = auth.getCurrentUser().getUid();
+            db.collection("pairing_invitations")
+                    .whereEqualTo("claimedByUid", currentAuthUid)
+                    .whereEqualTo("status", "APPROVED")
+                    .limit(1)
+                    .get()
+                    .addOnSuccessListener(querySnapshot -> {
+                        if (querySnapshot != null && !querySnapshot.isEmpty()) {
+                            DocumentSnapshot doc = querySnapshot.getDocuments().get(0);
+                            String ownerUid = doc.getString("ownerUid");
+                            String claimedDevId = doc.getString("claimedDeviceId");
+                            if (ownerUid != null && !ownerUid.isEmpty() && claimedDevId != null && !claimedDevId.isEmpty()) {
+                                Log.i(TAG, "Self-healing pairing state: Enrolled secondary device under owner " + ownerUid);
+                                sessionManager.setPairedSecondaryDevice(true);
+                                sessionManager.setPairedOwnerUid(ownerUid);
+                                sessionManager.setOwnerUid(ownerUid);
+                                sessionManager.setCurrentDeviceId(claimedDevId);
+                                startListeningToCommandsInternal();
+                            }
+                        }
+                    })
+                    .addOnFailureListener(e -> Log.d(TAG, "Pairing self-heal check completed: " + e.getMessage()));
+        }
+
+        startListeningToCommandsInternal();
+    }
+
+    private synchronized void startListeningToCommandsInternal() {
+        if (commandListener != null) {
+            commandListener.remove();
+            commandListener = null;
+        }
+
         String uid = getUid();
-        String deviceId = sessionManager.getCurrentDeviceId();
+        String deviceId = getDeviceId();
 
         if (uid == null || deviceId == null) {
-            Log.w(TAG, "Cannot listen to commands: UID or Device ID missing");
+            Log.w(TAG, "Cannot listen to commands: UID or Device ID missing (uid=" + uid + ", devId=" + deviceId + ")");
             return;
         }
+
+        Log.i(TAG, "Listening for remote commands on users/" + uid + "/devices/" + deviceId + "/commands");
 
         // Start BLE peripheral advertising so nearby controller can find this device if offline
         BleNearbyManager.getInstance(context).startAdvertisingAsTarget();
 
+        // 1. One-time fetch for pending QUEUED commands that arrived while process was offline
+        db.collection("users").document(uid)
+                .collection("devices").document(deviceId)
+                .collection("commands")
+                .whereEqualTo("status", "QUEUED")
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    if (querySnapshot != null) {
+                        for (DocumentSnapshot doc : querySnapshot.getDocuments()) {
+                            executeSingleCommand(uid, deviceId, doc);
+                        }
+                    }
+                })
+                .addOnFailureListener(e -> Log.e(TAG, "Error fetching QUEUED commands on startup", e));
+
+        // 2. Real-time snapshot listener for incoming commands via Firebase Cloud
         commandListener = db.collection("users").document(uid)
                 .collection("devices").document(deviceId)
                 .collection("commands")
@@ -110,7 +197,6 @@ public class CommandExecutionManager {
     private synchronized void executeSingleCommand(String uid, String deviceId, DocumentSnapshot doc) {
         String commandId = doc.getId();
 
-        // Duplicate-execution prevention
         if (processedCommandIds.contains(commandId)) {
             Log.i(TAG, "Command already processed in this session: " + commandId);
             return;
@@ -127,7 +213,6 @@ public class CommandExecutionManager {
             return;
         }
 
-        // Calculate age and check command expiration
         com.google.firebase.Timestamp createdAt = doc.getTimestamp("createdAt");
         long maxAge = ("LOCK_DEVICE".equalsIgnoreCase(type) || "ALARM_ALERT".equalsIgnoreCase(type))
                 ? EXPIRY_LOCK_ALARM_MS : EXPIRY_LOCATE_MS;
@@ -142,13 +227,14 @@ public class CommandExecutionManager {
             }
         }
 
+        Log.i(TAG, "Executing remote command " + commandId + " of type " + type + " on target device " + deviceId);
+
         // Atomically transition status to EXECUTING in Firestore
         db.collection("users").document(uid)
                 .collection("devices").document(deviceId)
                 .collection("commands").document(commandId)
                 .update("status", "EXECUTING");
 
-        // Record locally in Room
         final String finalType = type;
         new Thread(() -> {
             CommandEntity entity = new CommandEntity(
@@ -170,7 +256,6 @@ public class CommandExecutionManager {
             appDatabase.commandDao().insertOrUpdate(entity);
         }).start();
 
-        // Dispatch based on command type
         if ("LOCATE_NOW".equalsIgnoreCase(type)) {
             handleLocateCommand(uid, deviceId, commandId, doc);
         } else if ("LOCK_DEVICE".equalsIgnoreCase(type)) {
@@ -206,30 +291,17 @@ public class CommandExecutionManager {
         }
         final String finalRequestId = reqId;
 
-        try {
-            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
-                    .addOnSuccessListener(location -> {
-                        if (location != null) {
-                            recordAndCompleteLocate(uid, deviceId, commandId, finalRequestId, location);
-                        } else {
-                            // Fallback to last known location
-                            fusedLocationClient.getLastLocation().addOnSuccessListener(lastLoc -> {
-                                if (lastLoc != null) {
-                                    recordAndCompleteLocate(uid, deviceId, commandId, finalRequestId, lastLoc);
-                                } else {
-                                    updateCommandStatus(uid, deviceId, commandId, "FAILED", "GPS/Network location provider returned null");
-                                }
-                            }).addOnFailureListener(e -> {
-                                updateCommandStatus(uid, deviceId, commandId, "FAILED", "Location retrieval failed: " + e.getMessage());
-                            });
-                        }
-                    })
-                    .addOnFailureListener(e -> {
-                        updateCommandStatus(uid, deviceId, commandId, "FAILED", "High accuracy location failed: " + e.getMessage());
-                    });
-        } catch (SecurityException e) {
-            updateCommandStatus(uid, deviceId, commandId, "FAILED", "SecurityException: " + e.getMessage());
-        }
+        locationProvider.getCurrentLocation(new com.example.securetrack.location.ISecureLocationProvider.LocationCallback() {
+            @Override
+            public void onSuccess(Location location) {
+                recordAndCompleteLocate(uid, deviceId, commandId, finalRequestId, location);
+            }
+
+            @Override
+            public void onFailure(Exception exception) {
+                updateCommandStatus(uid, deviceId, commandId, "FAILED", "Location retrieval failed: " + (exception != null ? exception.getMessage() : "Unknown error"));
+            }
+        });
     }
 
     private void recordAndCompleteLocate(String uid, String deviceId, String commandId, String requestId, Location location) {
@@ -248,23 +320,25 @@ public class CommandExecutionManager {
                 timestampStr
         );
 
-        // Save to Firestore location history with exact requestId correlation
         locationRepository.recordLocation(record, new LocationRepository.ApiCallback<LocationRecord>() {
             @Override
             public void onSuccess(LocationRecord result) {
-                // Update device document with live location & battery
                 Map<String, Object> devUpdates = new HashMap<>();
                 devUpdates.put("lastSeen", FieldValue.serverTimestamp());
                 devUpdates.put("batteryLevel", DeviceUtils.getBatteryLevel(context));
                 devUpdates.put("locationStatus", "ACTIVE");
+                devUpdates.put("status", "ONLINE");
                 devUpdates.put("lastLatitude", location.getLatitude());
                 devUpdates.put("lastLongitude", location.getLongitude());
                 devUpdates.put("lastAccuracy", location.getAccuracy());
+                devUpdates.put("locationAccuracy", location.getAccuracy());
                 devUpdates.put("lastRequestId", requestId);
 
                 db.collection("users").document(uid)
                         .collection("devices").document(deviceId)
-                        .set(devUpdates, SetOptions.merge());
+                        .set(devUpdates, SetOptions.merge())
+                        .addOnSuccessListener(aVoid -> Log.i(TAG, "Target device location telemetry updated in Firestore"))
+                        .addOnFailureListener(e -> Log.e(TAG, "Failed to update target device location telemetry", e));
 
                 String resultMsg = String.format(Locale.US, "Location: (%.5f, %.5f) ±%.1fm [req:%s]",
                         location.getLatitude(), location.getLongitude(), location.getAccuracy(), requestId);
@@ -273,7 +347,25 @@ public class CommandExecutionManager {
 
             @Override
             public void onError(String errorMessage) {
-                String resultMsg = String.format(Locale.US, "Location: (%.5f, %.5f) ±%.1fm (Local only) [req:%s]",
+                Log.w(TAG, "Subcollection location write failed: " + errorMessage + "; updating device document directly");
+                Map<String, Object> devUpdates = new HashMap<>();
+                devUpdates.put("lastSeen", FieldValue.serverTimestamp());
+                devUpdates.put("batteryLevel", DeviceUtils.getBatteryLevel(context));
+                devUpdates.put("locationStatus", "ACTIVE");
+                devUpdates.put("status", "ONLINE");
+                devUpdates.put("lastLatitude", location.getLatitude());
+                devUpdates.put("lastLongitude", location.getLongitude());
+                devUpdates.put("lastAccuracy", location.getAccuracy());
+                devUpdates.put("locationAccuracy", location.getAccuracy());
+                devUpdates.put("lastRequestId", requestId);
+
+                db.collection("users").document(uid)
+                        .collection("devices").document(deviceId)
+                        .set(devUpdates, SetOptions.merge())
+                        .addOnSuccessListener(aVoid -> Log.i(TAG, "Target device location telemetry updated directly in Firestore"))
+                        .addOnFailureListener(e -> Log.e(TAG, "Failed to update direct location telemetry", e));
+
+                String resultMsg = String.format(Locale.US, "Location: (%.5f, %.5f) ±%.1fm (Telemetry synced) [req:%s]",
                         location.getLatitude(), location.getLongitude(), location.getAccuracy(), requestId);
                 updateCommandStatusWithRequestId(uid, deviceId, commandId, "EXECUTED", resultMsg, requestId);
             }
@@ -292,7 +384,13 @@ public class CommandExecutionManager {
         db.collection("users").document(uid)
                 .collection("devices").document(deviceId)
                 .collection("commands").document(commandId)
-                .set(updates, SetOptions.merge());
+                .set(updates, SetOptions.merge())
+                .addOnSuccessListener(aVoid -> Log.i(TAG, "Command " + commandId + " updated to " + status + " (" + result + ")"))
+                .addOnFailureListener(e -> Log.e(TAG, "Failed to update command " + commandId + " to " + status, e));
+
+        new Thread(() -> {
+            appDatabase.commandDao().updateExecutionStatus(commandId, status, result, System.currentTimeMillis());
+        }).start();
     }
 
     private void handleLockCommand(String uid, String deviceId, String commandId) {
@@ -320,35 +418,130 @@ public class CommandExecutionManager {
     private void handleAlarmCommand(String uid, String deviceId, String commandId) {
         AlarmSoundManager alarmManager = AlarmSoundManager.getInstance(context);
 
+        String deviceName = sessionManager.getDeviceName();
+        if (deviceName == null || deviceName.trim().isEmpty()) {
+            deviceName = android.os.Build.MODEL != null ? android.os.Build.MODEL : "Android Device";
+        }
+        final String finalDeviceName = deviceName;
+        final String alertId = "alarm_" + (commandId != null ? commandId : java.util.UUID.randomUUID().toString());
+
+        updateCommandStatus(uid, deviceId, commandId, "EXECUTING", "Activating 5-second panic security siren");
+
         alarmManager.playFiveSecondAlarm(new AlarmSoundManager.AlarmCallback() {
             @Override
             public void onAlarmStarted() {
-                Log.i(TAG, "5-second anti-theft alarm playing");
+                Log.i(TAG, "5-second panic security siren started on " + finalDeviceName);
+
+                Map<String, Object> alertMap = new HashMap<>();
+                alertMap.put("id", alertId);
+                alertMap.put("deviceId", deviceId);
+                alertMap.put("deviceName", finalDeviceName);
+                alertMap.put("eventType", "SECURITY_ALARM_TRIGGERED");
+                alertMap.put("severity", "CRITICAL");
+                alertMap.put("description", "Panic security siren activated on " + finalDeviceName);
+                alertMap.put("status", "ACTIVE");
+                alertMap.put("commandId", commandId);
+                alertMap.put("triggerSource", "REMOTE_COMMAND");
+                alertMap.put("executionStatus", "STARTED");
+                alertMap.put("timestamp", FieldValue.serverTimestamp());
+
+                db.collection("users").document(uid)
+                        .collection("alerts").document(alertId)
+                        .set(alertMap, SetOptions.merge())
+                        .addOnSuccessListener(aVoid -> Log.i(TAG, "Security alert recorded: " + alertId))
+                        .addOnFailureListener(e -> Log.e(TAG, "Failed to record security alert in Firestore", e));
+
+                new Thread(() -> {
+                    com.example.securetrack.database.SecurityAlertEntity entity = new com.example.securetrack.database.SecurityAlertEntity(
+                            alertId,
+                            deviceId,
+                            finalDeviceName,
+                            "SECURITY_ALARM_TRIGGERED",
+                            "CRITICAL",
+                            "Panic security siren activated on " + finalDeviceName,
+                            "ENABLED",
+                            "ACTIVE",
+                            System.currentTimeMillis(),
+                            0, null, 0, true
+                    );
+                    appDatabase.securityAlertDao().insertOrUpdate(entity);
+                }).start();
+
+                showAlarmNotification(finalDeviceName, "STARTED", alertId);
             }
 
             @Override
             public void onAlarmCompleted(String reason) {
                 updateCommandStatus(uid, deviceId, commandId, "EXECUTED", reason);
+
+                Map<String, Object> update = new HashMap<>();
+                update.put("executionStatus", "COMPLETED");
+                update.put("completedAt", FieldValue.serverTimestamp());
+
+                db.collection("users").document(uid)
+                        .collection("alerts").document(alertId)
+                        .update(update)
+                        .addOnSuccessListener(aVoid -> Log.i(TAG, "Security alert completed: " + alertId))
+                        .addOnFailureListener(e -> Log.e(TAG, "Failed to update alert completion", e));
+
+                showAlarmNotification(finalDeviceName, "COMPLETED", alertId);
             }
         });
     }
 
-    private void handleWipeCommand(String uid, String deviceId, String commandId) {
-        // Safe check: Wipe must only be executed if Device Admin is active and policy explicitly supports it
-        if (!PermissionUtils.isDeviceAdminActive(context)) {
-            updateCommandStatus(uid, deviceId, commandId, "FAILED", "Device Admin privilege required for wipe");
-            return;
-        }
-
-        updateCommandStatus(uid, deviceId, commandId, "EXECUTED", "Wipe request authorized");
+    private void showAlarmNotification(String deviceName, String executionStatus, String alertId) {
         try {
-            DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
-            if (dpm != null) {
-                dpm.wipeData(0);
+            android.app.NotificationManager nm = (android.app.NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm == null) return;
+
+            String channelId = "securetrack_panic_siren";
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                android.app.NotificationChannel channel = new android.app.NotificationChannel(
+                        channelId,
+                        "Panic Security Siren",
+                        android.app.NotificationManager.IMPORTANCE_HIGH
+                );
+                channel.setDescription("Emergency alerts for panic security siren activations");
+                channel.enableVibration(true);
+                nm.createNotificationChannel(channel);
             }
+
+            android.content.Intent intent = new android.content.Intent(context, com.example.securetrack.MainActivity.class);
+            intent.putExtra("navigate_to", "security");
+            intent.putExtra("alert_id", alertId);
+            intent.setFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+            int flags = android.app.PendingIntent.FLAG_UPDATE_CURRENT;
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                flags |= android.app.PendingIntent.FLAG_IMMUTABLE;
+            }
+            android.app.PendingIntent pendingIntent = android.app.PendingIntent.getActivity(context, 101, intent, flags);
+
+            String statusText = "STARTED".equals(executionStatus)
+                    ? "Panic siren activated and sounding for 5 seconds."
+                    : "Panic siren cycle completed. Alert recorded in Security Center.";
+
+            androidx.core.app.NotificationCompat.Builder builder = new androidx.core.app.NotificationCompat.Builder(context, channelId)
+                    .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                    .setContentTitle("SecureTrack Security Alarm: " + deviceName)
+                    .setContentText(statusText)
+                    .setStyle(new androidx.core.app.NotificationCompat.BigTextStyle().bigText(
+                            statusText + "\nDevice: " + deviceName + "\nStatus: " + executionStatus + "\nTap to review and dismiss in Security Center."
+                    ))
+                    .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
+                    .setAutoCancel(true)
+                    .setContentIntent(pendingIntent);
+
+            nm.notify(9001, builder.build());
         } catch (Exception e) {
-            updateCommandStatus(uid, deviceId, commandId, "FAILED", "Wipe execution error: " + e.getMessage());
+            Log.e(TAG, "Error displaying alarm notification", e);
         }
+    }
+
+    private void handleWipeCommand(String uid, String deviceId, String commandId) {
+        Log.w(TAG, "Rejecting WIPE_DEVICE command: Safety lock enforced.");
+        updateCommandStatus(uid, deviceId, commandId, "FAILED",
+                "Safety Lock: Factory wipe is permanently disabled in this release to protect user data.");
     }
 
     private void updateCommandStatus(String uid, String deviceId, String commandId, String status, String result) {
@@ -364,7 +557,6 @@ public class CommandExecutionManager {
                 .addOnSuccessListener(aVoid -> Log.i(TAG, "Command " + commandId + " updated to " + status))
                 .addOnFailureListener(e -> Log.e(TAG, "Failed to update command " + commandId, e));
 
-        // Update local Room command status
         new Thread(() -> {
             appDatabase.commandDao().updateExecutionStatus(commandId, status, result, System.currentTimeMillis());
         }).start();

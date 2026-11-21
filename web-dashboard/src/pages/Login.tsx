@@ -97,42 +97,42 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FB] flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-[#CBD5E1] p-8 space-y-6">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#0A0E17] flex items-center justify-center p-4 transition-colors duration-200">
+      <div className="max-w-md w-full bg-white dark:bg-[#121927] rounded-3xl shadow-xl border border-slate-200 dark:border-[#223049] p-8 space-y-6">
         <div className="text-center space-y-2">
-          <div className="inline-flex p-3 bg-[#D8E6FF] rounded-2xl text-[#152C4F]">
-            <Shield className="w-10 h-10" />
+          <div className="inline-flex p-3.5 bg-indigo-50 dark:bg-indigo-950/50 rounded-2xl text-indigo-600 dark:text-cyan-400 border border-indigo-100 dark:border-indigo-800/50 shadow-inner">
+            <Shield className="w-9 h-9" />
           </div>
-          <h2 className="text-2xl font-bold text-[#152C4F]">Sign In to SecureTrack</h2>
-          <p className="text-sm text-[#64748B]">Monitor and secure all your devices remotely</p>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white font-mono">Sign In to SecureTrack</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Zero-trust mobile fleet telemetry &amp; security</p>
         </div>
 
         {error && (
-          <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl flex items-start gap-2">
-            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <div className="p-3 bg-rose-100 dark:bg-rose-950/50 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-400 text-xs rounded-xl flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{error}</span>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-[#334155] mb-1">Email Address</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Email Address</label>
             <div className="relative">
-              <Mail className="w-5 h-5 absolute left-3 top-3 text-[#64748B]" />
+              <Mail className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@example.com"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#CBD5E1] bg-white text-[#152C4F] placeholder-[#64748B] focus:outline-none focus:border-[#315C97] focus:ring-2 focus:ring-[#315C97]/20 text-sm"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-[#162032] text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 text-xs"
               />
             </div>
           </div>
 
           <div>
             <div className="flex justify-between items-center mb-1">
-              <label className="block text-xs font-semibold text-[#334155]">Password</label>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">Password</label>
               <button
                 type="button"
                 onClick={() => {
@@ -141,26 +141,26 @@ export const Login: React.FC = () => {
                   setResetError('');
                   setShowForgotModal(true);
                 }}
-                className="text-xs text-[#315C97] font-semibold hover:underline"
+                className="text-xs text-indigo-600 dark:text-cyan-400 font-semibold hover:underline"
               >
                 Forgot Password?
               </button>
             </div>
             <div className="relative">
-              <Lock className="w-5 h-5 absolute left-3 top-3 text-[#64748B]" />
+              <Lock className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-10 pr-11 py-2.5 rounded-xl border border-[#CBD5E1] bg-white text-[#152C4F] placeholder-[#64748B] focus:outline-none focus:border-[#315C97] focus:ring-2 focus:ring-[#315C97]/20 text-sm"
+                className="w-full pl-10 pr-11 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-[#162032] text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 text-xs"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
-                className="absolute right-3 top-2.5 text-[#64748B] hover:text-[#152C4F] p-1 rounded-md transition-colors focus:outline-none focus:ring-1 focus:ring-[#315C97]"
+                className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md transition-colors"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -170,23 +170,23 @@ export const Login: React.FC = () => {
           <button
             type="submit"
             disabled={loading || googleLoading}
-            className="w-full py-3 bg-[#152C4F] text-white font-semibold rounded-xl shadow-md hover:bg-[#1e3a66] transition-all disabled:opacity-50 text-sm"
+            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-md transition-all disabled:opacity-50 text-xs font-mono"
           >
             {loading ? 'Authenticating...' : 'Sign In'}
           </button>
         </form>
 
         <div className="flex items-center my-4">
-          <div className="flex-1 border-t border-[#CBD5E1]" />
-          <span className="px-3 text-xs text-[#64748B] font-semibold uppercase">OR</span>
-          <div className="flex-1 border-t border-[#CBD5E1]" />
+          <div className="flex-1 border-t border-slate-200 dark:border-slate-800" />
+          <span className="px-3 text-[10px] text-slate-400 font-semibold uppercase tracking-wider">OR</span>
+          <div className="flex-1 border-t border-slate-200 dark:border-slate-800" />
         </div>
 
         <button
           type="button"
           onClick={handleGoogleSignIn}
           disabled={loading || googleLoading}
-          className="w-full py-2.5 px-4 bg-white border border-[#CBD5E1] text-[#152C4F] font-semibold rounded-xl hover:bg-[#F8F9FB] transition-all flex items-center justify-center gap-3 shadow-sm disabled:opacity-50 text-sm"
+          className="w-full py-2.5 px-4 bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-semibold rounded-xl hover:bg-slate-50 dark:hover:bg-[#1A263D] transition-all flex items-center justify-center gap-3 shadow-sm disabled:opacity-50 text-xs"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24">
             <path
@@ -209,9 +209,9 @@ export const Login: React.FC = () => {
           {googleLoading ? 'Connecting to Google...' : 'Sign in with Google'}
         </button>
 
-        <p className="text-center text-sm text-[#64748B]">
+        <p className="text-center text-xs text-slate-500 dark:text-slate-400">
           Don't have an account?{' '}
-          <Link to="/register" className="text-[#315C97] font-semibold hover:underline">
+          <Link to="/register" className="text-indigo-600 dark:text-cyan-400 font-semibold hover:underline">
             Register now
           </Link>
         </p>
@@ -220,31 +220,31 @@ export const Login: React.FC = () => {
       {/* Forgot Password Modal */}
       {showForgotModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-md w-full border border-[#CBD5E1] space-y-4">
+          <div className="bg-white dark:bg-[#121927] p-6 rounded-3xl shadow-2xl max-w-md w-full border border-slate-200 dark:border-[#223049] space-y-4">
             <div className="flex justify-between items-center">
-              <h3 className="text-xl font-bold text-[#152C4F]">Reset Your Password</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white font-mono">Reset Your Password</h3>
               <button
                 type="button"
                 onClick={() => setShowForgotModal(false)}
-                className="text-[#64748B] hover:text-[#152C4F] p-1 rounded-md"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <p className="text-xs text-[#64748B]">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Enter your registered email address. We will dispatch a secure link to reset your account password.
             </p>
 
             {resetMessage && (
-              <div className="p-3 bg-green-50 border border-green-200 text-green-700 text-xs rounded-xl flex items-start gap-2">
+              <div className="p-3 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs rounded-xl flex items-start gap-2">
                 <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>{resetMessage}</span>
               </div>
             )}
 
             {resetError && (
-              <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-start gap-2">
+              <div className="p-3 bg-rose-100 dark:bg-rose-950/50 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-400 text-xs rounded-xl flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>{resetError}</span>
               </div>
@@ -252,16 +252,16 @@ export const Login: React.FC = () => {
 
             <form onSubmit={handleResetPassword} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-[#334155] mb-1">Email Address</label>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Email Address</label>
                 <div className="relative">
-                  <Mail className="w-5 h-5 absolute left-3 top-3 text-[#64748B]" />
+                  <Mail className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
                   <input
                     type="email"
                     required
                     value={resetEmail}
                     onChange={(e) => setResetEmail(e.target.value)}
                     placeholder="name@example.com"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#CBD5E1] bg-white text-[#152C4F] placeholder-[#64748B] focus:outline-none focus:border-[#315C97] focus:ring-2 focus:ring-[#315C97]/20 text-sm"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-[#162032] text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 text-xs"
                     autoFocus
                   />
                 </div>
@@ -271,14 +271,14 @@ export const Login: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowForgotModal(false)}
-                  className="px-4 py-2 text-sm font-semibold text-[#64748B] hover:bg-gray-100 rounded-xl"
+                  className="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 rounded-xl"
                 >
                   Close
                 </button>
                 <button
                   type="submit"
                   disabled={resetLoading}
-                  className="px-4 py-2 text-sm font-semibold bg-[#152C4F] text-white rounded-xl hover:bg-[#1e3a66] disabled:opacity-50"
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-md disabled:opacity-50"
                 >
                   {resetLoading ? 'Sending...' : 'Send Reset Link'}
                 </button>

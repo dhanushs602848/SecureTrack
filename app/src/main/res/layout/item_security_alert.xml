@@ -4,10 +4,10 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="10dp"
-    app:cardBackgroundColor="@color/midnight_card"
-    app:cardCornerRadius="14dp"
+    app:cardBackgroundColor="@color/card_bg"
+    app:cardCornerRadius="16dp"
     app:cardElevation="2dp"
-    app:strokeColor="@color/midnight_border"
+    app:strokeColor="@color/border_color"
     app:strokeWidth="1dp">
 
     <LinearLayout
@@ -30,7 +30,7 @@
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:text="SIM_CARD_EVENT"
-                android:textColor="@color/white"
+                android:textColor="@color/text_primary"
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
@@ -66,7 +66,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:text="SIM state change detected on device"
-            android:textColor="@color/slate_100"
+            android:textColor="@color/text_primary"
             android:textSize="13sp" />
 
         <LinearLayout
@@ -84,7 +84,7 @@
                 android:paddingHorizontal="8dp"
                 android:paddingVertical="2dp"
                 android:text="Device: Galaxy A07"
-                android:textColor="@color/slate_400"
+                android:textColor="@color/text_secondary"
                 android:textSize="11sp" />
 
             <View
@@ -97,7 +97,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="10 mins ago"
-                android:textColor="@color/slate_400"
+                android:textColor="@color/text_secondary"
                 android:textSize="11sp" />
         </LinearLayout>
 

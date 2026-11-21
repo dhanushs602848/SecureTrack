@@ -123,6 +123,11 @@
 
     <!-- Service Notification -->
     <string name="notification_channel_name">SecureTrack Location Service</string>
-    <string name="notification_title">SecureTrack Monitoring Active</string>
-    <string name="notification_text">Protecting your device and recording location securely.</string>
+    <string name="notification_title">SecureTrack Protection Active</string>
+    <string name="notification_text">Monitoring operational • GPS active</string>
+    <string name="notification_action_stop">Stop Protection</string>
+    <string name="notification_status_active">Monitoring operational • GPS active</string>
+    <string name="notification_status_gps_disabled">GPS disabled • Location paused</string>
+    <string name="notification_status_offline">Offline • Location fixes saved locally; sync will resume when connected</string>
+    <string name="notification_status_permission_needed">Location permission needed • Commands ready</string>
 </resources>

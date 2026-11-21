@@ -34,13 +34,8 @@ export const Commands: React.FC = () => {
     if (!selectedDeviceId) return;
     try {
       if (commandType === 'WIPE_DEVICE') {
-        const step1 = window.confirm("CRITICAL WARNING: Factory resetting this device will permanently erase ALL user data, apps, photos, and accounts.\n\nDo you want to proceed to confirmation?");
-        if (!step1) return;
-        const step2 = window.prompt("Type 'ERASE' in capital letters to confirm remote factory reset:");
-        if (step2 !== 'ERASE') {
-          alert('Wipe cancelled: Confirmation word did not match.');
-          return;
-        }
+        alert('Safety Lock: Remote factory wipe is disabled in this build to prevent accidental data loss on enrolled devices.');
+        return;
       }
       await commandService.sendCommand(selectedDeviceId, commandType, 'Remote web trigger');
       alert(`Command ${commandType} dispatched.`);
@@ -54,29 +49,29 @@ export const Commands: React.FC = () => {
     switch (status) {
       case 'EXECUTED':
       case 'DELIVERED':
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        return 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800';
       case 'FAILED':
-        return 'bg-red-50 text-red-700 border-red-200';
+        return 'bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-300 dark:border-rose-800';
       case 'EXPIRED':
-        return 'bg-gray-100 text-gray-600 border-gray-300';
+        return 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700';
       case 'EXECUTING':
-        return 'bg-blue-50 text-blue-700 border-blue-200';
+        return 'bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-800';
       default:
-        return 'bg-amber-50 text-amber-700 border-amber-200';
+        return 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800';
     }
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6 max-w-4xl mx-auto transition-colors duration-200">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-[#152C4F]">Remote Command Center</h2>
-          <p className="text-sm text-[#62666D]">Dispatch verified anti-theft and recovery instructions</p>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white font-mono">Remote Command Center</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Dispatch verified anti-theft and recovery instructions</p>
         </div>
         <select
           value={selectedDeviceId}
           onChange={(e) => setSelectedDeviceId(e.target.value)}
-          className="w-full sm:w-64 bg-white border border-[#DFE2E7] text-[#152C4F] text-sm rounded-xl focus:ring-[#255DA8] focus:border-[#255DA8] p-2.5 shadow-sm"
+          className="w-full sm:w-64 bg-white dark:bg-[#121927] border border-slate-200 dark:border-[#223049] text-slate-900 dark:text-slate-200 text-xs rounded-xl focus:ring-cyan-500 focus:border-cyan-500 p-2.5 shadow-sm"
         >
           <option value="" disabled>Select a device</option>
           {devices.map(d => (
@@ -90,72 +85,72 @@ export const Commands: React.FC = () => {
         {/* Locate Now */}
         <button
           onClick={() => handleSendCommand('LOCATE_NOW')}
-          className="flex flex-col items-center justify-center gap-3 p-5 bg-white border-2 border-transparent hover:border-[#255DA8] rounded-2xl shadow-sm transition-all group"
+          className="flex flex-col items-center justify-center gap-3 p-5 bg-white dark:bg-[#121927] border border-slate-200 dark:border-[#223049] hover:border-cyan-500 dark:hover:border-cyan-400 rounded-2xl shadow-sm dark:shadow-lg transition-all group"
         >
-          <div className="w-11 h-11 bg-cyan-50 text-cyan-600 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+          <div className="w-11 h-11 bg-cyan-100 dark:bg-cyan-950/50 text-cyan-600 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-800/50 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform shadow-[0_0_10px_rgba(0,210,255,0.15)]">
             <MapPin className="w-5 h-5" />
           </div>
           <div className="text-center">
-            <h3 className="font-bold text-sm text-[#152C4F]">Locate Now</h3>
-            <p className="text-xs text-[#62666D] mt-0.5">Live GPS refresh</p>
+            <h3 className="font-bold text-sm text-slate-900 dark:text-white font-mono">Locate Now</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Live GPS refresh</p>
           </div>
         </button>
 
         {/* Lock Device */}
         <button
           onClick={() => handleSendCommand('LOCK_DEVICE')}
-          className="flex flex-col items-center justify-center gap-3 p-5 bg-white border-2 border-transparent hover:border-[#255DA8] rounded-2xl shadow-sm transition-all group"
+          className="flex flex-col items-center justify-center gap-3 p-5 bg-white dark:bg-[#121927] border border-slate-200 dark:border-[#223049] hover:border-indigo-500 dark:hover:border-indigo-400 rounded-2xl shadow-sm dark:shadow-lg transition-all group"
         >
-          <div className="w-11 h-11 bg-blue-50 text-[#255DA8] rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+          <div className="w-11 h-11 bg-indigo-100 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/50 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform shadow-[0_0_10px_rgba(99,102,241,0.15)]">
             <Lock className="w-5 h-5" />
           </div>
           <div className="text-center">
-            <h3 className="font-bold text-sm text-[#152C4F]">Lock Device</h3>
-            <p className="text-xs text-[#62666D] mt-0.5">Force screen lock</p>
+            <h3 className="font-bold text-sm text-slate-900 dark:text-white font-mono">Lock Device</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Force screen lock</p>
           </div>
         </button>
 
         {/* 5s Alarm */}
         <button
           onClick={() => handleSendCommand('ALARM_ALERT')}
-          className="flex flex-col items-center justify-center gap-3 p-5 bg-white border-2 border-transparent hover:border-amber-500 rounded-2xl shadow-sm transition-all group"
+          className="flex flex-col items-center justify-center gap-3 p-5 bg-white dark:bg-[#121927] border border-slate-200 dark:border-[#223049] hover:border-amber-500 dark:hover:border-amber-400 rounded-2xl shadow-sm dark:shadow-lg transition-all group"
         >
-          <div className="w-11 h-11 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+          <div className="w-11 h-11 bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform shadow-[0_0_10px_rgba(245,158,11,0.15)]">
             <Volume2 className="w-5 h-5" />
           </div>
           <div className="text-center">
-            <h3 className="font-bold text-sm text-[#152C4F]">5s Siren Alarm</h3>
-            <p className="text-xs text-[#62666D] mt-0.5">Auto-stop at 5 sec</p>
+            <h3 className="font-bold text-sm text-slate-900 dark:text-white font-mono">5s Siren Alarm</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Auto-stop at 5 sec</p>
           </div>
         </button>
 
         {/* Wipe Data */}
         <button
           onClick={() => handleSendCommand('WIPE_DEVICE')}
-          className="flex flex-col items-center justify-center gap-3 p-5 bg-white border-2 border-transparent hover:border-red-500 rounded-2xl shadow-sm transition-all group"
+          className="flex flex-col items-center justify-center gap-3 p-5 bg-white dark:bg-[#121927] border border-slate-200 dark:border-[#223049] hover:border-rose-500 dark:hover:border-rose-400 rounded-2xl shadow-sm dark:shadow-lg transition-all group opacity-85"
         >
-          <div className="w-11 h-11 bg-red-50 text-red-600 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
+          <div className="w-11 h-11 bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform shadow-[0_0_10px_rgba(239,68,68,0.15)]">
             <Trash2 className="w-5 h-5" />
           </div>
           <div className="text-center">
-            <h3 className="font-bold text-sm text-[#152C4F]">Wipe Data</h3>
-            <p className="text-xs text-[#62666D] mt-0.5">Multi-step factory reset</p>
+            <h3 className="font-bold text-sm text-slate-900 dark:text-white font-mono">Wipe Data</h3>
+            <p className="text-xs text-rose-500 dark:text-rose-400 mt-0.5">Safety Disabled</p>
           </div>
         </button>
       </div>
 
       {/* History Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-[#DFE2E7] overflow-hidden">
-        <div className="p-5 border-b border-[#DFE2E7] flex items-center justify-between">
+      <div className="bg-white dark:bg-[#121927] rounded-2xl shadow-sm dark:shadow-xl border border-slate-200 dark:border-[#223049] overflow-hidden">
+        <div className="p-5 border-b border-slate-200 dark:border-[#223049] flex items-center justify-between bg-slate-50 dark:bg-[#162032]">
           <div className="flex items-center gap-3">
-            <Terminal className="w-5 h-5 text-[#255DA8]" />
-            <h3 className="font-bold text-[#152C4F]">Command Execution History</h3>
+            <Terminal className="w-5 h-5 text-indigo-600 dark:text-cyan-400" />
+            <h3 className="font-bold text-slate-900 dark:text-white text-sm font-mono">Command Execution History</h3>
           </div>
-          <span className="text-xs text-[#62666D]">Auto-expires stale commands after 15m</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">Auto-expires stale commands after 15m</span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left text-[#1A1C1E]">
-            <thead className="text-xs text-[#62666D] uppercase bg-gray-50 border-b border-[#DFE2E7]">
+          <table className="w-full text-xs text-left text-slate-700 dark:text-slate-200">
+            <thead className="text-[11px] text-slate-500 dark:text-slate-400 uppercase bg-slate-50 dark:bg-[#162032]/60 border-b border-slate-200 dark:border-[#223049]">
               <tr>
                 <th className="px-6 py-4">Time</th>
                 <th className="px-6 py-4">Command</th>
@@ -164,35 +159,35 @@ export const Commands: React.FC = () => {
                 <th className="px-6 py-4">Result</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#DFE2E7]">
+            <tbody className="divide-y divide-slate-200 dark:divide-[#223049]">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-[#62666D]">Loading history...</td>
+                  <td colSpan={5} className="px-6 py-8 text-center text-slate-400 font-mono">Loading history...</td>
                 </tr>
               ) : commands.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-[#62666D]">No commands recorded for this device.</td>
+                  <td colSpan={5} className="px-6 py-12 text-center text-slate-400 font-mono">No commands recorded for this device.</td>
                 </tr>
               ) : (
                 commands.map((cmd) => (
-                  <tr key={cmd.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 font-mono text-xs text-gray-500 whitespace-nowrap">
+                  <tr key={cmd.id} className="hover:bg-slate-50 dark:hover:bg-[#162032] transition-colors">
+                    <td className="px-6 py-4 font-mono text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
                       {cmd.createdAt ? new Date(cmd.createdAt).toLocaleString() : 'Recent'}
                     </td>
-                    <td className="px-6 py-4 font-bold text-[#152C4F]">
+                    <td className="px-6 py-4 font-bold text-slate-900 dark:text-white font-mono">
                       {cmd.commandType}
                     </td>
                     <td className="px-6 py-4">
-                      <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
                         {cmd.transport || 'CLOUD'}
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold border uppercase tracking-wider ${getStatusBadge(cmd.status)}`}>
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider ${getStatusBadge(cmd.status)}`}>
                         {cmd.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-xs text-[#62666D]">
+                    <td className="px-6 py-4 text-xs text-slate-500 dark:text-slate-400">
                       {cmd.result || cmd.payload || '—'}
                     </td>
                   </tr>

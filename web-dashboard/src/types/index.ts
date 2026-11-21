@@ -14,6 +14,8 @@ export interface Device {
   installationId: string;
   status: 'ONLINE' | 'OFFLINE' | 'REVOKED';
   protectionEnabled: boolean;
+  protectionStatus?: 'ACTIVE' | 'DEGRADED' | 'NEEDS_ATTENTION' | 'OFFLINE';
+  protectionReason?: string;
   batteryLevel: number;
   lastSeen?: string;
   createdAt?: string;
@@ -57,6 +59,9 @@ export interface SecurityEvent {
   zoneId?: string;
   zoneName?: string;
   status?: 'ACTIVE' | 'ACKNOWLEDGED' | 'RESOLVED' | 'DISMISSED';
+  executionStatus?: 'REQUESTED' | 'STARTED' | 'COMPLETED' | 'FAILED' | string;
+  commandId?: string;
+  triggerSource?: string;
   dismissedAt?: string;
   dismissedBy?: string;
   resolvedAt?: string;

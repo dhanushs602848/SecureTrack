@@ -101,6 +101,85 @@ public class MultiDeviceSecurityTest {
         assertFalse("Alphanumeric must fail", isValidImei("35693803564380A"));
     }
 
+    @Test
+    public void testDeviceOnlineAndStaleStatus() {
+        Device onlineDevice = new Device("dev1", "Pixel 8", "Pixel", "14", 90, "ONLINE", true, "dev1");
+        com.google.firebase.Timestamp recentTimestamp = new com.google.firebase.Timestamp(new java.util.Date(System.currentTimeMillis() - 60000L)); // 1 min ago
+        onlineDevice.setLocationTimestamp(recentTimestamp);
+        onlineDevice.setLastLatitude(37.7749);
+        onlineDevice.setLastLongitude(-122.4194);
+        onlineDevice.setLocationAccuracy(8.5f);
+
+        assertTrue("Recently updated online device should be online", onlineDevice.isOnline());
+        assertFalse("Recent location fix should not be stale", onlineDevice.isLocationStale());
+
+        Device offlineDevice = new Device("dev2", "Galaxy S23", "S23", "14", 45, "OFFLINE", true, "dev2");
+        com.google.firebase.Timestamp oldTimestamp = new com.google.firebase.Timestamp(new java.util.Date(System.currentTimeMillis() - 25 * 60 * 1000L)); // 25 mins ago
+        offlineDevice.setLocationTimestamp(oldTimestamp);
+        offlineDevice.setLastLatitude(37.7749);
+        offlineDevice.setLastLongitude(-122.4194);
+
+        assertFalse("Old timestamp or OFFLINE status should make device offline", offlineDevice.isOnline());
+        assertTrue("Location older than 15 mins should be stale", offlineDevice.isLocationStale());
+    }
+
+    @Test
+    public void testDeviceFormattedAccuracyAndLastSeen() {
+        Device dev = new Device("dev1", "Pixel 8", "Pixel", "14", 90, "ONLINE", true, "dev1");
+        dev.setLocationAccuracy(12.4f);
+        assertEquals("±12m", dev.getFormattedAccuracy());
+
+        com.google.firebase.Timestamp tsFiveMinsAgo = new com.google.firebase.Timestamp(new java.util.Date(System.currentTimeMillis() - 5 * 60 * 1000L));
+        dev.setLocationTimestamp(tsFiveMinsAgo);
+        assertEquals("5m ago", dev.getFormattedLastSeen());
+    }
+
+    @Test
+    public void testRemoteLocateCommandLifecycleAndIsolation() {
+        String ownerUid = "owner-firebase-uid-100";
+        String controllerDevId = "controller-phone-001";
+        String targetDevId = "target-phone-002";
+
+        double controllerLat = 37.7749;
+        double controllerLng = -122.4194;
+
+        double targetLat = 40.7128; // New York
+        double targetLng = -74.0060;
+        float targetAccuracy = 6.2f;
+        String requestId = UUID.randomUUID().toString();
+
+        // 1. Controller queues command for target device
+        com.example.securetrack.models.DeviceCommand command = new com.example.securetrack.models.DeviceCommand("LOCATE_NOW", "QUEUED", "Remote locate from controller dashboard", "");
+        command.setDeviceId(targetDevId);
+        assertEquals("QUEUED", command.getStatus());
+        assertEquals(targetDevId, command.getDeviceId());
+
+        // 2. Target executes command and obtains its OWN location
+        com.example.securetrack.models.LocationRecord targetLocationRecord = new com.example.securetrack.models.LocationRecord(
+                targetDevId,
+                requestId,
+                targetLat,
+                targetLng,
+                targetAccuracy,
+                15.0,
+                0.0f,
+                "2025-01-01T12:00:00Z"
+        );
+
+        // Verify target location is NOT controller's location
+        assertNotEquals("Target latitude must not match controller latitude", controllerLat, targetLocationRecord.getLatitude(), 0.0001);
+        assertNotEquals("Target longitude must not match controller longitude", controllerLng, targetLocationRecord.getLongitude(), 0.0001);
+
+        // 3. Command updates status to EXECUTED
+        command.setStatus("EXECUTED");
+        command.setResult(String.format(java.util.Locale.US, "Location: (%.5f, %.5f) ±%.1fm [req:%s]",
+                targetLat, targetLng, targetAccuracy, requestId));
+
+        assertEquals("EXECUTED", command.getStatus());
+        assertTrue(command.getResult().contains(requestId));
+        assertTrue(command.getResult().contains("40.71280"));
+    }
+
     private boolean isValidImei(String imei) {
         if (imei == null || imei.length() != 15 || !imei.matches("\\d+")) {
             return false;

@@ -1,52 +1,58 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 2026 Gen-Z Cybersecurity Design System -->
-    <color name="bg_app">#0A0E17</color>
+    <!-- SecureTrack Light Mode Design Tokens (Gen-Z Cybersecurity Theme) -->
+    <color name="bg_app">#F8FAFC</color>
     <color name="primary_navy">#0F172A</color>
-    <color name="primary_blue">#6366F1</color>
-    <color name="light_blue">#1E1B4B</color>
-    <color name="card_bg">#121927</color>
-    <color name="secondary_surface">#182234</color>
-    <color name="border_color">#223049</color>
-    <color name="text_primary">#F8FAFC</color>
-    <color name="text_secondary">#94A3B8</color>
+    <color name="primary_blue">#4F46E5</color>
+    <color name="light_blue">#EEF2FF</color>
+    <color name="card_bg">#FFFFFF</color>
+    <color name="secondary_surface">#F1F5F9</color>
+    <color name="border_color">#E2E8F0</color>
+    <color name="text_primary">#0F172A</color>
+    <color name="text_secondary">#64748B</color>
     <color name="status_success">#10B981</color>
     <color name="status_error">#EF4444</color>
     <color name="status_warning">#F59E0B</color>
-    <color name="status_info_bg">#0E2A47</color>
+    <color name="status_info_bg">#E0F2FE</color>
 
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="transparent">#00000000</color>
 
     <!-- Navigation States -->
-    <color name="nav_selected">#00D2FF</color>
-    <color name="nav_unselected">#64748B</color>
+    <color name="nav_bg">#FFFFFF</color>
+    <color name="nav_selected">#4F46E5</color>
+    <color name="nav_unselected">#94A3B8</color>
 
-    <!-- Modern Dark Midnight & Electric Accents -->
-    <color name="midnight_dark">#0A0E17</color>
-    <color name="midnight_card">#121927</color>
-    <color name="midnight_card_secondary">#182234</color>
-    <color name="midnight_border">#223049</color>
-    <color name="electric_cyan">#00D2FF</color>
-    <color name="electric_blue">#6366F1</color>
-    <color name="electric_violet">#8B5CF6</color>
+    <!-- Semantic Aliases & Accents for Light Mode -->
+    <color name="midnight_dark">#F8FAFC</color>
+    <color name="midnight_card">#FFFFFF</color>
+    <color name="midnight_card_secondary">#F1F5F9</color>
+    <color name="midnight_border">#E2E8F0</color>
+    <color name="electric_cyan">#0284C7</color>
+    <color name="electric_blue">#4F46E5</color>
+    <color name="electric_violet">#7C3AED</color>
     <color name="mint_green">#10B981</color>
-    <color name="amber_warning">#F59E0B</color>
-    <color name="coral_error">#EF4444</color>
-    <color name="purple_ble">#8B5CF6</color>
-    <color name="slate_400">#94A3B8</color>
-    <color name="slate_300">#CBD5E1</color>
-    <color name="slate_100">#F1F5F9</color>
-    <color name="cyber_glow_cyan">#1A00D2FF</color>
-    <color name="cyber_glow_purple">#1A8B5CF6</color>
+    <color name="amber_warning">#D97706</color>
+    <color name="coral_error">#DC2626</color>
+    <color name="purple_ble">#7C3AED</color>
+    <color name="slate_400">#64748B</color>
+    <color name="slate_300">#475569</color>
+    <color name="slate_100">#0F172A</color>
+    <color name="cyber_glow_cyan">#1A0284C7</color>
+    <color name="cyber_glow_purple">#1A7C3AED</color>
     <color name="cyber_glow_emerald">#1A10B981</color>
 
     <!-- High-Visibility Input Specifications -->
-    <color name="input_text">#F8FAFC</color>
-    <color name="input_hint">#64748B</color>
-    <color name="input_label">#94A3B8</color>
-    <color name="input_border">#2A3854</color>
-    <color name="input_focus_border">#00D2FF</color>
-    <color name="input_bg">#141D2D</color>
+    <color name="input_text">#0F172A</color>
+    <color name="input_hint">#94A3B8</color>
+    <color name="input_label">#475569</color>
+    <color name="input_border">#CBD5E1</color>
+    <color name="input_focus_border">#4F46E5</color>
+    <color name="input_bg">#FFFFFF</color>
+
+    <!-- Theme Preview Card Colors -->
+    <color name="theme_preview_border_selected">#4F46E5</color>
+    <color name="theme_preview_border_unselected">#CBD5E1</color>
+    <color name="theme_preview_card_bg">#F1F5F9</color>
 </resources>

@@ -17,6 +17,7 @@ public class LocationHistoryActivity extends AppCompatActivity {
     private LocationRepository locationRepository;
     private SessionManager sessionManager;
     private LocationHistoryAdapter adapter;
+    private String targetDeviceId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -26,6 +27,19 @@ public class LocationHistoryActivity extends AppCompatActivity {
 
         locationRepository = new LocationRepository(this);
         sessionManager = new SessionManager(this);
+
+        targetDeviceId = getIntent().getStringExtra("device_id");
+        if (targetDeviceId == null || targetDeviceId.isEmpty()) {
+            targetDeviceId = sessionManager.getCurrentDeviceId();
+            if (targetDeviceId == null) {
+                targetDeviceId = sessionManager.getInstallationId();
+            }
+        }
+
+        String deviceName = getIntent().getStringExtra("device_name");
+        if (deviceName != null && !deviceName.trim().isEmpty()) {
+            binding.tvTitleLocationHistory.setText("History: " + deviceName);
+        }
 
         adapter = new LocationHistoryAdapter();
         binding.rvHistory.setLayoutManager(new LinearLayoutManager(this));
@@ -39,14 +53,13 @@ public class LocationHistoryActivity extends AppCompatActivity {
 
     private void loadHistory() {
         binding.swipeRefresh.setRefreshing(true);
-        String deviceId = sessionManager.getPrimaryDeviceIdStr();
-        if (deviceId == null) {
+        if (targetDeviceId == null) {
             binding.swipeRefresh.setRefreshing(false);
-            Toast.makeText(this, "No device registered", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "No device specified", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        locationRepository.getLocationHistory(deviceId, new LocationRepository.ApiCallback<List<LocationRecord>>() {
+        locationRepository.getLocationHistoryStr(targetDeviceId, new LocationRepository.ApiCallback<List<LocationRecord>>() {
             @Override
             public void onSuccess(List<LocationRecord> result) {
                 binding.swipeRefresh.setRefreshing(false);

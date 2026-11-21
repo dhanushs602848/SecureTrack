@@ -79,6 +79,26 @@ public class MainActivity extends AppCompatActivity {
                 badge.clearNumber();
             }
         });
+
+        handleNavigationIntent(getIntent());
+        checkUserRequestedExit();
+    }
+
+    @Override
+    protected void onNewIntent(@androidx.annotation.NonNull android.content.Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleNavigationIntent(intent);
+    }
+
+    private void handleNavigationIntent(android.content.Intent intent) {
+        if (intent == null) return;
+        String navigateTo = intent.getStringExtra("navigate_to");
+        if ("security".equalsIgnoreCase(navigateTo)) {
+            binding.bottomNavigation.setSelectedItemId(R.id.navigation_security);
+        } else if ("tracking".equalsIgnoreCase(navigateTo)) {
+            binding.bottomNavigation.setSelectedItemId(R.id.navigation_tracking);
+        }
     }
 
     @Override
@@ -90,10 +110,72 @@ public class MainActivity extends AppCompatActivity {
         com.example.securetrack.utils.SessionManager sm = new com.example.securetrack.utils.SessionManager(this);
         if (sm.isLoggedIn()) {
             new com.example.securetrack.repositories.DeviceRepository(this).sendHeartbeat(null);
+            com.example.securetrack.security.CommandExecutionManager.getInstance(this).startListeningToCommands();
         }
+    }
+
+    private String selectedDeviceIdForTracking;
+
+    public String getSelectedDeviceIdForTracking() {
+        return selectedDeviceIdForTracking;
+    }
+
+    public void navigateToTrackingTabWithDevice(String deviceId) {
+        this.selectedDeviceIdForTracking = deviceId;
+        binding.bottomNavigation.setSelectedItemId(R.id.navigation_tracking);
     }
 
     public void navigateToTrackingTab() {
         binding.bottomNavigation.setSelectedItemId(R.id.navigation_tracking);
+    }
+
+    private void checkUserRequestedExit() {
+        com.example.securetrack.utils.SessionManager sm = new com.example.securetrack.utils.SessionManager(this);
+        // Only evaluate if user's saved preference was that background tracking is enabled
+        if (!sm.isBackgroundTrackingEnabled()) {
+            return;
+        }
+
+        // 1. If foreground protection service is still running after Recents swipe-away,
+        // preserve its active state and continue protection without prompting.
+        if (com.example.securetrack.location.LocationTrackingService.isServiceRunning(this)) {
+            return;
+        }
+
+        // 2. Service has actually stopped while background tracking was supposed to be active.
+        // Check if there was an exit reason or process termination.
+        long lastPrompt = sm.getLastUserExitPromptTimestamp();
+        boolean hasInterruption = false;
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            try {
+                android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+                if (am != null) {
+                    java.util.List<android.app.ApplicationExitInfo> exitInfos =
+                            am.getHistoricalProcessExitReasons(getPackageName(), 0, 1);
+                    if (exitInfos != null && !exitInfos.isEmpty()) {
+                        android.app.ApplicationExitInfo latestExit = exitInfos.get(0);
+                        if (latestExit.getTimestamp() > lastPrompt) {
+                            hasInterruption = true;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                android.util.Log.w("MainActivity", "Could not inspect ApplicationExitInfo: " + e.getMessage());
+            }
+        } else {
+            hasInterruption = true;
+        }
+
+        if (hasInterruption) {
+            sm.setLastUserExitPromptTimestamp(System.currentTimeMillis());
+            sm.setBackgroundTrackingEnabled(false);
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                    .setTitle("Protection Service Interrupted")
+                    .setMessage("SecureTrack protection was stopped because the application process was terminated. Endpoint tracking is currently paused. Would you like to resume protection?")
+                    .setPositiveButton("Resume Protection", (dialog, which) -> navigateToTrackingTab())
+                    .setNegativeButton("Dismiss", null)
+                    .show();
+        }
     }
 }

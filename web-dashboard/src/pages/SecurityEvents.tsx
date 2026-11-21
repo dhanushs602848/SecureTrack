@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ShieldAlert, AlertTriangle, Info, Shield, CheckCircle, RotateCcw, Trash2, Check } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, Info, Shield, CheckCircle, RotateCcw, Check } from 'lucide-react';
 import { securityService, deviceService } from '../services/api';
 import { SecurityEvent, Device } from '../types';
 
@@ -66,19 +66,19 @@ export const SecurityEvents: React.FC = () => {
 
   const getSeverityIcon = (severity: string) => {
     switch (severity) {
-      case 'CRITICAL': return <ShieldAlert className="w-5 h-5 text-red-500" />;
+      case 'CRITICAL': return <ShieldAlert className="w-5 h-5 text-rose-500" />;
       case 'HIGH': return <AlertTriangle className="w-5 h-5 text-orange-500" />;
       case 'WARNING': return <AlertTriangle className="w-5 h-5 text-amber-500" />;
-      default: return <Info className="w-5 h-5 text-cyan-400" />;
+      default: return <Info className="w-5 h-5 text-cyan-500 dark:text-cyan-400" />;
     }
   };
 
   const getSeverityBadge = (severity: string) => {
     switch (severity) {
-      case 'CRITICAL': return 'bg-red-950/40 text-red-400 border-red-800';
-      case 'HIGH': return 'bg-orange-950/40 text-orange-400 border-orange-800';
-      case 'WARNING': return 'bg-amber-950/40 text-amber-400 border-amber-800';
-      default: return 'bg-cyan-950/40 text-cyan-400 border-cyan-800';
+      case 'CRITICAL': return 'bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-300 dark:border-rose-800';
+      case 'HIGH': return 'bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400 border-orange-300 dark:border-orange-800';
+      case 'WARNING': return 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800';
+      default: return 'bg-cyan-100 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-400 border-cyan-300 dark:border-cyan-800';
     }
   };
 
@@ -95,26 +95,26 @@ export const SecurityEvents: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-6 max-w-5xl mx-auto transition-colors duration-200">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-bold text-white font-mono">Security Center &amp; Alerts</h2>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white font-mono">Security Center &amp; Alerts</h2>
             <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
               activeEvents.length === 0
-                ? 'bg-emerald-950/50 text-emerald-400 border-emerald-800'
-                : 'bg-rose-950/50 text-rose-400 border-rose-800'
+                ? 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800'
+                : 'bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 border-rose-300 dark:border-rose-800'
             }`}>
               {activeEvents.length} Active
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">Telemetry alarms, perimeter alerts, and safe audit dismissals</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Telemetry alarms, perimeter alerts, and safe audit dismissals</p>
         </div>
         <select
           value={selectedDeviceId}
           onChange={(e) => setSelectedDeviceId(e.target.value)}
-          className="w-full sm:w-64 bg-[#121927] border border-[#223049] text-slate-200 text-xs rounded-xl focus:ring-cyan-500 focus:border-cyan-500 p-2.5 shadow-sm"
+          className="w-full sm:w-64 bg-white dark:bg-[#121927] border border-slate-200 dark:border-[#223049] text-slate-900 dark:text-slate-200 text-xs rounded-xl focus:ring-cyan-500 focus:border-cyan-500 p-2.5 shadow-sm"
         >
           <option value="" disabled>Select a device</option>
           {devices.map(d => (
@@ -124,21 +124,21 @@ export const SecurityEvents: React.FC = () => {
       </div>
 
       {actionMessage && (
-        <div className="p-3 bg-emerald-950/60 border border-emerald-700/60 text-emerald-300 rounded-xl text-xs flex items-center justify-between shadow-lg">
+        <div className="p-3 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700/60 text-emerald-800 dark:text-emerald-300 rounded-xl text-xs flex items-center justify-between shadow-lg">
           <span className="font-medium">{actionMessage}</span>
-          <Check className="w-4 h-4 text-emerald-400" />
+          <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
         </div>
       )}
 
       {/* Filter Tabs & Bulk Actions */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-1.5 bg-[#121927] border border-[#223049] p-1 rounded-xl">
+        <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-[#121927] border border-slate-200 dark:border-[#223049] p-1 rounded-xl">
           <button
             onClick={() => setFilter('ACTIVE')}
             className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
               filter === 'ACTIVE'
                 ? 'bg-cyan-500 text-black shadow-md'
-                : 'text-slate-400 hover:text-white'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             ACTIVE ({activeEvents.length})
@@ -148,7 +148,7 @@ export const SecurityEvents: React.FC = () => {
             className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
               filter === 'DISMISSED'
                 ? 'bg-cyan-500 text-black shadow-md'
-                : 'text-slate-400 hover:text-white'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             DISMISSED ({dismissedEvents.length})
@@ -158,7 +158,7 @@ export const SecurityEvents: React.FC = () => {
             className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
               filter === 'RESOLVED'
                 ? 'bg-cyan-500 text-black shadow-md'
-                : 'text-slate-400 hover:text-white'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             RESOLVED ({resolvedEvents.length})
@@ -168,7 +168,7 @@ export const SecurityEvents: React.FC = () => {
             className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
               filter === 'ALL'
                 ? 'bg-cyan-500 text-black shadow-md'
-                : 'text-slate-400 hover:text-white'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             ALL ({activeEvents.length + resolvedEvents.length})
@@ -177,7 +177,7 @@ export const SecurityEvents: React.FC = () => {
 
         <button
           onClick={handleBulkDismissResolved}
-          className="px-3 py-1.5 text-xs font-semibold text-cyan-400 hover:bg-cyan-950/40 border border-cyan-800/60 rounded-xl transition-colors flex items-center gap-1.5"
+          className="px-3 py-1.5 text-xs font-semibold text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-950/40 border border-cyan-300 dark:border-cyan-800/60 rounded-xl transition-colors flex items-center gap-1.5"
         >
           <CheckCircle className="w-3.5 h-3.5" />
           Dismiss Resolved Alerts
@@ -185,29 +185,29 @@ export const SecurityEvents: React.FC = () => {
       </div>
 
       {/* Events List */}
-      <div className="bg-[#121927] rounded-2xl shadow-xl border border-[#223049] overflow-hidden">
-        <div className="p-4 border-b border-[#223049] bg-[#162032] flex items-center justify-between">
+      <div className="bg-white dark:bg-[#121927] rounded-2xl shadow-sm dark:shadow-xl border border-slate-200 dark:border-[#223049] overflow-hidden">
+        <div className="p-4 border-b border-slate-200 dark:border-[#223049] bg-slate-50 dark:bg-[#162032] flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Shield className="w-4 h-4 text-cyan-400" />
-            <h3 className="font-bold text-white text-xs uppercase tracking-wider font-mono">
+            <Shield className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+            <h3 className="font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider font-mono">
               Audit Trail ({filteredEvents.length})
             </h3>
           </div>
-          <span className="text-[11px] text-slate-400 font-mono">Safe dismissal preserves historical audit records</span>
+          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">Safe dismissal preserves historical audit records</span>
         </div>
 
-        <div className="divide-y divide-[#223049]">
+        <div className="divide-y divide-slate-200 dark:divide-[#223049]">
           {loading ? (
             <div className="p-12 text-center text-slate-400 font-mono text-xs">Loading security telemetry...</div>
           ) : filteredEvents.length === 0 ? (
             <div className="p-16 text-center text-slate-400 space-y-3">
-              <Shield className="w-12 h-12 mx-auto text-emerald-400/40" />
-              <p className="font-semibold text-white text-sm font-mono">
-                {filter === 'ACTIVE' ? 'All caught up • 0 active security alerts' : 'No Security Alerts Found'}
+              <Shield className="w-12 h-12 mx-auto text-emerald-500 dark:text-emerald-400/40" />
+              <p className="font-semibold text-slate-900 dark:text-white text-sm font-mono">
+                {filter === 'ACTIVE' || activeEvents.length === 0 ? 'No active alerts' : 'No Security Alerts Found'}
               </p>
               <p className="text-xs text-slate-500">
-                {filter === 'ACTIVE'
-                  ? 'All security alerts have been safely dismissed. Switch to DISMISSED to review historical audit records.'
+                {filter === 'ACTIVE' || activeEvents.length === 0
+                  ? "You're all clear. Your dismissed alerts remain available in history."
                   : `There are no ${filter.toLowerCase()} security events in this view.`}
               </p>
             </div>
@@ -218,31 +218,44 @@ export const SecurityEvents: React.FC = () => {
                 <div
                   key={event.id}
                   className={`p-5 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-                    isDismissed ? 'bg-[#0E1524]/60 opacity-60' : 'hover:bg-[#162032]'
+                    isDismissed
+                      ? 'bg-slate-50/70 dark:bg-[#0E1524]/60 opacity-60'
+                      : 'hover:bg-slate-50/80 dark:hover:bg-[#162032]'
                   }`}
                 >
                   <div className="flex items-start gap-4 flex-1 min-w-0">
                     <div className="flex-shrink-0 mt-0.5">
-                      <div className="w-10 h-10 rounded-xl bg-[#1A263D] border border-slate-700 flex items-center justify-center shadow-inner">
+                      <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-[#1A263D] border border-slate-200 dark:border-slate-700 flex items-center justify-center shadow-inner">
                         {getSeverityIcon(event.severity)}
                       </div>
                     </div>
                     <div className="space-y-1 min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="font-bold text-white text-xs truncate font-mono">{event.eventType}</h4>
+                        <h4 className="font-bold text-slate-900 dark:text-white text-xs truncate font-mono">{event.eventType}</h4>
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${getSeverityBadge(event.severity)}`}>
                           {event.severity}
                         </span>
+                        {event.executionStatus && (
+                          <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border uppercase ${
+                            event.executionStatus === 'COMPLETED'
+                              ? 'bg-cyan-100 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-400 border-cyan-300 dark:border-cyan-800'
+                              : event.executionStatus === 'STARTED'
+                              ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800'
+                              : 'bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-300 dark:border-rose-800'
+                          }`}>
+                            EXEC: {event.executionStatus}
+                          </span>
+                        )}
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
                           isDismissed
-                            ? 'bg-slate-800/80 text-slate-400 border-slate-700'
-                            : 'bg-emerald-950/40 text-emerald-400 border-emerald-800'
+                            ? 'bg-slate-200 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700'
+                            : 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800'
                         }`}>
                           {event.status || 'ACTIVE'}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-300">{event.description}</p>
-                      <p className="text-[10px] font-mono text-slate-500">
+                      <p className="text-xs text-slate-700 dark:text-slate-300">{event.description}</p>
+                      <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
                         {new Date(event.timestamp).toLocaleString()}
                         {event.deviceName ? ` • Device: ${event.deviceName}` : ''}
                         {event.dismissedAt ? ` • Dismissed: ${new Date(event.dismissedAt).toLocaleString()}` : ''}
@@ -250,25 +263,21 @@ export const SecurityEvents: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-center">
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                     {isDismissed ? (
                       <button
                         onClick={() => handleRestore(event.id)}
-                        className="px-3 py-1.5 text-xs text-cyan-400 hover:text-white bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-800/60 rounded-xl transition-all flex items-center gap-1.5"
-                        title="Restore to Active"
+                        className="px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-cyan-600 dark:hover:text-cyan-400 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 border border-slate-300 dark:border-slate-700 rounded-xl transition-all flex items-center gap-1.5"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Restore</span>
+                        Restore
                       </button>
                     ) : (
                       <button
                         onClick={() => handleDismiss(event.id)}
-                        className="px-3 py-1.5 text-xs text-rose-400 hover:text-white bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/60 rounded-xl transition-all flex items-center gap-1.5"
-                        title="Dismiss Alert"
+                        className="px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 bg-slate-100 dark:bg-slate-800/80 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-slate-300 dark:border-slate-700 rounded-xl transition-all flex items-center gap-1.5"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Dismiss</span>
+                        Dismiss
                       </button>
                     )}
                   </div>

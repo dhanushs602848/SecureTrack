@@ -3,16 +3,16 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/bg_card"
-    android:layout_marginBottom="8dp"
+    android:layout_marginBottom="10dp"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:padding="16dp">
 
     <TextView
         android:id="@+id/tv_history_coords"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Lat: 37.7749, Lng: -122.4194"
-        android:textColor="@color/primary_navy"
+        android:textColor="@color/text_primary"
         android:textSize="14sp"
         android:textStyle="bold" />
 
@@ -20,7 +20,7 @@
         android:id="@+id/tv_history_time"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
+        android:layout_marginTop="4dp"
         android:text="Accuracy: 5.0m | 2025-01-01 12:00:00 UTC"
         android:textColor="@color/text_secondary"
         android:textSize="12sp" />

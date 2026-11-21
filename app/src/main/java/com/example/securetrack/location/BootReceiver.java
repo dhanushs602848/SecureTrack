@@ -25,11 +25,7 @@ public class BootReceiver extends BroadcastReceiver {
 
             // Check if user previously enabled tracking
             if (sessionManager.isBackgroundTrackingEnabled()) {
-                if (PermissionUtils.hasBackgroundLocationPermission(context)) {
-                    showBootNotification(context, "SecureTrack service requires manual tap to resume background location tracking after reboot.");
-                } else {
-                    showBootNotification(context, "Background location permission required to resume tracking.");
-                }
+                showBootNotification(context, "SecureTrack protection was paused after device reboot. Tap to reopen and resume protection.");
             }
         }
     }

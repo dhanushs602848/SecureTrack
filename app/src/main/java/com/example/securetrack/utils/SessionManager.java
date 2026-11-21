@@ -24,9 +24,17 @@ public class SessionManager {
     private static final String KEY_PRIMARY_DEVICE_ID = "primary_device_id";
     private static final String KEY_PRIMARY_DEVICE_ID_STR = "primary_device_id_str";
     private static final String KEY_EMERGENCY_CONTACT = "emergency_contact";
+    private static final String KEY_LAST_USER_EXIT_PROMPT_TIMESTAMP = "last_user_exit_prompt_ts";
     private static final String KEY_LOCK_MESSAGE = "lock_message";
     private static final String KEY_SIM_ALERT = "sim_alert_enabled";
     private static final String KEY_LOW_BATTERY_ALERT = "low_battery_alert_enabled";
+    private static final String KEY_IS_PAIRED_DEVICE = "is_paired_secondary_device";
+    private static final String KEY_PAIRED_OWNER_UID = "paired_owner_uid";
+
+    public static final String THEME_LIGHT = "LIGHT";
+    public static final String THEME_DARK = "DARK";
+    public static final String THEME_SYSTEM = "SYSTEM";
+    private static final String KEY_THEME_MODE = "app_theme_mode";
 
     private final SharedPreferences prefs;
 
@@ -45,12 +53,14 @@ public class SessionManager {
     }
 
     public void saveFirebaseAuthSession(String uid, String email, String fullName) {
-        prefs.edit()
+        SharedPreferences.Editor editor = prefs.edit()
                 .putString(KEY_FIREBASE_UID, uid)
-                .putString(KEY_OWNER_UID, uid)
                 .putString(KEY_USER_EMAIL, email)
-                .putString(KEY_USER_NAME, fullName)
-                .apply();
+                .putString(KEY_USER_NAME, fullName);
+        if (!isPairedSecondaryDevice()) {
+            editor.putString(KEY_OWNER_UID, uid);
+        }
+        editor.apply();
     }
 
     public String getToken() {
@@ -65,17 +75,46 @@ public class SessionManager {
         return uid;
     }
 
+    public boolean isPairedSecondaryDevice() {
+        return prefs.getBoolean(KEY_IS_PAIRED_DEVICE, false);
+    }
+
+    public void setPairedSecondaryDevice(boolean isPaired) {
+        prefs.edit().putBoolean(KEY_IS_PAIRED_DEVICE, isPaired).apply();
+    }
+
+    public String getPairedOwnerUid() {
+        return prefs.getString(KEY_PAIRED_OWNER_UID, null);
+    }
+
+    public void setPairedOwnerUid(String ownerUid) {
+        prefs.edit().putString(KEY_PAIRED_OWNER_UID, ownerUid).apply();
+    }
+
     /**
      * Authenticated human owner UID.
      * Guaranteed to return only the verified account owner UID.
-     * Fails closed by returning null if not authenticated, preventing paired devices
-     * from falling back to their own device Firebase UID.
+     * If this device is an enrolled secondary device, returns the paired account owner UID,
+     * preventing enrolled devices from overwriting or falling back to their own auth UID.
      */
     public String getOwnerUid() {
+        if (isPairedSecondaryDevice()) {
+            String paired = getPairedOwnerUid();
+            if (paired != null && !paired.isEmpty()) {
+                return paired;
+            }
+        }
         return prefs.getString(KEY_OWNER_UID, null);
     }
 
     public void setOwnerUid(String ownerUid) {
+        if (isPairedSecondaryDevice()) {
+            String paired = getPairedOwnerUid();
+            if (paired != null && !paired.isEmpty()) {
+                prefs.edit().putString(KEY_OWNER_UID, paired).apply();
+                return;
+            }
+        }
         prefs.edit().putString(KEY_OWNER_UID, ownerUid).apply();
     }
 
@@ -212,6 +251,14 @@ public class SessionManager {
         prefs.edit().putString(KEY_LOCK_MESSAGE, message).apply();
     }
 
+    public long getLastUserExitPromptTimestamp() {
+        return prefs.getLong(KEY_LAST_USER_EXIT_PROMPT_TIMESTAMP, 0L);
+    }
+
+    public void setLastUserExitPromptTimestamp(long timestamp) {
+        prefs.edit().putLong(KEY_LAST_USER_EXIT_PROMPT_TIMESTAMP, timestamp).apply();
+    }
+
     public boolean isSimAlertEnabled() {
         return prefs.getBoolean(KEY_SIM_ALERT, true);
     }
@@ -254,6 +301,31 @@ public class SessionManager {
         prefs.edit().putString(KEY_BLE_DEVICE_SECRETS_PREFIX + deviceId, secret).apply();
     }
 
+    public String getThemeMode() {
+        return prefs.getString(KEY_THEME_MODE, THEME_SYSTEM);
+    }
+
+    public void setThemeMode(String themeMode) {
+        if (themeMode == null) themeMode = THEME_SYSTEM;
+        prefs.edit().putString(KEY_THEME_MODE, themeMode).apply();
+        applyTheme(themeMode);
+    }
+
+    public static void applyTheme(String themeMode) {
+        if (THEME_LIGHT.equalsIgnoreCase(themeMode)) {
+            androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO);
+        } else if (THEME_DARK.equalsIgnoreCase(themeMode)) {
+            androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES);
+        } else {
+            androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        }
+    }
+
+    public static void applySavedTheme(Context context) {
+        SessionManager session = new SessionManager(context);
+        applyTheme(session.getThemeMode());
+    }
+
     public void logout() {
         try {
             FirebaseAuth.getInstance().signOut();
@@ -270,6 +342,8 @@ public class SessionManager {
                 .remove(KEY_USER_NAME)
                 .remove(KEY_CURRENT_DEVICE_ID)
                 .remove(KEY_PRIMARY_DEVICE_ID_STR)
+                .remove(KEY_IS_PAIRED_DEVICE)
+                .remove(KEY_PAIRED_OWNER_UID)
                 .apply();
     }
 }

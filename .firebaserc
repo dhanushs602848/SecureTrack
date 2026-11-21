@@ -1,5 +1,18 @@
 {
   "projects": {
     "default": "track-99c90"
-  }
+  },
+  "targets": {
+    "track-99c90": {
+      "hosting": {
+        "securetrack": [
+          "track-99c90-track"
+        ],
+        "legacy": [
+          "track-99c90"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

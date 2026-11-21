@@ -5,7 +5,7 @@
     android:id="@+id/coordinator_layout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/midnight_dark">
+    android:background="@color/bg_app">
 
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
@@ -32,7 +32,7 @@
                     android:background="@drawable/bg_chip_dark"
                     android:contentDescription="Navigate Back"
                     android:src="@android:drawable/ic_menu_revert"
-                    app:tint="@color/white" />
+                    app:tint="@color/text_primary" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -45,7 +45,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Lost Device Recovery"
-                        android:textColor="@color/white"
+                        android:textColor="@color/text_primary"
                         android:textSize="20sp"
                         android:textStyle="bold" />
 
@@ -54,7 +54,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Target: Samsung Galaxy A07"
-                        android:textColor="@color/slate_400"
+                        android:textColor="@color/text_secondary"
                         android:textSize="12sp" />
                 </LinearLayout>
 
@@ -101,7 +101,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="12dp"
                         android:text="Device is marked as lost. High-priority tracking is active. Real-time telemetry will report whenever reachable."
-                        android:textColor="@color/white"
+                        android:textColor="@color/text_primary"
                         android:textSize="12.5sp" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
@@ -111,10 +111,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                app:cardBackgroundColor="@color/midnight_card"
+                app:cardBackgroundColor="@color/card_bg"
                 app:cardCornerRadius="16dp"
-                app:cardElevation="3dp"
-                app:strokeColor="@color/midnight_border"
+                app:cardElevation="2dp"
+                app:strokeColor="@color/border_color"
                 app:strokeWidth="1dp">
 
                 <LinearLayout
@@ -127,7 +127,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Latest Known Telemetry"
-                        android:textColor="@color/white"
+                        android:textColor="@color/text_primary"
                         android:textSize="15sp"
                         android:textStyle="bold" />
 
@@ -151,7 +151,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="Battery Level"
-                                android:textColor="@color/slate_400"
+                                android:textColor="@color/text_secondary"
                                 android:textSize="11sp" />
 
                             <TextView
@@ -179,7 +179,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="Last Seen"
-                                android:textColor="@color/slate_400"
+                                android:textColor="@color/text_secondary"
                                 android:textSize="11sp" />
 
                             <TextView
@@ -188,7 +188,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
                                 android:text="2m ago"
-                                android:textColor="@color/white"
+                                android:textColor="@color/text_primary"
                                 android:textSize="14sp"
                                 android:textStyle="bold" />
                         </LinearLayout>
@@ -224,7 +224,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="Accuracy ±15m"
-                                android:textColor="@color/slate_400"
+                                android:textColor="@color/text_secondary"
                                 android:textSize="11sp" />
                         </LinearLayout>
 
@@ -234,7 +234,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
                             android:text="13.0827° N, 80.2707° E"
-                            android:textColor="@color/white"
+                            android:textColor="@color/text_primary"
                             android:textSize="13sp" />
                     </LinearLayout>
 
@@ -263,7 +263,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="22dp"
                 android:text="Emergency Recovery Actions"
-                android:textColor="@color/white"
+                android:textColor="@color/text_primary"
                 android:textSize="15sp"
                 android:textStyle="bold" />
 
@@ -273,7 +273,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
                 android:layout_marginTop="12dp"
-                android:backgroundTint="@color/midnight_card"
+                android:backgroundTint="@color/card_bg"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 android:text="Open Android Find Hub (Offline Network)"
@@ -299,7 +299,7 @@
                     android:layout_height="48dp"
                     android:layout_marginEnd="6dp"
                     android:layout_weight="1"
-                    android:backgroundTint="@color/midnight_card"
+                    android:backgroundTint="@color/card_bg"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
                     android:text="Sound 5s Alarm"
@@ -319,18 +319,18 @@
                     android:layout_height="48dp"
                     android:layout_marginStart="6dp"
                     android:layout_weight="1"
-                    android:backgroundTint="@color/midnight_card"
+                    android:backgroundTint="@color/card_bg"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
                     android:text="Lock Device"
-                    android:textColor="@color/white"
+                    android:textColor="@color/text_primary"
                     android:textSize="13sp"
                     app:cornerRadius="12dp"
                     app:icon="@android:drawable/ic_secure"
                     app:iconGravity="textStart"
                     app:iconSize="16dp"
-                    app:iconTint="@color/white"
-                    app:strokeColor="@color/midnight_border"
+                    app:iconTint="@color/text_primary"
+                    app:strokeColor="@color/border_color"
                     app:strokeWidth="1dp" />
             </LinearLayout>
 
@@ -340,7 +340,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
                 android:layout_marginTop="10dp"
-                android:backgroundTint="@color/midnight_card_secondary"
+                android:backgroundTint="@color/secondary_surface"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 android:text="Device Recovered (Deactivate Lost Mode)"

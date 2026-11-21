@@ -146,9 +146,9 @@ public class SecurityRepository {
                         String devName = doc.getString("deviceName");
                         String locStatus = doc.getString("locationStatus");
                         String status = doc.getString("status");
-                        Long dismissedAt = doc.getLong("dismissedAt");
+                        long dismissedAt = parseFlexibleTimestamp(doc.get("dismissedAt"));
                         String dismissedBy = doc.getString("dismissedBy");
-                        Long resolvedAt = doc.getLong("resolvedAt");
+                        long resolvedAt = parseFlexibleTimestamp(doc.get("resolvedAt"));
 
                         com.google.firebase.Timestamp ts = doc.getTimestamp("timestamp");
                         long time = ts != null ? ts.toDate().getTime() : System.currentTimeMillis();
@@ -163,9 +163,9 @@ public class SecurityRepository {
                         );
                         se.setId(doc.getId());
                         se.setStatus(status != null ? status : "ACTIVE");
-                        se.setDismissedAt(dismissedAt != null ? dismissedAt : 0);
+                        se.setDismissedAt(dismissedAt);
                         se.setDismissedBy(dismissedBy);
-                        se.setResolvedAt(resolvedAt != null ? resolvedAt : 0);
+                        se.setResolvedAt(resolvedAt);
                         list.add(se);
 
                         entities.add(new SecurityAlertEntity(
@@ -178,9 +178,9 @@ public class SecurityRepository {
                                 locStatus,
                                 status != null ? status : "ACTIVE",
                                 time,
-                                dismissedAt != null ? dismissedAt : 0,
+                                dismissedAt,
                                 dismissedBy,
-                                resolvedAt != null ? resolvedAt : 0,
+                                resolvedAt,
                                 true
                         ));
                     }
@@ -330,8 +330,10 @@ public class SecurityRepository {
         }
 
         String commandId = UUID.randomUUID().toString();
+        String requestId = "req_" + UUID.randomUUID().toString().substring(0, 8);
         Map<String, Object> map = new HashMap<>();
         map.put("id", commandId);
+        map.put("requestId", requestId);
         map.put("commandType", command.getCommandType());
         map.put("command", command.getCommandType());
         map.put("targetDeviceId", targetDeviceId);
@@ -356,6 +358,55 @@ public class SecurityRepository {
                     callback.onSuccess(created);
                 })
                 .addOnFailureListener(e -> callback.onError("Firestore command dispatch error: " + e.getMessage()));
+    }
+
+    public com.google.firebase.firestore.ListenerRegistration listenToDeviceCommands(String deviceId, ApiCallback<List<DeviceCommand>> callback) {
+        String uid = getUid();
+        String targetDeviceId = deviceId != null ? deviceId : sessionManager.getPrimaryDeviceIdStr();
+        if (uid == null || targetDeviceId == null) {
+            callback.onError("User or device not identified");
+            return null;
+        }
+
+        return db.collection("users").document(uid)
+                .collection("devices").document(targetDeviceId)
+                .collection("commands")
+                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .limit(50)
+                .addSnapshotListener((querySnapshot, error) -> {
+                    if (error != null) {
+                        callback.onError(error.getMessage());
+                        return;
+                    }
+                    if (querySnapshot != null) {
+                        List<DeviceCommand> list = new ArrayList<>();
+                        for (DocumentSnapshot doc : querySnapshot.getDocuments()) {
+                            String id = doc.getString("id");
+                            if (id == null) id = doc.getId();
+                            String type = doc.getString("commandType");
+                            if (type == null) type = doc.getString("command");
+                            String status = doc.getString("status");
+                            String payload = doc.getString("payload");
+                            String result = doc.getString("result");
+
+                            DeviceCommand cmd = new DeviceCommand(
+                                    type != null ? type : "COMMAND",
+                                    status != null ? status : "QUEUED",
+                                    payload,
+                                    result
+                            );
+                            cmd.setId(id);
+                            cmd.setDeviceId(targetDeviceId);
+                            com.google.firebase.Timestamp ts = doc.getTimestamp("createdAt");
+                            if (ts != null) {
+                                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("MMM dd, yyyy • HH:mm", java.util.Locale.getDefault());
+                                cmd.setCreatedAt(sdf.format(ts.toDate()));
+                            }
+                            list.add(cmd);
+                        }
+                        callback.onSuccess(list);
+                    }
+                });
     }
 
     public void getDeviceCommands(String deviceId, ApiCallback<List<DeviceCommand>> callback) {
@@ -396,5 +447,36 @@ public class SecurityRepository {
                     callback.onSuccess(list);
                 })
                 .addOnFailureListener(e -> callback.onError("Firestore command history error: " + e.getMessage()));
+    }
+
+    private long parseFlexibleTimestamp(Object raw) {
+        if (raw == null) return 0L;
+        if (raw instanceof Number) {
+            return ((Number) raw).longValue();
+        }
+        if (raw instanceof com.google.firebase.Timestamp) {
+            return ((com.google.firebase.Timestamp) raw).toDate().getTime();
+        }
+        if (raw instanceof java.util.Date) {
+            return ((java.util.Date) raw).getTime();
+        }
+        if (raw instanceof String) {
+            String str = ((String) raw).trim();
+            if (str.isEmpty()) return 0L;
+            try {
+                return Long.parseLong(str);
+            } catch (Exception e) {
+                try {
+                    return java.time.Instant.parse(str).toEpochMilli();
+                } catch (Exception ignored) {
+                    try {
+                        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSX", java.util.Locale.US);
+                        java.util.Date d = sdf.parse(str);
+                        if (d != null) return d.getTime();
+                    } catch (Exception ignored2) {}
+                }
+            }
+        }
+        return 0L;
     }
 }

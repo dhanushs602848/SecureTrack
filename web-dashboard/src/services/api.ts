@@ -24,8 +24,7 @@ import {
   onSnapshot,
   Timestamp
 } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { auth, db, functions } from './firebase';
+import { auth, db } from './firebase';
 import { Device, DeviceCommand, LocationRecord, SecurityEvent, User, SafeZone } from '../types';
 
 const convertTimestamp = (ts: any): string => {
@@ -192,7 +191,9 @@ const parseDeviceDoc = (d: any): Device => {
     androidVersion: data.androidVersion || '14',
     installationId: data.installationId || d.id,
     status: status,
-    protectionEnabled: data.protectionEnabled ?? true,
+    protectionEnabled: data.protectionEnabled !== undefined ? data.protectionEnabled : (data.locationStatus !== 'DISABLED'),
+    protectionStatus: data.protectionStatus || (data.locationStatus === 'DISABLED' ? 'DEGRADED' : status === 'OFFLINE' ? 'OFFLINE' : 'ACTIVE'),
+    protectionReason: data.protectionReason || (data.locationStatus === 'DISABLED' ? 'Location services switched off in system settings' : 'All protection systems operational'),
     batteryLevel: data.batteryLevel ?? 100,
     lastSeen: convertTimestamp(data.lastSeen),
     locationStatus: data.locationStatus || 'ENABLED',
@@ -501,6 +502,9 @@ export const securityService = {
             zoneId: data.zoneId,
             zoneName: data.zoneName,
             status: data.status || 'ACTIVE',
+            executionStatus: data.executionStatus,
+            commandId: data.commandId,
+            triggerSource: data.triggerSource,
             dismissedAt: convertTimestamp(data.dismissedAt),
             dismissedBy: data.dismissedBy,
             resolvedAt: convertTimestamp(data.resolvedAt)

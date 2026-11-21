@@ -86,7 +86,21 @@ public class HomeFragment extends Fragment {
 
                 if (thisDevice != null) {
                     binding.tvPrimaryDeviceName.setText(thisDevice.getDeviceName() + " (This Device)");
-                    binding.tvProtectionStatus.setText(thisDevice.isProtectionEnabled() ? "Active & Protected" : "Protection Paused");
+                    com.example.securetrack.utils.ProtectionHealthEvaluator.ProtectionReport report =
+                            com.example.securetrack.utils.ProtectionHealthEvaluator.evaluate(requireContext());
+                    if (com.example.securetrack.utils.ProtectionHealthEvaluator.STATUS_ACTIVE.equals(report.status)) {
+                        binding.tvProtectionStatus.setText("Active & Protected");
+                        binding.tvProtectionStatus.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), com.example.securetrack.R.color.status_success));
+                    } else if (com.example.securetrack.utils.ProtectionHealthEvaluator.STATUS_DEGRADED.equals(report.status)) {
+                        binding.tvProtectionStatus.setText("Degraded: " + report.reason);
+                        binding.tvProtectionStatus.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), com.example.securetrack.R.color.status_warning));
+                    } else if (com.example.securetrack.utils.ProtectionHealthEvaluator.STATUS_NEEDS_ATTENTION.equals(report.status)) {
+                        binding.tvProtectionStatus.setText("Action Needed: " + report.reason);
+                        binding.tvProtectionStatus.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), com.example.securetrack.R.color.status_error));
+                    } else {
+                        binding.tvProtectionStatus.setText("Offline (No Connection)");
+                        binding.tvProtectionStatus.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), com.example.securetrack.R.color.text_secondary));
+                    }
                     sessionManager.setCurrentDeviceId(thisDevice.getId());
                     sessionManager.setDeviceName(thisDevice.getDeviceName());
                 } else if (!devices.isEmpty()) {

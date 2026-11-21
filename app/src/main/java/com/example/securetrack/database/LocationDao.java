@@ -9,7 +9,10 @@ import java.util.List;
 public interface LocationDao {
 
     @Insert
-    void insert(LocationEntity location);
+    long insert(LocationEntity location);
+
+    @Query("SELECT * FROM offline_locations WHERE clientUuid = :clientUuid LIMIT 1")
+    LocationEntity getByClientUuid(String clientUuid);
 
     @Query("SELECT * FROM offline_locations WHERE isSynced = 0 ORDER BY timestamp ASC")
     List<LocationEntity> getUnsyncedLocations();

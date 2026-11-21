@@ -24,10 +24,19 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const isMock = Boolean(import.meta.env.DEV) && typeof window !== 'undefined' && (
+    window.location.search.includes('mock_auth=true') ||
+    localStorage.getItem('mock_auth') === 'true'
+  );
+  const [user, setUser] = useState<User | null>(() => isMock ? {
+    id: 'test_user_id',
+    email: 'dhanushs602848@gmail.com',
+    fullName: 'Dhanush S',
+    phoneNumber: '+91 9876543210'
+  } : null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState<string | null>(() => isMock ? 'mock_preview_token' : null);
+  const [loading, setLoading] = useState(!isMock);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (fbUser) => {
@@ -58,8 +67,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
         }
       } else {
-        setUser(null);
-        setToken(null);
+        if (isMock) {
+          setUser({
+            id: 'test_user_id',
+            email: 'dhanushs602848@gmail.com',
+            fullName: 'Dhanush S',
+            phoneNumber: '+91 9876543210'
+          });
+          setToken('mock_preview_token');
+        } else {
+          setUser(null);
+          setToken(null);
+        }
       }
       setLoading(false);
     });
@@ -68,7 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (fbUser) {
         const idToken = await fbUser.getIdToken();
         setToken(idToken);
-      } else {
+      } else if (!isMock) {
         setToken(null);
       }
     });

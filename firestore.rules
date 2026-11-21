@@ -49,7 +49,10 @@ service cloud.firestore {
         allow update: if isHumanOwner(userId) || (
           isAuthorizedDevice(userId, deviceId) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'batteryLevel', 'lastSeen', 'locationStatus', 'trackingStatus', 'networkStatus', 'status'
+            'batteryLevel', 'lastSeen', 'locationStatus', 'trackingStatus', 'networkStatus', 'status',
+            'locationPermission', 'bluetoothStatus', 'bluetoothPermission', 'protectionStatus',
+            'protectionReason', 'protectionEnabled',
+            'lastLatitude', 'lastLongitude', 'locationAccuracy', 'lastAccuracy', 'locationSource', 'locationTimestamp', 'lastRequestId'
           ]) &&
           request.resource.data.status in ['ONLINE', 'OFFLINE']
         );
@@ -74,10 +77,10 @@ service cloud.firestore {
           allow update: if isHumanOwner(userId) || (
             isAuthorizedDevice(userId, deviceId) &&
             request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-              'status', 'result', 'executedAt', 'error', 'details', 'progress'
+              'status', 'result', 'executedAt', 'error', 'details', 'progress', 'requestId'
             ]) &&
-            request.resource.data.status in ['RECEIVED', 'ACKNOWLEDGED', 'EXECUTING', 'EXECUTED', 'FAILED'] &&
-            request.resource.data.targetDeviceId == resource.data.targetDeviceId &&
+            request.resource.data.status in ['RECEIVED', 'ACKNOWLEDGED', 'EXECUTING', 'EXECUTED', 'FAILED', 'EXPIRED'] &&
+            (!('targetDeviceId' in resource.data) || request.resource.data.targetDeviceId == resource.data.targetDeviceId) &&
             (!('command' in resource.data) || request.resource.data.command == resource.data.command) &&
             (!('commandType' in resource.data) || request.resource.data.commandType == resource.data.commandType) &&
             (!('payload' in resource.data) || request.resource.data.payload == resource.data.payload)
@@ -95,14 +98,20 @@ service cloud.firestore {
         // Human owner or any active authorized device owned by this user can create security alerts
         allow create: if isHumanOwner(userId) || (
           isAuthenticated() &&
-          request.resource.data.ownerUid == userId &&
+          (!('ownerUid' in request.resource.data) || request.resource.data.ownerUid == userId) &&
           isAuthorizedDevice(userId, request.resource.data.deviceId)
         );
-        allow update: if isHumanOwner(userId) &&
+        allow update: if (isHumanOwner(userId) &&
                       request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                         'status', 'dismissedAt', 'dismissedBy', 'resolvedAt'
                       ]) &&
-                      request.resource.data.status in ['ACTIVE', 'ACKNOWLEDGED', 'RESOLVED', 'DISMISSED'];
+                      request.resource.data.status in ['ACTIVE', 'ACKNOWLEDGED', 'RESOLVED', 'DISMISSED']) ||
+                      (isAuthenticated() &&
+                      isAuthorizedDevice(userId, resource.data.deviceId) &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                        'executionStatus', 'completedAt'
+                      ]) &&
+                      request.resource.data.executionStatus in ['STARTED', 'COMPLETED']);
         allow delete: if isHumanOwner(userId);
       }
 
@@ -116,8 +125,8 @@ service cloud.firestore {
       // Get: Any authenticated user who knows the 256-bit token hash can inspect the invitation
       allow get: if isAuthenticated();
 
-      // List: Only authenticated owners can list their own invitations
-      allow list: if isAuthenticated() && resource.data.ownerUid == request.auth.uid;
+      // List: Authenticated owners can list their own invitations, or claimants can find invitations claimed by them
+      allow list: if isAuthenticated() && (resource.data.ownerUid == request.auth.uid || resource.data.claimedByUid == request.auth.uid);
 
       // Create: Only authenticated human owner
       allow create: if isAuthenticated() &&

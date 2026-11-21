@@ -328,6 +328,13 @@ public class DeviceRegistrationActivity extends AppCompatActivity {
             public void onSuccess(Device result) {
                 binding.layoutClaimProgress.setVisibility(View.GONE);
                 binding.btnSubmitClaim.setEnabled(true);
+                com.example.securetrack.security.CommandExecutionManager.getInstance(DeviceRegistrationActivity.this).startListeningToCommands();
+
+                if (com.example.securetrack.utils.PermissionUtils.hasForegroundLocationPermission(DeviceRegistrationActivity.this)) {
+                    android.content.Intent serviceIntent = new android.content.Intent(DeviceRegistrationActivity.this, com.example.securetrack.location.LocationTrackingService.class);
+                    androidx.core.content.ContextCompat.startForegroundService(DeviceRegistrationActivity.this, serviceIntent);
+                }
+
                 Toast.makeText(DeviceRegistrationActivity.this, "Paired Successfully to Owner Account!", Toast.LENGTH_LONG).show();
                 finish();
             }

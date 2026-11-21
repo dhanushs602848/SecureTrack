@@ -30,3 +30,8 @@
 *.keystore
 *.jks
 google-services.json
+
+# Temporary dumps, screenshots and release binaries
+*.png
+ui_*.xml
+release/

@@ -160,17 +160,26 @@ public class SecurityFragment extends Fragment {
     }
 
     private void setupQuickActions() {
-        // 5s Alarm Action
+        // 5s Alarm Action with manual STOP control
         binding.btnActionAlarm.setOnClickListener(v -> {
-            AlarmSoundManager.getInstance(requireContext()).playFiveSecondAlarm(new AlarmSoundManager.AlarmCallback() {
+            AlarmSoundManager alarmManager = AlarmSoundManager.getInstance(requireContext());
+            if (alarmManager.isPlaying()) {
+                alarmManager.stopAlarm();
+                Toast.makeText(requireContext(), "Panic security siren stopped manually", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            alarmManager.playFiveSecondAlarm(new AlarmSoundManager.AlarmCallback() {
                 @Override
                 public void onAlarmStarted() {
-                    Toast.makeText(requireContext(), "Playing 5-second loud alarm...", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(requireContext(), "Playing 5-second panic security siren...", Toast.LENGTH_SHORT).show();
                 }
 
                 @Override
                 public void onAlarmCompleted(String reason) {
-                    Toast.makeText(requireContext(), "Alarm stopped: " + reason, Toast.LENGTH_SHORT).show();
+                    if (isAdded()) {
+                        Toast.makeText(requireContext(), "Siren stopped: " + reason, Toast.LENGTH_SHORT).show();
+                    }
                 }
             });
         });
@@ -358,17 +367,17 @@ public class SecurityFragment extends Fragment {
 
         adapter.setEvents(filtered);
         if (filtered.isEmpty()) {
-            binding.tvEmptyState.setVisibility(View.VISIBLE);
+            binding.tvEmptyStateCard.setVisibility(View.VISIBLE);
             binding.rvSecurityAlerts.setVisibility(View.GONE);
             if ("ACTIVE".equals(currentFilter) || "ALL".equals(currentFilter)) {
-                binding.tvEmptyState.setText("All caught up • 0 active security alerts\nTap 'Dismissed' to view alert history");
+                binding.tvEmptyState.setText("No active alerts\nYou're all clear. Your dismissed alerts remain available in history.");
             } else if ("DISMISSED".equals(currentFilter)) {
                 binding.tvEmptyState.setText("No dismissed alerts in history");
             } else {
                 binding.tvEmptyState.setText("No alerts matching current filter");
             }
         } else {
-            binding.tvEmptyState.setVisibility(View.GONE);
+            binding.tvEmptyStateCard.setVisibility(View.GONE);
             binding.rvSecurityAlerts.setVisibility(View.VISIBLE);
         }
     }

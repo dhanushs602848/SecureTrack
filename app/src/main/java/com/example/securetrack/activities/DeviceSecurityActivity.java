@@ -26,6 +26,7 @@ public class DeviceSecurityActivity extends AppCompatActivity {
     private DeviceRepository deviceRepository;
     private SessionManager sessionManager;
     private CommandAdapter adapter;
+    private com.google.firebase.firestore.ListenerRegistration commandsListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,9 +48,28 @@ public class DeviceSecurityActivity extends AppCompatActivity {
         binding.btnLocateDevice.setOnClickListener(v -> dispatchCommand("LOCATE_NOW"));
         binding.btnLockDevice.setOnClickListener(v -> dispatchCommand("LOCK_DEVICE"));
         binding.btnAlarm.setOnClickListener(v -> {
+            com.example.securetrack.security.AlarmSoundManager alarmManager = com.example.securetrack.security.AlarmSoundManager.getInstance(this);
+            if (alarmManager.isPlaying()) {
+                alarmManager.stopAlarm();
+                binding.btnAlarm.setText(com.example.securetrack.R.string.btn_alarm);
+                android.widget.Toast.makeText(this, "Panic siren stopped manually", android.widget.Toast.LENGTH_SHORT).show();
+                return;
+            }
+
             String targetId = getTargetDeviceId();
             if (targetId != null && targetId.equals(sessionManager.getCurrentDeviceId())) {
-                com.example.securetrack.security.AlarmSoundManager.getInstance(this).playFiveSecondAlarm(null);
+                binding.btnAlarm.setText("Stop Siren");
+                alarmManager.playFiveSecondAlarm(new com.example.securetrack.security.AlarmSoundManager.AlarmCallback() {
+                    @Override
+                    public void onAlarmStarted() {
+                        android.widget.Toast.makeText(DeviceSecurityActivity.this, "Panic security siren active (5s)", android.widget.Toast.LENGTH_SHORT).show();
+                    }
+
+                    @Override
+                    public void onAlarmCompleted(String reason) {
+                        runOnUiThread(() -> binding.btnAlarm.setText(com.example.securetrack.R.string.btn_alarm));
+                    }
+                });
             }
             dispatchCommand("ALARM_ALERT");
         });
@@ -57,14 +77,33 @@ public class DeviceSecurityActivity extends AppCompatActivity {
         binding.btnRevokeDevice.setOnClickListener(v -> confirmRevocation());
 
         setupDeviceAdminSwitch();
-        loadCommandHistory();
+        subscribeToCommands();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         binding.switchDeviceAdmin.setChecked(SecureAdminReceiver.isAdminActive(this));
-        loadCommandHistory();
+        subscribeToCommands();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        stopCommandsListener();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        stopCommandsListener();
+    }
+
+    private void stopCommandsListener() {
+        if (commandsListener != null) {
+            commandsListener.remove();
+            commandsListener = null;
+        }
     }
 
     private void setupTargetDeviceHeader() {
@@ -126,12 +165,16 @@ public class DeviceSecurityActivity extends AppCompatActivity {
             return;
         }
 
+        String toastMsg = "LOCATE_NOW".equalsIgnoreCase(commandType)
+                ? "Locate request dispatched • Waiting for target..."
+                : "Command Sent";
+        Toast.makeText(DeviceSecurityActivity.this, toastMsg, Toast.LENGTH_SHORT).show();
+
         DeviceCommand cmd = new DeviceCommand(commandType, "QUEUED", "Manual trigger from security dashboard", "");
         securityRepository.createCommand(deviceId, cmd, new SecurityRepository.ApiCallback<DeviceCommand>() {
             @Override
             public void onSuccess(DeviceCommand result) {
-                Toast.makeText(DeviceSecurityActivity.this, "Command Sent", Toast.LENGTH_SHORT).show();
-                loadCommandHistory();
+                // Real-time listener will automatically update the list
             }
 
             @Override
@@ -141,11 +184,12 @@ public class DeviceSecurityActivity extends AppCompatActivity {
         });
     }
 
-    private void loadCommandHistory() {
+    private void subscribeToCommands() {
+        stopCommandsListener();
         String deviceId = getTargetDeviceId();
         if (deviceId == null) return;
 
-        securityRepository.getDeviceCommands(deviceId, new SecurityRepository.ApiCallback<List<DeviceCommand>>() {
+        commandsListener = securityRepository.listenToDeviceCommands(deviceId, new SecurityRepository.ApiCallback<List<DeviceCommand>>() {
             @Override
             public void onSuccess(List<DeviceCommand> result) {
                 if (result == null || result.isEmpty()) {
@@ -162,27 +206,36 @@ public class DeviceSecurityActivity extends AppCompatActivity {
 
             @Override
             public void onError(String errorMessage) {
-                binding.tvEmptyCommands.setVisibility(View.VISIBLE);
-                binding.tvCommandsCount.setText("0 commands");
-                Toast.makeText(DeviceSecurityActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
+                securityRepository.getDeviceCommands(deviceId, new SecurityRepository.ApiCallback<List<DeviceCommand>>() {
+                    @Override
+                    public void onSuccess(List<DeviceCommand> list) {
+                        if (list == null || list.isEmpty()) {
+                            binding.tvEmptyCommands.setVisibility(View.VISIBLE);
+                            binding.tvCommandsCount.setText("0 commands");
+                            adapter.setCommands(new ArrayList<>());
+                        } else {
+                            binding.tvEmptyCommands.setVisibility(View.GONE);
+                            binding.tvCommandsCount.setText(list.size() + " commands");
+                            adapter.setCommands(list);
+                        }
+                    }
+
+                    @Override
+                    public void onError(String err) {
+                        binding.tvEmptyCommands.setVisibility(View.VISIBLE);
+                        binding.tvCommandsCount.setText("0 commands");
+                    }
+                });
             }
         });
     }
 
     private void confirmWipeDevice() {
         new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("CRITICAL: Factory Reset Device")
-                .setMessage("Factory resetting will permanently erase ALL user data, apps, accounts, and storage on this device. This operation CANNOT be undone.\n\nAre you sure you wish to proceed?")
-                .setIcon(android.R.drawable.ic_dialog_alert)
-                .setPositiveButton("Continue to Verification", (dialog, which) -> {
-                    new androidx.appcompat.app.AlertDialog.Builder(this)
-                            .setTitle("Final Confirmation: Erase Everything")
-                            .setMessage("Please confirm that you understand this target device will immediately reboot and factory wipe all data.")
-                            .setPositiveButton("CONFIRM WIPE", (d2, w2) -> dispatchCommand("WIPE_DEVICE"))
-                            .setNegativeButton("Cancel", null)
-                            .show();
-                })
-                .setNegativeButton("Cancel", null)
+                .setTitle("Remote Wipe Feature Disabled")
+                .setMessage("Factory wipe operations are strictly disabled in this build to protect against accidental data loss.")
+                .setIcon(android.R.drawable.ic_dialog_info)
+                .setPositiveButton("OK", null)
                 .show();
     }
 

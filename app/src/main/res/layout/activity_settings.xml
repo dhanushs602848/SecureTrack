@@ -48,7 +48,7 @@
             android:orientation="vertical"
             android:paddingBottom="24dp">
 
-            <!-- Emergency & Recovery Contacts Card -->
+            <!-- APPEARANCE & THEME CUSTOMISATION (MANDATORY 3 MODES) -->
             <androidx.cardview.widget.CardView
                 style="@style/Widget.SecureTrack.Card"
                 android:layout_width="match_parent"
@@ -64,8 +64,351 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:text="Appearance"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="Choose how SecureTrack looks on your device"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp" />
+
+                    <!-- 3 Theme Preview Cards -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:orientation="horizontal"
+                        android:weightSum="3">
+
+                        <!-- 1. LIGHT MODE PREVIEW CARD -->
+                        <LinearLayout
+                            android:id="@+id/card_theme_light"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="5dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_theme_card_unselected"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center"
+                            android:orientation="vertical"
+                            android:padding="10dp">
+
+                            <!-- Miniature Light Mockup -->
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="72dp"
+                                android:background="#FFFFFF"
+                                android:elevation="1dp"
+                                android:orientation="vertical"
+                                android:padding="4dp">
+
+                                <!-- Mini Header -->
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="12dp"
+                                    android:background="#F8FAFC"
+                                    android:gravity="center_vertical"
+                                    android:paddingHorizontal="4dp">
+
+                                    <View
+                                        android:layout_width="6dp"
+                                        android:layout_height="6dp"
+                                        android:background="#4F46E5" />
+
+                                    <View
+                                        android:layout_width="20dp"
+                                        android:layout_height="3dp"
+                                        android:layout_marginStart="3dp"
+                                        android:background="#0F172A" />
+                                </LinearLayout>
+
+                                <!-- Mini Card -->
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="34dp"
+                                    android:layout_margin="3dp"
+                                    android:background="#F1F5F9"
+                                    android:orientation="vertical"
+                                    android:padding="3dp">
+
+                                    <View
+                                        android:layout_width="24dp"
+                                        android:layout_height="3dp"
+                                        android:background="#0284C7" />
+
+                                    <View
+                                        android:layout_width="16dp"
+                                        android:layout_height="2dp"
+                                        android:layout_marginTop="3dp"
+                                        android:background="#94A3B8" />
+                                </LinearLayout>
+
+                                <!-- Mini Nav Bar -->
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="10dp"
+                                    android:layout_marginTop="4dp"
+                                    android:background="#FFFFFF"
+                                    android:gravity="center">
+
+                                    <View
+                                        android:layout_width="8dp"
+                                        android:layout_height="3dp"
+                                        android:background="#4F46E5" />
+
+                                    <View
+                                        android:layout_width="8dp"
+                                        android:layout_height="3dp"
+                                        android:layout_marginStart="4dp"
+                                        android:background="#CBD5E1" />
+                                </LinearLayout>
+                            </LinearLayout>
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:text="Light"
+                                android:textColor="@color/text_primary"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+
+                            <ImageView
+                                android:id="@+id/iv_check_light"
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
+                                android:layout_marginTop="4dp"
+                                android:contentDescription="Selected"
+                                android:src="@drawable/ic_check_circle"
+                                android:visibility="invisible" />
+                        </LinearLayout>
+
+                        <!-- 2. DARK MODE PREVIEW CARD -->
+                        <LinearLayout
+                            android:id="@+id/card_theme_dark"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginHorizontal="2.5dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_theme_card_unselected"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center"
+                            android:orientation="vertical"
+                            android:padding="10dp">
+
+                            <!-- Miniature Dark Mockup -->
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="72dp"
+                                android:background="#0A0E17"
+                                android:orientation="vertical"
+                                android:padding="4dp">
+
+                                <!-- Mini Header -->
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="12dp"
+                                    android:background="#0F172A"
+                                    android:gravity="center_vertical"
+                                    android:paddingHorizontal="4dp">
+
+                                    <View
+                                        android:layout_width="6dp"
+                                        android:layout_height="6dp"
+                                        android:background="#00D2FF" />
+
+                                    <View
+                                        android:layout_width="20dp"
+                                        android:layout_height="3dp"
+                                        android:layout_marginStart="3dp"
+                                        android:background="#F8FAFC" />
+                                </LinearLayout>
+
+                                <!-- Mini Card -->
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="34dp"
+                                    android:layout_margin="3dp"
+                                    android:background="#121927"
+                                    android:orientation="vertical"
+                                    android:padding="3dp">
+
+                                    <View
+                                        android:layout_width="24dp"
+                                        android:layout_height="3dp"
+                                        android:background="#00D2FF" />
+
+                                    <View
+                                        android:layout_width="16dp"
+                                        android:layout_height="2dp"
+                                        android:layout_marginTop="3dp"
+                                        android:background="#64748B" />
+                                </LinearLayout>
+
+                                <!-- Mini Nav Bar -->
+                                <LinearLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="10dp"
+                                    android:layout_marginTop="4dp"
+                                    android:background="#0F172A"
+                                    android:gravity="center">
+
+                                    <View
+                                        android:layout_width="8dp"
+                                        android:layout_height="3dp"
+                                        android:background="#00D2FF" />
+
+                                    <View
+                                        android:layout_width="8dp"
+                                        android:layout_height="3dp"
+                                        android:layout_marginStart="4dp"
+                                        android:background="#334155" />
+                                </LinearLayout>
+                            </LinearLayout>
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:text="Dark"
+                                android:textColor="@color/text_primary"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+
+                            <ImageView
+                                android:id="@+id/iv_check_dark"
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
+                                android:layout_marginTop="4dp"
+                                android:contentDescription="Selected"
+                                android:src="@drawable/ic_check_circle"
+                                android:visibility="invisible" />
+                        </LinearLayout>
+
+                        <!-- 3. SYSTEM DEFAULT PREVIEW CARD -->
+                        <LinearLayout
+                            android:id="@+id/card_theme_system"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="5dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_theme_card_unselected"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center"
+                            android:orientation="vertical"
+                            android:padding="10dp">
+
+                            <!-- Miniature Split Mockup (Light half / Dark half) -->
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="72dp"
+                                android:orientation="horizontal">
+
+                                <!-- Light Half -->
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="match_parent"
+                                    android:layout_weight="1"
+                                    android:background="#FFFFFF"
+                                    android:orientation="vertical"
+                                    android:padding="3dp">
+
+                                    <View
+                                        android:layout_width="match_parent"
+                                        android:layout_height="8dp"
+                                        android:background="#4F46E5" />
+
+                                    <View
+                                        android:layout_width="match_parent"
+                                        android:layout_height="22dp"
+                                        android:layout_marginTop="4dp"
+                                        android:background="#F1F5F9" />
+
+                                    <View
+                                        android:layout_width="match_parent"
+                                        android:layout_height="6dp"
+                                        android:layout_marginTop="4dp"
+                                        android:background="#E2E8F0" />
+                                </LinearLayout>
+
+                                <!-- Dark Half -->
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="match_parent"
+                                    android:layout_weight="1"
+                                    android:background="#0A0E17"
+                                    android:orientation="vertical"
+                                    android:padding="3dp">
+
+                                    <View
+                                        android:layout_width="match_parent"
+                                        android:layout_height="8dp"
+                                        android:background="#00D2FF" />
+
+                                    <View
+                                        android:layout_width="match_parent"
+                                        android:layout_height="22dp"
+                                        android:layout_marginTop="4dp"
+                                        android:background="#121927" />
+
+                                    <View
+                                        android:layout_width="match_parent"
+                                        android:layout_height="6dp"
+                                        android:layout_marginTop="4dp"
+                                        android:background="#1E293B" />
+                                </LinearLayout>
+                            </LinearLayout>
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:text="System"
+                                android:textColor="@color/text_primary"
+                                android:textSize="13sp"
+                                android:textStyle="bold" />
+
+                            <ImageView
+                                android:id="@+id/iv_check_system"
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
+                                android:layout_marginTop="4dp"
+                                android:contentDescription="Selected"
+                                android:src="@drawable/ic_check_circle"
+                                android:visibility="invisible" />
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- Emergency & Recovery Contacts Card -->
+            <androidx.cardview.widget.CardView
+                style="@style/Widget.SecureTrack.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
                         android:text="Emergency Recovery Info"
-                        android:textColor="@color/primary_navy"
+                        android:textColor="@color/text_primary"
                         android:textSize="16sp"
                         android:textStyle="bold" />
 
@@ -152,7 +495,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Anti-Theft Protection Triggers"
-                        android:textColor="@color/primary_navy"
+                        android:textColor="@color/text_primary"
                         android:textSize="16sp"
                         android:textStyle="bold" />
 
@@ -299,7 +642,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Device Policy Administrator"
-                        android:textColor="@color/primary_navy"
+                        android:textColor="@color/text_primary"
                         android:textSize="16sp"
                         android:textStyle="bold" />
 
@@ -331,7 +674,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Checking..."
-                            android:textColor="@color/primary_navy"
+                            android:textColor="@color/text_primary"
                             android:textSize="14sp"
                             android:textStyle="bold" />
                     </LinearLayout>
@@ -343,7 +686,7 @@
                         android:layout_marginTop="12dp"
                         android:background="@drawable/bg_secondary_button"
                         android:text="Manage Device Admin"
-                        android:textColor="@color/primary_navy"
+                        android:textColor="@color/text_primary"
                         android:textSize="14sp"
                         app:backgroundTint="@null" />
                 </LinearLayout>
@@ -366,7 +709,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="System &amp; Cloud"
-                        android:textColor="@color/primary_navy"
+                        android:textColor="@color/text_primary"
                         android:textSize="16sp"
                         android:textStyle="bold" />
 
@@ -416,7 +759,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="256-Bit Cryptographic Pairing"
-                            android:textColor="@color/primary_navy"
+                            android:textColor="@color/text_primary"
                             android:textSize="13sp"
                             android:textStyle="bold" />
                     </LinearLayout>
@@ -443,7 +786,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="1.0.0 (Release)"
+                            android:text="1.2.0 (Premium)"
                             android:textColor="@color/text_primary"
                             android:textSize="14sp"
                             android:textStyle="bold" />
@@ -451,7 +794,7 @@
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
-            <!-- Hidden developer / backend API layout kept for backward compatibility but completely invisible to users -->
+            <!-- Hidden developer / backend API layout kept for backward compatibility -->
             <LinearLayout
                 android:id="@+id/layout_dev_settings"
                 android:layout_width="match_parent"

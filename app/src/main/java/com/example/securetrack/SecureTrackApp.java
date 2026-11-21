@@ -11,6 +11,7 @@ public class SecureTrackApp extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        com.example.securetrack.utils.SessionManager.applySavedTheme(this);
         FirebaseApp.initializeApp(this);
 
         FirebaseAppCheck firebaseAppCheck = FirebaseAppCheck.getInstance();
@@ -25,5 +26,6 @@ public class SecureTrackApp extends Application {
         }
 
         com.example.securetrack.sync.DurableSyncManager.initializePeriodicSync(this);
+        com.example.securetrack.security.CommandExecutionManager.getInstance(this).startListeningToCommands();
     }
 }

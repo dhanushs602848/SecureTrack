@@ -1,17 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
+    <!-- Base application theme (LIGHT) -->
     <style name="Base.Theme.SecureTrack" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/electric_cyan</item>
-        <item name="colorOnPrimary">#0A0E17</item>
-        <item name="colorPrimaryContainer">#182234</item>
-        <item name="colorOnPrimaryContainer">@color/electric_cyan</item>
+        <item name="colorPrimary">@color/electric_blue</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorPrimaryContainer">@color/light_blue</item>
+        <item name="colorOnPrimaryContainer">@color/electric_blue</item>
         <item name="colorSecondary">@color/electric_violet</item>
         <item name="colorOnSecondary">@color/white</item>
+        <item name="colorSurface">@color/card_bg</item>
+        <item name="colorOnSurface">@color/text_primary</item>
         <item name="android:statusBarColor">@color/bg_app</item>
-        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowBackground">@color/bg_app</item>
-        <item name="android:navigationBarColor">#0A0E17</item>
+        <item name="android:navigationBarColor">@color/bg_app</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">true</item>
 
         <!-- High-visibility text input defaults -->
         <item name="android:editTextColor">@color/input_text</item>
@@ -26,7 +29,7 @@
     <style name="Widget.SecureTrack.Card" parent="Widget.Material3.CardView.Elevated">
         <item name="cardBackgroundColor">@color/card_bg</item>
         <item name="cardCornerRadius">18dp</item>
-        <item name="cardElevation">0dp</item>
+        <item name="cardElevation">2dp</item>
         <item name="strokeColor">@color/border_color</item>
         <item name="strokeWidth">1dp</item>
     </style>

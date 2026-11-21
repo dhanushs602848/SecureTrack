@@ -22,9 +22,9 @@
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/app_name"
+            android:contentDescription="Back"
             android:src="@android:drawable/ic_menu_revert"
-            app:tint="@color/primary_navy" />
+            app:tint="@color/text_primary" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -42,7 +42,7 @@
                 android:letterSpacing="-0.01"
                 android:maxLines="1"
                 android:text="@string/device_security"
-                android:textColor="@color/primary_navy"
+                android:textColor="@color/text_primary"
                 android:textSize="20sp"
                 android:textStyle="bold" />
 
@@ -67,7 +67,11 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        app:cardElevation="1dp">
+        app:cardBackgroundColor="@color/card_bg"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="1dp"
+        app:strokeColor="@color/border_color"
+        app:strokeWidth="1dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -80,7 +84,6 @@
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="12dp"
                 android:layout_weight="1"
                 android:orientation="vertical">
 
@@ -89,51 +92,48 @@
                     android:layout_height="wrap_content"
                     android:fontFamily="sans-serif-medium"
                     android:includeFontPadding="false"
-                    android:letterSpacing="-0.005"
                     android:text="@string/device_admin_status"
-                    android:textColor="@color/primary_navy"
-                    android:textSize="15sp"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
 
                 <TextView
-                    android:id="@+id/tv_admin_desc"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="2dp"
                     android:fontFamily="sans-serif"
-                    android:letterSpacing="0.01"
-                    android:lineSpacingExtra="2dp"
+                    android:includeFontPadding="false"
                     android:text="@string/device_admin_desc"
                     android:textColor="@color/text_secondary"
-                    android:textSize="12.5sp" />
+                    android:textSize="11.5sp" />
             </LinearLayout>
 
             <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/switch_device_admin"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp" />
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
-    <!-- Remote Actions Section Header -->
+    <!-- Remote Defense Action Header -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="18dp"
+        android:layout_marginTop="20dp"
         android:fontFamily="sans-serif-medium"
         android:includeFontPadding="false"
-        android:letterSpacing="0.04"
+        android:letterSpacing="-0.01"
         android:text="@string/remote_actions"
-        android:textAllCaps="true"
-        android:textColor="@color/primary_navy"
-        android:textSize="12.5sp"
+        android:textColor="@color/text_primary"
+        android:textSize="15sp"
         android:textStyle="bold" />
 
-    <!-- 4 Action Buttons Row -->
+    <!-- 4 Command Buttons Grid -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="10dp"
         android:orientation="horizontal"
         android:weightSum="4">
 
@@ -156,7 +156,7 @@
             android:textColor="@color/white"
             android:textSize="12sp"
             android:textStyle="bold"
-            app:backgroundTint="#00897B"
+            app:backgroundTint="@color/status_success"
             app:cornerRadius="10dp" />
 
         <com.google.android.material.button.MaterialButton
@@ -178,7 +178,7 @@
             android:textColor="@color/white"
             android:textSize="12sp"
             android:textStyle="bold"
-            app:backgroundTint="#255DA8"
+            app:backgroundTint="@color/electric_blue"
             app:cornerRadius="10dp" />
 
         <com.google.android.material.button.MaterialButton
@@ -200,7 +200,7 @@
             android:textColor="@color/white"
             android:textSize="12sp"
             android:textStyle="bold"
-            app:backgroundTint="#FF9800"
+            app:backgroundTint="@color/amber_warning"
             app:cornerRadius="10dp" />
 
         <com.google.android.material.button.MaterialButton
@@ -222,7 +222,7 @@
             android:textColor="@color/white"
             android:textSize="12sp"
             android:textStyle="bold"
-            app:backgroundTint="#D32F2F"
+            app:backgroundTint="@color/status_error"
             app:cornerRadius="10dp" />
     </LinearLayout>
 
@@ -240,11 +240,11 @@
         android:letterSpacing="0.01"
         android:text="@string/revoke_device_access"
         android:textAllCaps="false"
-        android:textColor="#BA1A1A"
+        android:textColor="@color/status_error"
         android:textSize="13.5sp"
-        app:backgroundTint="#FFF5F5"
+        app:backgroundTint="@color/card_bg"
         app:cornerRadius="10dp"
-        app:strokeColor="#FFCDD2"
+        app:strokeColor="@color/status_error"
         app:strokeWidth="1dp" />
 
     <!-- Command History Header -->
@@ -263,25 +263,22 @@
             android:includeFontPadding="false"
             android:letterSpacing="-0.01"
             android:text="@string/command_history"
-            android:textColor="@color/primary_navy"
-            android:textSize="16.5sp"
+            android:textColor="@color/text_primary"
+            android:textSize="15sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/tv_commands_count"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_badge_info"
-            android:fontFamily="sans-serif-medium"
-            android:letterSpacing="0.02"
-            android:paddingHorizontal="8dp"
-            android:paddingVertical="2dp"
-            android:textColor="@color/primary_blue"
-            android:textSize="11sp"
-            tools:text="1 command" />
+            android:fontFamily="sans-serif"
+            android:includeFontPadding="false"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            tools:text="0 commands" />
     </LinearLayout>
 
-    <!-- Empty State -->
+    <!-- Empty Commands Placeholder -->
     <TextView
         android:id="@+id/tv_empty_commands"
         android:layout_width="match_parent"
@@ -294,14 +291,15 @@
         android:textSize="13sp"
         android:visibility="gone" />
 
-    <!-- Commands List -->
+    <!-- Commands Recycler View -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rv_commands"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="8dp"
         android:layout_weight="1"
         android:clipToPadding="false"
-        android:paddingBottom="8dp" />
+        android:paddingBottom="12dp"
+        tools:listitem="@layout/item_command" />
 
 </LinearLayout>

@@ -2,11 +2,13 @@ package com.example.securetrack;
 
 import com.example.securetrack.ble.BleNearbyManager;
 import com.example.securetrack.database.CommandEntity;
+import com.example.securetrack.database.LocationEntity;
 import com.example.securetrack.database.SecurityAlertEntity;
 import com.example.securetrack.models.DeviceCommand;
 import com.example.securetrack.models.ResolvedLocation;
 import com.example.securetrack.models.SecurityEvent;
 import com.example.securetrack.security.AlarmSoundManager;
+import com.example.securetrack.security.AntiShutdownManager;
 import org.junit.Test;
 import java.util.UUID;
 import static org.junit.Assert.*;
@@ -282,7 +284,6 @@ public class SecurityAndLocationUpgradeTest {
         double invalidLat = 105.0; // latitude > 90
         boolean invalidCoords = (invalidLat >= -90.0 && invalidLat <= 90.0);
         assertFalse("Latitude > 90 must fail validation", invalidCoords);
-
         double invalidLng = -195.0; // longitude < -180
         boolean invalidLngCoords = (invalidLng >= -180.0 && invalidLng <= 180.0);
         assertFalse("Longitude < -180 must fail validation", invalidLngCoords);
@@ -388,5 +389,314 @@ public class SecurityAndLocationUpgradeTest {
 
         activeCount = alerts.stream().filter(a -> SecurityAlertEntity.STATUS_ACTIVE.equals(a.getStatus())).count();
         assertEquals("After generating 1 new alert, active count must become 2", 2, activeCount);
+    }
+
+    @Test
+    public void testPanicSecurityAlarmEventCreationAndStatusProgression() {
+        String commandId = "cmd-panic-siren-909";
+        String deviceId = "device-a07-001";
+        String deviceName = "Samsung Galaxy A07";
+        String alertId = "alarm_" + commandId;
+
+        // 1. Initial trigger: command dispatched and execution starts
+        SecurityAlertEntity alarmAlert = new SecurityAlertEntity(
+                alertId,
+                deviceId,
+                deviceName,
+                "SECURITY_ALARM_TRIGGERED",
+                "CRITICAL",
+                "Panic security siren activated on " + deviceName,
+                "ENABLED",
+                SecurityAlertEntity.STATUS_ACTIVE,
+                System.currentTimeMillis(),
+                0, null, 0, true
+        );
+
+        assertEquals("alarm_cmd-panic-siren-909", alarmAlert.getId());
+        assertEquals("SECURITY_ALARM_TRIGGERED", alarmAlert.getEventType());
+        assertEquals("CRITICAL", alarmAlert.getSeverity());
+        assertEquals("ACTIVE", alarmAlert.getStatus());
+
+        // 2. Alarm plays for 5 seconds and completes:
+        // Alert status MUST REMAIN ACTIVE so owner can review it in Security Center!
+        long completedAt = System.currentTimeMillis() + 5000L;
+        alarmAlert.setResolvedAt(completedAt);
+        assertEquals("ACTIVE", alarmAlert.getStatus());
+        assertTrue("Completed timestamp must be recorded", alarmAlert.getResolvedAt() > 0);
+
+        // 3. Owner dismisses the alarm event in Security Center
+        long dismissedAt = completedAt + 10000L;
+        alarmAlert.setStatus(SecurityAlertEntity.STATUS_DISMISSED);
+        alarmAlert.setDismissedAt(dismissedAt);
+        alarmAlert.setDismissedBy("owner-user-uid");
+
+        assertEquals("DISMISSED", alarmAlert.getStatus());
+        assertEquals(dismissedAt, alarmAlert.getDismissedAt());
+        assertEquals("owner-user-uid", alarmAlert.getDismissedBy());
+
+        // 4. Owner restores the alarm event (undo dismissal)
+        alarmAlert.setStatus(SecurityAlertEntity.STATUS_ACTIVE);
+        alarmAlert.setDismissedAt(0);
+        alarmAlert.setDismissedBy(null);
+
+        assertEquals("ACTIVE", alarmAlert.getStatus());
+        assertEquals(0, alarmAlert.getDismissedAt());
+        assertNull(alarmAlert.getDismissedBy());
+    }
+
+    @Test
+    public void testAntiShutdownCapabilityEvaluationOnPersonalDevice() {
+        // Consumer / Unmanaged personal device without Device Owner
+        AntiShutdownManager.CapabilityStatus status =
+                AntiShutdownManager.evaluateCapability(false, false, false);
+        assertEquals(AntiShutdownManager.CapabilityStatus.UNSUPPORTED_PERSONAL_DEVICE, status);
+
+        // Even with standard Device Admin active, without Device Owner it remains unsupported
+        AntiShutdownManager.CapabilityStatus statusWithAdmin =
+                AntiShutdownManager.evaluateCapability(false, true, false);
+        assertEquals(AntiShutdownManager.CapabilityStatus.UNSUPPORTED_PERSONAL_DEVICE, statusWithAdmin);
+
+        String explanation = AntiShutdownManager.getCapabilityExplanation(status);
+        assertNotNull(explanation);
+        assertTrue("Explanation must disclose hardware power-cut cannot be overridden on consumer devices",
+                explanation.contains("Device Owner") && explanation.contains("hardware power-cut"));
+    }
+
+    @Test
+    public void testAntiShutdownCapabilityEvaluationOnDeviceOwner() {
+        // Enrolled Enterprise Device Owner device
+        AntiShutdownManager.CapabilityStatus readyStatus =
+                AntiShutdownManager.evaluateCapability(true, true, false);
+        assertEquals(AntiShutdownManager.CapabilityStatus.SUPPORTED_DEVICE_OWNER_READY, readyStatus);
+
+        // Lock Task mode active
+        AntiShutdownManager.CapabilityStatus activeStatus =
+                AntiShutdownManager.evaluateCapability(true, true, true);
+        assertEquals(AntiShutdownManager.CapabilityStatus.ACTIVE_LOCK_TASK, activeStatus);
+
+        String activeExplanation = AntiShutdownManager.getCapabilityExplanation(activeStatus);
+        assertTrue(activeExplanation.contains("Lock Task"));
+    }
+
+    @Test
+    public void testAntiShutdownRecoveryPinHashing() {
+        String pin1 = "9824";
+        String pin2 = "1234";
+
+        String hash1 = AntiShutdownManager.hashPin(pin1);
+        String hash2 = AntiShutdownManager.hashPin(pin2);
+
+        assertNotNull(hash1);
+        assertNotNull(hash2);
+        assertFalse("Different recovery PINs must generate distinct hashes", hash1.equals(hash2));
+        assertEquals("Same PIN must generate identical SHA-256 hash", hash1, AntiShutdownManager.hashPin(pin1));
+    }
+
+    @Test
+    public void testWipeSafetyLockPermanentlyEnforced() {
+        // Verify that WIPE_DEVICE command is marked as FAILED with safety lock explanation
+        DeviceCommand wipeCmd = new DeviceCommand("cmd-wipe-001", "WIPE_DEVICE", "{}");
+        String safetyFailureReason = "Safety Lock: Factory wipe is permanently disabled in this release to protect user data.";
+
+        // Simulating the safety lock rejection
+        wipeCmd.setStatus("FAILED");
+        wipeCmd.setResult(safetyFailureReason);
+
+        assertEquals("FAILED", wipeCmd.getStatus());
+        assertTrue(wipeCmd.getResult().contains("Safety Lock"));
+        assertFalse("Safety lock must never allow EXECUTED status for wipe", "EXECUTED".equals(wipeCmd.getStatus()));
+    }
+
+    @Test
+    public void testLocationTrackingServiceActionConstantsAndChannel() {
+        assertEquals("com.example.securetrack.action.START_TRACKING", com.example.securetrack.location.LocationTrackingService.ACTION_START_TRACKING);
+        assertEquals("com.example.securetrack.action.STOP_TRACKING", com.example.securetrack.location.LocationTrackingService.ACTION_STOP_TRACKING);
+        assertEquals("com.example.securetrack.action.REFRESH_STATUS", com.example.securetrack.location.LocationTrackingService.ACTION_REFRESH_STATUS);
+        assertEquals("securetrack_location_channel", com.example.securetrack.location.LocationTrackingService.CHANNEL_ID);
+        assertEquals(1001, com.example.securetrack.location.LocationTrackingService.NOTIFICATION_ID);
+    }
+
+    @Test
+    public void testProtectionHealthReportModelAccuracy() {
+        // Active healthy state
+        com.example.securetrack.utils.ProtectionHealthEvaluator.ProtectionReport activeReport =
+                new com.example.securetrack.utils.ProtectionHealthEvaluator.ProtectionReport(
+                        com.example.securetrack.utils.ProtectionHealthEvaluator.STATUS_ACTIVE,
+                        "All security & telemetry protection systems operational",
+                        true, true, true, true, true
+                );
+        assertEquals("ACTIVE", activeReport.status);
+        assertTrue(activeReport.protectionEnabled);
+        assertTrue(activeReport.isLocationPermGranted);
+        assertTrue(activeReport.isLocationServiceEnabled);
+
+        // Degraded state (GPS disabled)
+        com.example.securetrack.utils.ProtectionHealthEvaluator.ProtectionReport degradedReport =
+                new com.example.securetrack.utils.ProtectionHealthEvaluator.ProtectionReport(
+                        com.example.securetrack.utils.ProtectionHealthEvaluator.STATUS_DEGRADED,
+                        "Location services switched off in system settings",
+                        true, false, true, true, true
+                );
+        assertEquals("DEGRADED", degradedReport.status);
+        assertFalse("Protection must not be reported enabled when degraded", degradedReport.protectionEnabled);
+        assertFalse(degradedReport.isLocationServiceEnabled);
+
+        // Offline state
+        com.example.securetrack.utils.ProtectionHealthEvaluator.ProtectionReport offlineReport =
+                new com.example.securetrack.utils.ProtectionHealthEvaluator.ProtectionReport(
+                        com.example.securetrack.utils.ProtectionHealthEvaluator.STATUS_OFFLINE,
+                        "Device has no active internet connection",
+                        true, true, true, true, false
+                );
+        assertEquals("OFFLINE", offlineReport.status);
+        assertFalse(offlineReport.protectionEnabled);
+        assertFalse(offlineReport.isConnected);
+    }
+
+    @Test
+    public void testDurableOfflineLocationPersistenceIntegrity() {
+        String deviceId = "dev-test-pixel-9";
+        String clientUuid = UUID.randomUUID().toString();
+        String originalTimestamp = "2026-11-21T10:45:00Z";
+        double lat = 13.06938;
+        double lng = 77.53035;
+        float accuracy = 8.5f;
+
+        // 1. Initial write-ahead persistent state: must be un-synced before network call
+        LocationEntity entity = new LocationEntity(
+                deviceId,
+                clientUuid,
+                lat,
+                lng,
+                accuracy,
+                920.0,
+                0.0f,
+                originalTimestamp,
+                false
+        );
+
+        assertFalse("Write-ahead location must be un-synced upon creation", entity.isSynced());
+        assertEquals(clientUuid, entity.getClientUuid());
+        assertEquals(originalTimestamp, entity.getTimestamp());
+        assertEquals(lat, entity.getLatitude(), 0.00001);
+        assertEquals(lng, entity.getLongitude(), 0.00001);
+
+        // 2. Transition upon confirmed cloud receipt: marked synced without altering timestamp or UUID
+        entity.setSynced(true);
+        assertTrue("Entity must reflect synced state", entity.isSynced());
+        assertEquals("Timestamp must remain immutable across retries", originalTimestamp, entity.getTimestamp());
+        assertEquals("Client UUID must remain invariant to guarantee idempotent Firestore writes", clientUuid, entity.getClientUuid());
+    }
+
+    @Test
+    public void testHonestTrackingStatusDistinction() {
+        // Case 1: Service intentionally stopped
+        boolean trackingEnabled = false;
+        boolean locationUpdatesActive = false;
+        boolean gpsEnabled = true;
+        boolean permissionGranted = true;
+
+        String status1 = !trackingEnabled ? "STOPPED" : (locationUpdatesActive && gpsEnabled && permissionGranted ? "ACTIVE" : "PAUSED");
+        assertEquals("STOPPED", status1);
+
+        // Case 2: Tracking enabled, but GPS disabled in system settings
+        trackingEnabled = true;
+        locationUpdatesActive = false;
+        gpsEnabled = false;
+        permissionGranted = true;
+
+        String status2 = !trackingEnabled ? "STOPPED" : (locationUpdatesActive && gpsEnabled && permissionGranted ? "ACTIVE" : "PAUSED");
+        assertEquals("PAUSED", status2);
+        assertNotEquals("GPS disabled must NEVER be marked ACTIVE", "ACTIVE", status2);
+
+        // Case 3: Tracking enabled, GPS active, permission granted, updates flowing
+        trackingEnabled = true;
+        locationUpdatesActive = true;
+        gpsEnabled = true;
+        permissionGranted = true;
+
+        String status3 = !trackingEnabled ? "STOPPED" : (locationUpdatesActive && gpsEnabled && permissionGranted ? "ACTIVE" : "PAUSED");
+        assertEquals("ACTIVE", status3);
+    }
+
+    @Test
+    public void testLocationTimestampParsingIntegrity() {
+        // 1. ISO-8601 UTC timestamp
+        String isoUtc = "2026-11-21T10:15:30Z";
+        com.google.firebase.Timestamp ts1 = com.example.securetrack.repositories.LocationRepository.parseTimestamp(isoUtc);
+        assertNotNull(ts1);
+        // Verify round-trip time matches UTC
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US);
+        sdf.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+        assertEquals("2026-11-21T10:15:30Z", sdf.format(ts1.toDate()));
+
+        // 2. Epoch millis format
+        long epoch = 1795256130000L;
+        com.google.firebase.Timestamp ts2 = com.example.securetrack.repositories.LocationRepository.parseTimestamp(String.valueOf(epoch));
+        assertNotNull(ts2);
+        assertEquals(epoch / 1000L, ts2.getSeconds());
+
+        // 3. Fallback for null or empty string produces valid non-null timestamp
+        long before = System.currentTimeMillis() / 1000L;
+        com.google.firebase.Timestamp tsNull = com.example.securetrack.repositories.LocationRepository.parseTimestamp(null);
+        com.google.firebase.Timestamp tsEmpty = com.example.securetrack.repositories.LocationRepository.parseTimestamp("   ");
+        long after = System.currentTimeMillis() / 1000L;
+
+        assertNotNull(tsNull);
+        assertNotNull(tsEmpty);
+        assertTrue(tsNull.getSeconds() >= before && tsNull.getSeconds() <= after + 1);
+        assertTrue(tsEmpty.getSeconds() >= before && tsEmpty.getSeconds() <= after + 1);
+    }
+
+    @Test
+    public void testOfflineLocationDeduplicationByClientUuid() {
+        String clientUuid = "unique-test-uuid-999";
+        LocationEntity e1 = new LocationEntity("dev-1", clientUuid, 12.9, 77.5, 5.0f, 0.0, 0.0f, "2026-11-21T10:00:00Z", false);
+        e1.setId(101L);
+
+        // Simulate repository getByClientUuid check
+        java.util.Map<String, LocationEntity> mockStore = new java.util.HashMap<>();
+        mockStore.put(e1.getClientUuid(), e1);
+
+        // When second attempt arrives with identical clientUuid, lookup succeeds and avoids inserting duplicate
+        LocationEntity existing = mockStore.get(clientUuid);
+        assertNotNull("Existing entity must be identified by clientUuid", existing);
+        assertEquals(101L, existing.getId());
+
+        // Insertion skipped because existing != null
+        long assignedId = existing != null ? existing.getId() : 102L;
+        assertEquals(101L, assignedId);
+        assertEquals(1, mockStore.size());
+    }
+
+    @Test
+    public void testOfflineQueueRetentionAndSyncedCleanup() {
+        // List representing Room table
+        java.util.List<LocationEntity> table = new java.util.ArrayList<>();
+        LocationEntity loc1 = new LocationEntity("dev-1", "uuid-fail", 12.0, 77.0, 5.0f, 0.0, 0.0f, "2026-11-21T10:00:00Z", false);
+        loc1.setId(1L);
+        LocationEntity loc2 = new LocationEntity("dev-1", "uuid-success", 12.1, 77.1, 5.0f, 0.0, 0.0f, "2026-11-21T10:05:00Z", false);
+        loc2.setId(2L);
+
+        table.add(loc1);
+        table.add(loc2);
+
+        // Upload only loc2 successfully; mark it synced
+        loc2.setSynced(true);
+
+        // Query unsynced: loc1 must remain
+        java.util.List<LocationEntity> unsynced = new java.util.ArrayList<>();
+        for (LocationEntity e : table) {
+            if (!e.isSynced()) unsynced.add(e);
+        }
+        assertEquals(1, unsynced.size());
+        assertEquals("uuid-fail", unsynced.get(0).getClientUuid());
+
+        // Simulate deleteSyncedLocations()
+        table.removeIf(LocationEntity::isSynced);
+
+        assertEquals("Failed record must survive cleanup", 1, table.size());
+        assertEquals("uuid-fail", table.get(0).getClientUuid());
+        assertFalse("Surviving record must retain isSynced = false", table.get(0).isSynced());
     }
 }

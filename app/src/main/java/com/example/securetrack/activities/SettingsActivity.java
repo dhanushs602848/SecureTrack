@@ -29,6 +29,9 @@ public class SettingsActivity extends AppCompatActivity {
 
         binding.btnBack.setOnClickListener(v -> finish());
 
+        // 0. Appearance Theme Customisation (Mandatory 3 Modes)
+        setupAppearanceSelection();
+
         // 1. Emergency Recovery Contacts
         binding.etEmergencyContact.setText(sessionManager.getEmergencyContact());
         binding.etLockMessage.setText(sessionManager.getLockMessage());
@@ -116,5 +119,42 @@ public class SettingsActivity extends AppCompatActivity {
             binding.tvAdminStatus.setTextColor(getColor(R.color.status_warning));
             binding.btnManageAdmin.setText("Enable Device Admin");
         }
+    }
+
+    private void setupAppearanceSelection() {
+        updateAppearanceUI(sessionManager.getThemeMode());
+
+        binding.cardThemeLight.setOnClickListener(v -> {
+            sessionManager.setThemeMode(SessionManager.THEME_LIGHT);
+            updateAppearanceUI(SessionManager.THEME_LIGHT);
+            Toast.makeText(this, "Light mode activated", Toast.LENGTH_SHORT).show();
+        });
+
+        binding.cardThemeDark.setOnClickListener(v -> {
+            sessionManager.setThemeMode(SessionManager.THEME_DARK);
+            updateAppearanceUI(SessionManager.THEME_DARK);
+            Toast.makeText(this, "Dark mode activated", Toast.LENGTH_SHORT).show();
+        });
+
+        binding.cardThemeSystem.setOnClickListener(v -> {
+            sessionManager.setThemeMode(SessionManager.THEME_SYSTEM);
+            updateAppearanceUI(SessionManager.THEME_SYSTEM);
+            Toast.makeText(this, "Following system theme", Toast.LENGTH_SHORT).show();
+        });
+    }
+
+    private void updateAppearanceUI(String currentTheme) {
+        boolean isLight = SessionManager.THEME_LIGHT.equalsIgnoreCase(currentTheme);
+        boolean isDark = SessionManager.THEME_DARK.equalsIgnoreCase(currentTheme);
+        boolean isSystem = SessionManager.THEME_SYSTEM.equalsIgnoreCase(currentTheme) || (!isLight && !isDark);
+
+        binding.cardThemeLight.setBackgroundResource(isLight ? R.drawable.bg_theme_card_selected : R.drawable.bg_theme_card_unselected);
+        binding.ivCheckLight.setVisibility(isLight ? android.view.View.VISIBLE : android.view.View.INVISIBLE);
+
+        binding.cardThemeDark.setBackgroundResource(isDark ? R.drawable.bg_theme_card_selected : R.drawable.bg_theme_card_unselected);
+        binding.ivCheckDark.setVisibility(isDark ? android.view.View.VISIBLE : android.view.View.INVISIBLE);
+
+        binding.cardThemeSystem.setBackgroundResource(isSystem ? R.drawable.bg_theme_card_selected : R.drawable.bg_theme_card_unselected);
+        binding.ivCheckSystem.setVisibility(isSystem ? android.view.View.VISIBLE : android.view.View.INVISIBLE);
     }
 }
