@@ -77,7 +77,7 @@ service cloud.firestore {
           allow update: if isHumanOwner(userId) || (
             isAuthorizedDevice(userId, deviceId) &&
             request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-              'status', 'result', 'executedAt', 'error', 'details', 'progress', 'requestId'
+              'status', 'result', 'executedAt', 'error', 'details', 'progress', 'requestId', 'claimedAt'
             ]) &&
             request.resource.data.status in ['RECEIVED', 'ACKNOWLEDGED', 'EXECUTING', 'EXECUTED', 'FAILED', 'EXPIRED'] &&
             (!('targetDeviceId' in resource.data) || request.resource.data.targetDeviceId == resource.data.targetDeviceId) &&

@@ -111,22 +111,24 @@ public class CommandExecutionManager {
         String currentInstallationId = sessionManager.getInstallationId();
 
         // Exact pairing recovery: Self-heal secondary enrollment using exact claimedDeviceId + authUid + status
-        if (auth.getCurrentUser() != null && !sessionManager.isPairedSecondaryDevice() && auth.getCurrentUser().isAnonymous()) {
+        if (auth.getCurrentUser() != null && !sessionManager.isPairedSecondaryDevice()) {
             String currentAuthUid = auth.getCurrentUser().getUid();
 
             db.collection("pairing_invitations")
                     .whereEqualTo("claimedByUid", currentAuthUid)
                     .whereEqualTo("claimedDeviceId", currentInstallationId)
                     .whereEqualTo("status", "APPROVED")
-                    .limit(1)
                     .get()
                     .addOnSuccessListener(querySnapshot -> {
-                        if (querySnapshot != null && !querySnapshot.isEmpty()) {
+                        if (querySnapshot != null && querySnapshot.size() == 1) {
                             DocumentSnapshot doc = querySnapshot.getDocuments().get(0);
                             String ownerUid = doc.getString("ownerUid");
                             String claimedDevId = doc.getString("claimedDeviceId");
+                            String claimedByUid = doc.getString("claimedByUid");
 
-                            if (ownerUid != null && !ownerUid.isEmpty() && currentInstallationId.equals(claimedDevId)) {
+                            if (ownerUid != null && !ownerUid.isEmpty()
+                                    && currentInstallationId.equals(claimedDevId)
+                                    && currentAuthUid.equals(claimedByUid)) {
                                 // Verify target device is active and not REVOKED before saving state
                                 db.collection("users").document(ownerUid)
                                         .collection("devices").document(currentInstallationId)
@@ -141,12 +143,23 @@ public class CommandExecutionManager {
                                                 startListeningToCommandsInternal();
                                             } else {
                                                 Log.w(TAG, "Self-healing rejected: Device is revoked or unapproved in Firestore");
+                                                startListeningToCommandsInternal();
                                             }
                                         })
-                                        .addOnFailureListener(e -> Log.e(TAG, "Device verification failed during recovery", e));
+                                        .addOnFailureListener(e -> {
+                                            Log.e(TAG, "Device verification failed during recovery", e);
+                                            startListeningToCommandsInternal();
+                                        });
+                            } else {
+                                Log.w(TAG, "Ambiguous or mismatched invitation fields during recovery");
+                                startListeningToCommandsInternal();
                             }
                         } else {
-                            Log.d(TAG, "No matching approved pairing invitation for installation " + currentInstallationId);
+                            if (querySnapshot != null && querySnapshot.size() > 1) {
+                                Log.w(TAG, "Ambiguous multiple matching approved invitations (" + querySnapshot.size() + "), rejecting recovery");
+                            } else {
+                                Log.d(TAG, "No matching approved pairing invitation for installation " + currentInstallationId);
+                            }
                             startListeningToCommandsInternal();
                         }
                     })
@@ -216,13 +229,17 @@ public class CommandExecutionManager {
         startListeningToCommands();
     }
 
+    private static class TxResult {
+        final String action;
+        final DocumentSnapshot snapshot;
+        TxResult(String action, DocumentSnapshot snapshot) {
+            this.action = action;
+            this.snapshot = snapshot;
+        }
+    }
+
     /**
-     * Genuinely Atomic Command Claiming via Firestore Transaction.
-     * Guarantees:
-     * 1. Status read & verified as QUEUED inside db.runTransaction
-     * 2. Expiration verified and handled atomically
-     * 3. QUEUED -> EXECUTING transition committed before execution begins
-             * 4. In-memory processed set updated ONLY on transaction success
+     * Genuinely Atomic Command Claiming via Firestore Transaction with Robust Semantics.
      */
     private void executeSingleCommand(String uid, String deviceId, DocumentSnapshot initialDoc) {
         String commandId = initialDoc.getId();
@@ -239,12 +256,12 @@ public class CommandExecutionManager {
         db.runTransaction(transaction -> {
             DocumentSnapshot snapshot = transaction.get(cmdRef);
             if (!snapshot.exists()) {
-                throw new FirebaseFirestoreException("Command document does not exist", FirebaseFirestoreException.Code.NOT_FOUND);
+                return new TxResult("NOT_FOUND", null);
             }
 
             String currentStatus = snapshot.getString("status");
             if (!"QUEUED".equalsIgnoreCase(currentStatus)) {
-                throw new FirebaseFirestoreException("Command status is " + currentStatus + ", not QUEUED", FirebaseFirestoreException.Code.ABORTED);
+                return new TxResult("ALREADY_CLAIMED", snapshot);
             }
 
             String type = snapshot.getString("commandType");
@@ -252,7 +269,12 @@ public class CommandExecutionManager {
                 type = snapshot.getString("command");
             }
             if (type == null) {
-                throw new FirebaseFirestoreException("Malformed command missing commandType", FirebaseFirestoreException.Code.INVALID_ARGUMENT);
+                Map<String, Object> failUpdates = new HashMap<>();
+                failUpdates.put("status", "FAILED");
+                failUpdates.put("result", "Malformed command missing commandType");
+                failUpdates.put("executedAt", FieldValue.serverTimestamp());
+                transaction.update(cmdRef, failUpdates);
+                return new TxResult("MALFORMED", snapshot);
             }
 
             com.google.firebase.Timestamp createdAt = snapshot.getTimestamp("createdAt");
@@ -267,7 +289,7 @@ public class CommandExecutionManager {
                     expireUpdates.put("result", "Command expired before execution (exceeded " + (maxAge / 60000) + " min validity window)");
                     expireUpdates.put("executedAt", FieldValue.serverTimestamp());
                     transaction.update(cmdRef, expireUpdates);
-                    throw new FirebaseFirestoreException("Command expired", FirebaseFirestoreException.Code.DEADLINE_EXCEEDED);
+                    return new TxResult("EXPIRED", snapshot);
                 }
             }
 
@@ -276,67 +298,75 @@ public class CommandExecutionManager {
             claimUpdates.put("claimedAt", FieldValue.serverTimestamp());
             transaction.update(cmdRef, claimUpdates);
 
-            return snapshot;
-        }).addOnSuccessListener(claimedDoc -> {
-            processedCommandIds.add(commandId);
-
-            String type = claimedDoc.getString("commandType");
-            if (type == null) type = claimedDoc.getString("command");
-
-            Log.i(TAG, "Successfully claimed and executing remote command " + commandId + " [" + type + "] on target " + deviceId);
-
-            final String finalType = type;
-            com.google.firebase.Timestamp createdAt = claimedDoc.getTimestamp("createdAt");
-            long maxAge = ("LOCK_DEVICE".equalsIgnoreCase(type) || "ALARM_ALERT".equalsIgnoreCase(type))
-                    ? EXPIRY_LOCK_ALARM_MS : EXPIRY_LOCATE_MS;
-
-            new Thread(() -> {
-                CommandEntity entity = new CommandEntity(
-                        commandId,
-                        deviceId,
-                        finalType,
-                        uid,
-                        "",
-                        CommandEntity.STATE_EXECUTING,
-                        "Executing on target device",
-                        CommandEntity.TRANSPORT_CLOUD,
-                        createdAt != null ? createdAt.toDate().getTime() : System.currentTimeMillis(),
-                        System.currentTimeMillis() + maxAge,
-                        System.currentTimeMillis(),
-                        0,
-                        "SYNCED",
-                        0
-                );
-                appDatabase.commandDao().insertOrUpdate(entity);
-            }).start();
-
-            if ("LOCATE_NOW".equalsIgnoreCase(type)) {
-                handleLocateCommand(uid, deviceId, commandId, claimedDoc);
-            } else if ("LOCK_DEVICE".equalsIgnoreCase(type)) {
-                handleLockCommand(uid, deviceId, commandId);
-            } else if ("ALARM_ALERT".equalsIgnoreCase(type)) {
-                handleAlarmCommand(uid, deviceId, commandId);
-            } else if ("WIPE_DEVICE".equalsIgnoreCase(type)) {
-                handleWipeCommand(uid, deviceId, commandId);
-            } else {
-                updateCommandStatus(uid, deviceId, commandId, "FAILED", "Unsupported command type: " + type);
+            return new TxResult("CLAIMED", snapshot);
+        }).addOnSuccessListener(txResult -> {
+            if (txResult == null) return;
+            switch (txResult.action) {
+                case "CLAIMED":
+                    processedCommandIds.add(commandId);
+                    executeClaimedCommand(uid, deviceId, commandId, txResult.snapshot);
+                    break;
+                case "EXPIRED":
+                    Log.w(TAG, "Command " + commandId + " marked as EXPIRED in committed transaction.");
+                    processedCommandIds.add(commandId);
+                    break;
+                case "MALFORMED":
+                    Log.w(TAG, "Command " + commandId + " marked as FAILED (malformed) in committed transaction.");
+                    processedCommandIds.add(commandId);
+                    break;
+                case "ALREADY_CLAIMED":
+                case "NOT_FOUND":
+                    Log.d(TAG, "Command " + commandId + " status was not QUEUED or not found (" + txResult.action + ").");
+                    processedCommandIds.add(commandId);
+                    break;
             }
         }).addOnFailureListener(e -> {
-            if (e instanceof FirebaseFirestoreException) {
-                FirebaseFirestoreException fe = (FirebaseFirestoreException) e;
-                if (fe.getCode() == FirebaseFirestoreException.Code.ABORTED) {
-                    Log.d(TAG, "Command " + commandId + " already claimed by another worker or not QUEUED.");
-                    processedCommandIds.add(commandId);
-                } else if (fe.getCode() == FirebaseFirestoreException.Code.DEADLINE_EXCEEDED) {
-                    Log.w(TAG, "Command " + commandId + " marked as EXPIRED in transaction.");
-                    processedCommandIds.add(commandId);
-                } else {
-                    Log.e(TAG, "Command claim transaction failed for " + commandId + ": " + e.getMessage());
-                }
-            } else {
-                Log.e(TAG, "Command claim failed for " + commandId + ": " + e.getMessage());
-            }
+            Log.e(TAG, "Command claim transaction failed for " + commandId + ": " + e.getMessage());
         });
+    }
+
+    private void executeClaimedCommand(String uid, String deviceId, String commandId, DocumentSnapshot claimedDoc) {
+        String type = claimedDoc.getString("commandType");
+        if (type == null) type = claimedDoc.getString("command");
+
+        Log.i(TAG, "Successfully claimed and executing remote command " + commandId + " [" + type + "] on target " + deviceId);
+
+        final String finalType = type;
+        com.google.firebase.Timestamp createdAt = claimedDoc.getTimestamp("createdAt");
+        long maxAge = ("LOCK_DEVICE".equalsIgnoreCase(type) || "ALARM_ALERT".equalsIgnoreCase(type))
+                ? EXPIRY_LOCK_ALARM_MS : EXPIRY_LOCATE_MS;
+
+        new Thread(() -> {
+            CommandEntity entity = new CommandEntity(
+                    commandId,
+                    deviceId,
+                    finalType,
+                    uid,
+                    "",
+                    CommandEntity.STATE_EXECUTING,
+                    "Executing on target device",
+                    CommandEntity.TRANSPORT_CLOUD,
+                    createdAt != null ? createdAt.toDate().getTime() : System.currentTimeMillis(),
+                    System.currentTimeMillis() + maxAge,
+                    System.currentTimeMillis(),
+                    0,
+                    "SYNCED",
+                    0
+            );
+            appDatabase.commandDao().insertOrUpdate(entity);
+        }).start();
+
+        if ("LOCATE_NOW".equalsIgnoreCase(type)) {
+            handleLocateCommand(uid, deviceId, commandId, claimedDoc);
+        } else if ("LOCK_DEVICE".equalsIgnoreCase(type)) {
+            handleLockCommand(uid, deviceId, commandId);
+        } else if ("ALARM_ALERT".equalsIgnoreCase(type)) {
+            handleAlarmCommand(uid, deviceId, commandId);
+        } else if ("WIPE_DEVICE".equalsIgnoreCase(type)) {
+            handleWipeCommand(uid, deviceId, commandId);
+        } else {
+            updateCommandStatus(uid, deviceId, commandId, "FAILED", "Unsupported command type: " + type);
+        }
     }
 
     @SuppressLint("MissingPermission")
