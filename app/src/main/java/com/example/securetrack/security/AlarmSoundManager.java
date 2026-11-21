@@ -44,7 +44,8 @@ public class AlarmSoundManager {
 
     private AlarmSoundManager(Context context) {
         this.context = context.getApplicationContext();
-        this.mainHandler = new Handler(Looper.getMainLooper());
+        Looper mainLooper = Looper.getMainLooper();
+        this.mainHandler = mainLooper != null ? new Handler(mainLooper) : null;
     }
 
     public static AlarmSoundManager getInstance(Context context) {
@@ -153,7 +154,9 @@ public class AlarmSoundManager {
                 }
             }
         };
-        mainHandler.postDelayed(stopRunnable, ALARM_DURATION_MS);
+        if (mainHandler != null && stopRunnable != null) {
+            mainHandler.postDelayed(stopRunnable, ALARM_DURATION_MS);
+        }
     }
 
     /**
@@ -162,7 +165,7 @@ public class AlarmSoundManager {
     public synchronized void stopAlarm() {
         if (!isPlaying) return;
         Log.i(TAG, "Manual panic siren stop requested");
-        if (stopRunnable != null) {
+        if (mainHandler != null && stopRunnable != null) {
             mainHandler.removeCallbacks(stopRunnable);
             stopRunnable = null;
         }

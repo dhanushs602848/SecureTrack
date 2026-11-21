@@ -127,11 +127,12 @@ public class BleNearbyManager {
 
     private BleNearbyManager(Context context) {
         this.context = context.getApplicationContext();
-        this.mainHandler = new Handler(Looper.getMainLooper());
-        this.bluetoothManager = (BluetoothManager) this.context.getSystemService(Context.BLUETOOTH_SERVICE);
+        Looper mainLooper = Looper.getMainLooper();
+        this.mainHandler = mainLooper != null ? new Handler(mainLooper) : null;
+        this.bluetoothManager = this.context != null ? (BluetoothManager) this.context.getSystemService(Context.BLUETOOTH_SERVICE) : null;
         this.bluetoothAdapter = bluetoothManager != null ? bluetoothManager.getAdapter() : null;
         this.sessionManager = new SessionManager(this.context);
-        this.fusedLocationClient = LocationServices.getFusedLocationProviderClient(this.context);
+        this.fusedLocationClient = this.context != null ? LocationServices.getFusedLocationProviderClient(this.context) : null;
     }
 
     public static BleNearbyManager getInstance(Context context) {
@@ -646,14 +647,16 @@ public class BleNearbyManager {
         scanner.startScan(Collections.singletonList(filter), settings, scanCallback);
 
         // Auto-stop scan after 12 seconds if no device found
-        mainHandler.postDelayed(() -> {
-            if (isScanning) {
-                stopScan();
-                if (callback != null) {
-                    callback.onError("No nearby SecureTrack BLE device found within range");
+        if (mainHandler != null) {
+            mainHandler.postDelayed(() -> {
+                if (isScanning) {
+                    stopScan();
+                    if (callback != null) {
+                        callback.onError("No nearby SecureTrack BLE device found within range");
+                    }
                 }
-            }
-        }, 12000L);
+            }, 12000L);
+        }
     }
 
     @SuppressLint("MissingPermission")
