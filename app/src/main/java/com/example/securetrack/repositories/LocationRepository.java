@@ -46,27 +46,7 @@ public class LocationRepository {
     }
 
     public static com.google.firebase.Timestamp parseTimestamp(String timestampStr) {
-        if (timestampStr != null && !timestampStr.trim().isEmpty()) {
-            String trimmed = timestampStr.trim();
-            try {
-                java.text.SimpleDateFormat isoFormat = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US);
-                isoFormat.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
-                java.util.Date date = isoFormat.parse(trimmed);
-                if (date != null) return new com.google.firebase.Timestamp(date);
-            } catch (Exception ignored) {}
-
-            try {
-                long epoch = Long.parseLong(trimmed);
-                return new com.google.firebase.Timestamp(new java.util.Date(epoch));
-            } catch (Exception ignored) {}
-
-            try {
-                java.text.SimpleDateFormat displayFormat = new java.text.SimpleDateFormat("EEE MMM dd HH:mm:ss z yyyy", java.util.Locale.US);
-                java.util.Date date = displayFormat.parse(trimmed);
-                if (date != null) return new com.google.firebase.Timestamp(date);
-            } catch (Exception ignored) {}
-        }
-        return new com.google.firebase.Timestamp(new java.util.Date());
+        return com.example.securetrack.utils.TimestampUtils.parseTimestamp(timestampStr);
     }
 
     public void recordLocation(LocationRecord record, ApiCallback<LocationRecord> callback) {

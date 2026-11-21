@@ -629,7 +629,7 @@ public class SecurityAndLocationUpgradeTest {
     public void testLocationTimestampParsingIntegrity() {
         // 1. ISO-8601 UTC timestamp
         String isoUtc = "2026-11-21T10:15:30Z";
-        com.google.firebase.Timestamp ts1 = com.example.securetrack.repositories.LocationRepository.parseTimestamp(isoUtc);
+        com.google.firebase.Timestamp ts1 = com.example.securetrack.utils.TimestampUtils.parseTimestamp(isoUtc);
         assertNotNull(ts1);
         // Verify round-trip time matches UTC
         java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US);
@@ -638,14 +638,14 @@ public class SecurityAndLocationUpgradeTest {
 
         // 2. Epoch millis format
         long epoch = 1795256130000L;
-        com.google.firebase.Timestamp ts2 = com.example.securetrack.repositories.LocationRepository.parseTimestamp(String.valueOf(epoch));
+        com.google.firebase.Timestamp ts2 = com.example.securetrack.utils.TimestampUtils.parseTimestamp(String.valueOf(epoch));
         assertNotNull(ts2);
         assertEquals(epoch / 1000L, ts2.getSeconds());
 
         // 3. Fallback for null or empty string produces valid non-null timestamp
         long before = System.currentTimeMillis() / 1000L;
-        com.google.firebase.Timestamp tsNull = com.example.securetrack.repositories.LocationRepository.parseTimestamp(null);
-        com.google.firebase.Timestamp tsEmpty = com.example.securetrack.repositories.LocationRepository.parseTimestamp("   ");
+        com.google.firebase.Timestamp tsNull = com.example.securetrack.utils.TimestampUtils.parseTimestamp(null);
+        com.google.firebase.Timestamp tsEmpty = com.example.securetrack.utils.TimestampUtils.parseTimestamp("   ");
         long after = System.currentTimeMillis() / 1000L;
 
         assertNotNull(tsNull);
