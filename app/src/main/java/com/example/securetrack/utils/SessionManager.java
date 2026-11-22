@@ -35,6 +35,7 @@ public class SessionManager {
     public static final String THEME_DARK = "DARK";
     public static final String THEME_SYSTEM = "SYSTEM";
     private static final String KEY_THEME_MODE = "app_theme_mode";
+    private static final String KEY_FCM_TOKEN = "fcm_token";
 
     private final SharedPreferences prefs;
 
@@ -325,8 +326,20 @@ public class SessionManager {
         prefs.edit().putString(KEY_BLE_DEVICE_SECRETS_PREFIX + deviceId, secret).apply();
     }
 
+    public String getFcmToken() {
+        return prefs.getString(KEY_FCM_TOKEN, null);
+    }
+
+    public void setFcmToken(String token) {
+        if (token == null) {
+            prefs.edit().remove(KEY_FCM_TOKEN).apply();
+        } else {
+            prefs.edit().putString(KEY_FCM_TOKEN, token).apply();
+        }
+    }
+
     public String getThemeMode() {
-        return prefs.getString(KEY_THEME_MODE, THEME_SYSTEM);
+        return prefs.getString(KEY_THEME_MODE, THEME_DARK);
     }
 
     public void setThemeMode(String themeMode) {
@@ -368,6 +381,7 @@ public class SessionManager {
                 .remove(KEY_PRIMARY_DEVICE_ID_STR)
                 .remove(KEY_IS_PAIRED_DEVICE)
                 .remove(KEY_PAIRED_OWNER_UID)
+                .remove(KEY_FCM_TOKEN)
                 .apply();
     }
 

@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.securetrack"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.5"
+        versionCode = 4
+        versionName = "1.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -72,6 +72,7 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-messaging")
     implementation("com.google.firebase:firebase-functions")
     implementation("com.google.firebase:firebase-appcheck")
     implementation("com.google.firebase:firebase-appcheck-playintegrity")

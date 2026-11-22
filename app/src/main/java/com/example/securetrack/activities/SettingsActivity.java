@@ -100,12 +100,36 @@ public class SettingsActivity extends AppCompatActivity {
                 }
             });
         }
+
+        // 5. System Diagnostics & Health Check Screen
+        if (binding.tvSettingsVersion != null) {
+            binding.tvSettingsVersion.setText(com.example.securetrack.BuildConfig.VERSION_NAME + " (Build " + com.example.securetrack.BuildConfig.VERSION_CODE + ")");
+        }
+        if (binding.btnOpenDiagnostics != null) {
+            binding.btnOpenDiagnostics.setOnClickListener(v -> {
+                startActivity(new Intent(this, DiagnosticsActivity.class));
+            });
+        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         updateAdminStatus();
+        updateDiagnosticsSummary();
+    }
+
+    private void updateDiagnosticsSummary() {
+        if (binding.tvSettingsFcmStatus != null) {
+            String token = sessionManager.getFcmToken();
+            if (!TextUtils.isEmpty(token)) {
+                binding.tvSettingsFcmStatus.setText("Registered & Active");
+                binding.tvSettingsFcmStatus.setTextColor(getColor(R.color.status_success));
+            } else {
+                binding.tvSettingsFcmStatus.setText("Pending Registration");
+                binding.tvSettingsFcmStatus.setTextColor(getColor(R.color.status_warning));
+            }
+        }
     }
 
     private void updateAdminStatus() {

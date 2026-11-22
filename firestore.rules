@@ -52,7 +52,8 @@ service cloud.firestore {
             'batteryLevel', 'lastSeen', 'locationStatus', 'trackingStatus', 'networkStatus', 'status',
             'locationPermission', 'bluetoothStatus', 'bluetoothPermission', 'protectionStatus',
             'protectionReason', 'protectionEnabled',
-            'lastLatitude', 'lastLongitude', 'locationAccuracy', 'lastAccuracy', 'locationSource', 'locationTimestamp', 'lastRequestId'
+            'lastLatitude', 'lastLongitude', 'locationAccuracy', 'lastAccuracy', 'locationSource', 'locationTimestamp', 'lastRequestId',
+            'fcmToken', 'fcmTokenUpdatedAt'
           ]) &&
           request.resource.data.status in ['ONLINE', 'OFFLINE']
         );

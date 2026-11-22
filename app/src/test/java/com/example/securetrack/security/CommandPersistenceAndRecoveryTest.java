@@ -348,7 +348,7 @@ public class CommandPersistenceAndRecoveryTest {
     }
 
     // =========================================================================
-    // 10. PAIRING RECOVERY EVALUATOR CONTRACT
+    // 10. PAIRING RECOVERY EVALUATOR CONTRACT (12 COMPREHENSIVE SECURITY POLICIES)
     // =========================================================================
 
     @Test
@@ -356,58 +356,126 @@ public class CommandPersistenceAndRecoveryTest {
         String authUid = "user-auth-123";
         String installId = "inst-001";
         String ownerUid = "owner-999";
+        String bleSecret = "sec-123";
 
-        // Case 1: Valid
+        // Case 1: One valid approved invitation
         List<Map<String, Object>> invs = new ArrayList<>();
         Map<String, Object> inv = new HashMap<>();
         inv.put("status", "APPROVED");
         inv.put("claimedByUid", authUid);
         inv.put("claimedDeviceId", installId);
         inv.put("ownerUid", ownerUid);
-        inv.put("bleSharedSecret", "sec-123");
+        inv.put("bleSharedSecret", bleSecret);
         invs.add(inv);
 
         Map<String, Object> devDoc = new HashMap<>();
         devDoc.put("status", "ONLINE");
         devDoc.put("deviceName", "Samsung A07");
+        devDoc.put("ownerUid", ownerUid);
+        devDoc.put("deviceAuthUid", authUid);
+        devDoc.put("installationId", installId);
+        devDoc.put("bleSharedSecret", bleSecret);
 
         CommandExecutionManager.PairingRecoveryResult okResult =
                 CommandExecutionManager.evaluateRecovery(authUid, installId, invs, devDoc);
-        assertTrue(okResult.success);
+        assertTrue("One valid approved invitation must succeed", okResult.success);
+        assertEquals(ownerUid, okResult.ownerUid);
+        assertEquals(bleSecret, okResult.bleSharedSecret);
 
-        // Case 2: Mismatched UID
-        CommandExecutionManager.PairingRecoveryResult uidMismatch =
-                CommandExecutionManager.evaluateRecovery("different-uid", installId, invs, devDoc);
-        assertFalse(uidMismatch.success);
-        assertTrue(uidMismatch.rejectionReason.contains("Authenticated UID mismatch"));
+        // Case 2: Several duplicate invitations for the same verified owner and target
+        List<Map<String, Object>> duplicateInvs = new ArrayList<>(invs);
+        Map<String, Object> dupInv = new HashMap<>(inv);
+        duplicateInvs.add(dupInv);
+        CommandExecutionManager.PairingRecoveryResult dupResult =
+                CommandExecutionManager.evaluateRecovery(authUid, installId, duplicateInvs, devDoc);
+        assertTrue("Several duplicate invitations for the same verified owner and target must resolve successfully", dupResult.success);
+        assertEquals(ownerUid, dupResult.ownerUid);
 
-        // Case 3: Mismatched Installation ID
-        CommandExecutionManager.PairingRecoveryResult instMismatch =
-                CommandExecutionManager.evaluateRecovery(authUid, "different-inst", invs, devDoc);
-        assertFalse(instMismatch.success);
-        assertTrue(instMismatch.rejectionReason.contains("Installation ID mismatch"));
+        // Case 3: Multiple conflicting owners
+        List<Map<String, Object>> conflictingInvs = new ArrayList<>(invs);
+        Map<String, Object> conflictInv = new HashMap<>(inv);
+        conflictInv.put("ownerUid", "different-owner-888");
+        conflictingInvs.add(conflictInv);
 
-        // Case 4: Ambiguous multiple invitations
-        List<Map<String, Object>> ambiguous = new ArrayList<>(invs);
-        ambiguous.add(new HashMap<>(inv));
-        CommandExecutionManager.PairingRecoveryResult ambResult =
-                CommandExecutionManager.evaluateRecovery(authUid, installId, ambiguous, devDoc);
-        assertFalse(ambResult.success);
-        assertTrue(ambResult.rejectionReason.contains("Ambiguous"));
+        Map<String, Map<String, Object>> multiOwnerDocs = new HashMap<>();
+        multiOwnerDocs.put(ownerUid, devDoc);
+        Map<String, Object> conflictDevDoc = new HashMap<>(devDoc);
+        conflictDevDoc.put("ownerUid", "different-owner-888");
+        multiOwnerDocs.put("different-owner-888", conflictDevDoc);
 
-        // Case 5: Missing device doc
+        CommandExecutionManager.PairingRecoveryResult conflictResult =
+                CommandExecutionManager.evaluateRecoveryMultiOwner(authUid, installId, conflictingInvs, multiOwnerDocs, null);
+        assertFalse("Multiple conflicting owners must be rejected", conflictResult.success);
+        assertTrue("Must report explicit ownership conflict", conflictResult.rejectionReason.contains("Ownership conflict"));
+
+        // Case 4: Missing corresponding device document
         CommandExecutionManager.PairingRecoveryResult missingDoc =
                 CommandExecutionManager.evaluateRecovery(authUid, installId, invs, null);
-        assertFalse(missingDoc.success);
+        assertFalse("Missing device doc must be rejected", missingDoc.success);
         assertTrue(missingDoc.rejectionReason.contains("does not exist"));
 
-        // Case 6: Revoked device
-        Map<String, Object> revokedDoc = new HashMap<>();
+        // Case 5: Revoked target device
+        Map<String, Object> revokedDoc = new HashMap<>(devDoc);
         revokedDoc.put("status", "REVOKED");
         CommandExecutionManager.PairingRecoveryResult revResult =
                 CommandExecutionManager.evaluateRecovery(authUid, installId, invs, revokedDoc);
-        assertFalse(revResult.success);
+        assertFalse("Revoked target device must be rejected", revResult.success);
         assertTrue(revResult.rejectionReason.contains("REVOKED"));
+
+        // Case 6: Incorrect installation ID
+        CommandExecutionManager.PairingRecoveryResult instMismatch =
+                CommandExecutionManager.evaluateRecovery(authUid, "different-inst", invs, devDoc);
+        assertFalse("Installation ID mismatch must be rejected", instMismatch.success);
+        assertTrue(instMismatch.rejectionReason.contains("Installation ID mismatch"));
+
+        // Case 7: Incorrect claiming UID
+        CommandExecutionManager.PairingRecoveryResult uidMismatch =
+                CommandExecutionManager.evaluateRecovery("different-uid", installId, invs, devDoc);
+        assertFalse("Claiming UID mismatch must be rejected", uidMismatch.success);
+        assertTrue(uidMismatch.rejectionReason.contains("Authenticated UID mismatch"));
+
+        // Case 8: Missing shared secret when required
+        CommandExecutionManager.PairingRecoveryResult secMissing =
+                CommandExecutionManager.evaluateRecovery(authUid, installId, invs, devDoc, "different-required-secret");
+        assertFalse("Secret mismatch with required session secret must be rejected", secMissing.success);
+        assertTrue(secMissing.rejectionReason.contains("shared secret mismatch"));
+
+        // Case 9: Secret mismatch between invitation and device doc
+        Map<String, Object> secretMismatchDevDoc = new HashMap<>(devDoc);
+        secretMismatchDevDoc.put("bleSharedSecret", "inconsistent-secret-xyz");
+        CommandExecutionManager.PairingRecoveryResult secMismatchResult =
+                CommandExecutionManager.evaluateRecovery(authUid, installId, invs, secretMismatchDevDoc);
+        assertFalse("Secret mismatch between invitation and device document must be rejected", secMismatchResult.success);
+        assertTrue(secMismatchResult.rejectionReason.contains("Pairing credentials mismatch"));
+
+        // Case 10: Expired or rejected invitation
+        List<Map<String, Object>> rejectedInvs = new ArrayList<>();
+        Map<String, Object> rejInv = new HashMap<>(inv);
+        rejInv.put("status", "REJECTED");
+        rejectedInvs.add(rejInv);
+        CommandExecutionManager.PairingRecoveryResult rejResult =
+                CommandExecutionManager.evaluateRecovery(authUid, installId, rejectedInvs, devDoc);
+        assertFalse("REJECTED status invitation must be rejected", rejResult.success);
+        assertTrue(rejResult.rejectionReason.contains("not APPROVED"));
+
+        // Case 11: Incorrect owner/target direction (ownerUid == authUid)
+        List<Map<String, Object>> selfInvs = new ArrayList<>();
+        Map<String, Object> selfInv = new HashMap<>(inv);
+        selfInv.put("ownerUid", authUid); // owner cannot be claiming device itself
+        selfInvs.add(selfInv);
+        CommandExecutionManager.PairingRecoveryResult selfResult =
+                CommandExecutionManager.evaluateRecovery(authUid, installId, selfInvs, devDoc);
+        assertFalse("Owner claiming itself as secondary device must be rejected", selfResult.success);
+        assertTrue(selfResult.rejectionReason.contains("owner/target direction"));
+
+        // Case 12: Unauthorized recovery (empty UID or empty installation ID)
+        CommandExecutionManager.PairingRecoveryResult emptyAuth =
+                CommandExecutionManager.evaluateRecovery("", installId, invs, devDoc);
+        assertFalse("Empty auth UID must be rejected", emptyAuth.success);
+
+        CommandExecutionManager.PairingRecoveryResult emptyInst =
+                CommandExecutionManager.evaluateRecovery(authUid, "", invs, devDoc);
+        assertFalse("Empty installation ID must be rejected", emptyInst.success);
     }
 
     // =========================================================================

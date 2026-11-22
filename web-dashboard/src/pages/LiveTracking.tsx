@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { LocationMap } from '../components/LocationMap';
-import { locationService, deviceService } from '../services/api';
+import { locationService, deviceService, commandService } from '../services/api';
 import { LocationRecord, Device } from '../types';
-import { Activity, Clock, AlertTriangle, MapPin } from 'lucide-react';
+import { Activity, Clock, AlertTriangle, MapPin, RefreshCw } from 'lucide-react';
 
 export const LiveTracking: React.FC = () => {
   const [devices, setDevices] = useState<Device[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [latestLocation, setLatestLocation] = useState<LocationRecord | null>(null);
+  const [isLocating, setIsLocating] = useState<boolean>(false);
+  const [locateFeedback, setLocateFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubDevices = deviceService.subscribeToDevices((data) => {
@@ -53,6 +55,22 @@ export const LiveTracking: React.FC = () => {
     ? Date.now() - new Date(latestLocation.timestamp).getTime() > 15 * 60 * 1000
     : false;
 
+  const handleLocateNow = async () => {
+    if (!selectedDeviceId) return;
+    setIsLocating(true);
+    setLocateFeedback(null);
+    try {
+      await commandService.sendCommand(selectedDeviceId, 'REFRESH_LOCATION');
+      setLocateFeedback('Location refresh command dispatched via Cloud & FCM.');
+      setTimeout(() => setLocateFeedback(null), 5000);
+    } catch (e: any) {
+      setLocateFeedback(`Failed to dispatch command: ${e.message || 'Unknown error'}`);
+      setTimeout(() => setLocateFeedback(null), 5000);
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
   return (
     <div className="space-y-6 flex flex-col h-[calc(100vh-6rem)] max-w-7xl mx-auto transition-colors duration-200">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
@@ -60,19 +78,41 @@ export const LiveTracking: React.FC = () => {
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white font-mono">Live Tracking</h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Real-time GPS endpoint positioning &amp; status</p>
         </div>
-        <select
-          value={selectedDeviceId}
-          onChange={(e) => setSelectedDeviceId(e.target.value)}
-          className="w-full sm:w-72 bg-white dark:bg-[#121927] border border-slate-200 dark:border-[#223049] text-slate-900 dark:text-slate-200 text-xs rounded-xl focus:ring-cyan-500 focus:border-cyan-500 p-2.5 shadow-sm"
-        >
-          <option value="" disabled>Select a device</option>
-          {devices.map(d => (
-            <option key={d.id} value={d.id}>
-              {d.deviceName} ({d.model}) - {d.status}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <select
+            value={selectedDeviceId}
+            onChange={(e) => setSelectedDeviceId(e.target.value)}
+            className="w-full sm:w-72 bg-white dark:bg-[#121927] border border-slate-200 dark:border-[#223049] text-slate-900 dark:text-slate-200 text-xs rounded-xl focus:ring-cyan-500 focus:border-cyan-500 p-2.5 shadow-sm"
+          >
+            <option value="" disabled>Select a device</option>
+            {devices.map(d => (
+              <option key={d.id} value={d.id}>
+                {d.deviceName} ({d.model}) - {d.status}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={handleLocateNow}
+            disabled={!selectedDeviceId || isLocating}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-sm transition shrink-0"
+            title="Dispatch immediate real-time GPS location refresh command"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLocating ? 'animate-spin' : ''}`} />
+            <span>Locate Now</span>
+          </button>
+        </div>
       </div>
+
+      {locateFeedback && (
+        <div className={`p-3 rounded-xl text-xs flex items-center gap-2 shrink-0 ${
+          locateFeedback.startsWith('Failed')
+            ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800'
+            : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+        }`}>
+          <Activity className="w-4 h-4 shrink-0" />
+          <span>{locateFeedback}</span>
+        </div>
+      )}
 
       {isLocationDisabled && (
         <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl flex items-center gap-3 text-amber-900 dark:text-amber-300 text-xs shadow-sm shrink-0">

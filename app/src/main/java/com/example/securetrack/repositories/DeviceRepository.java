@@ -7,6 +7,7 @@ import android.net.NetworkInfo;
 import android.os.Build;
 import android.util.Log;
 import com.example.securetrack.models.*;
+import com.example.securetrack.security.CommandExecutionManager;
 import com.example.securetrack.utils.DeviceUtils;
 import com.example.securetrack.utils.SessionManager;
 import com.google.firebase.Timestamp;
@@ -549,6 +550,9 @@ public class DeviceRepository {
                                 if (bleSecret != null && !bleSecret.isEmpty()) {
                                     sessionManager.setBleSharedSecret(bleSecret);
                                 }
+
+                                com.example.securetrack.fcm.FcmTokenManager.registerOrRefreshFcmToken(context);
+                                CommandExecutionManager.getInstance(context).startListeningToCommands();
 
                                 Device enrolled = new Device(
                                         installId,

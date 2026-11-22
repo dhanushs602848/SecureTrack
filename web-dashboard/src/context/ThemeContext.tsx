@@ -11,7 +11,7 @@ interface ThemeContextType {
 const THEME_STORAGE_KEY = 'securetrack_theme';
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: 'system',
+  theme: 'dark',
   resolvedTheme: 'dark',
   setTheme: () => {},
 });
@@ -28,7 +28,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return saved;
       }
     }
-    return 'system';
+    return 'dark';
   });
 
   const [systemDark, setSystemDark] = useState<boolean>(() => {

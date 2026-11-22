@@ -9,4 +9,8 @@ public interface IPairingRecoveryService {
     }
 
     void checkRecovery(String authUid, String installationId, RecoveryCallback callback);
+
+    default void checkRecovery(String authUid, String installationId, String expectedBleSecret, RecoveryCallback callback) {
+        checkRecovery(authUid, installationId, callback);
+    }
 }

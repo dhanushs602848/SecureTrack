@@ -23,8 +23,10 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.SetOptions;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -211,18 +213,57 @@ public class CommandExecutionManager {
 
     /**
      * Pure evaluator for Google-authenticated pairing recovery.
-     * Verifies:
-     * 1. Exact authenticated UID.
-     * 2. Exact installation ID.
-     * 3. Exactly one matching APPROVED invitation.
-     * 4. Existing device document under owner.
-     * 5. Device is not revoked.
+     * Evaluates all candidate invitations against the 10 security criteria:
+     * 1. Status is APPROVED.
+     * 2. ClaimedByUid matches authenticated UID.
+     * 3. ClaimedDeviceId matches installation ID.
+     * 4. Valid ownerUid distinct from claimant (proper direction).
+     * 5. Target device document exists.
+     * 6. Target device is not REVOKED.
+     * 7. Target device matches installation identity and auth identity.
+     * 8. Constant-time credentials check (bleSharedSecret) against expected secret if provided.
+     * 9. Resolves multiple duplicate invitations under the same verified owner.
+     * 10. Rejects multiple conflicting owners with explicit conflict error.
      */
     public static PairingRecoveryResult evaluateRecovery(
             String currentAuthUid,
             String currentInstallationId,
             List<Map<String, Object>> approvedInvitations,
             Map<String, Object> deviceDocument
+    ) {
+        return evaluateRecovery(currentAuthUid, currentInstallationId, approvedInvitations, deviceDocument, null);
+    }
+
+    public static PairingRecoveryResult evaluateRecovery(
+            String currentAuthUid,
+            String currentInstallationId,
+            List<Map<String, Object>> approvedInvitations,
+            Map<String, Object> deviceDocument,
+            String expectedBleSecret
+    ) {
+        Map<String, Map<String, Object>> docsByOwner = new HashMap<>();
+        if (approvedInvitations != null) {
+            for (Map<String, Object> inv : approvedInvitations) {
+                if (inv != null) {
+                    String oUid = (String) inv.get("ownerUid");
+                    if (oUid != null && !oUid.trim().isEmpty() && deviceDocument != null) {
+                        String docOwner = (String) deviceDocument.get("ownerUid");
+                        if (docOwner == null || docOwner.equals(oUid)) {
+                            docsByOwner.put(oUid, deviceDocument);
+                        }
+                    }
+                }
+            }
+        }
+        return evaluateRecoveryMultiOwner(currentAuthUid, currentInstallationId, approvedInvitations, docsByOwner, expectedBleSecret);
+    }
+
+    public static PairingRecoveryResult evaluateRecoveryMultiOwner(
+            String currentAuthUid,
+            String currentInstallationId,
+            List<Map<String, Object>> approvedInvitations,
+            Map<String, Map<String, Object>> deviceDocumentsByOwner,
+            String expectedBleSecret
     ) {
         if (currentAuthUid == null || currentAuthUid.trim().isEmpty()) {
             return PairingRecoveryResult.reject("Authenticated UID is missing or empty");
@@ -233,44 +274,141 @@ public class CommandExecutionManager {
         if (approvedInvitations == null || approvedInvitations.isEmpty()) {
             return PairingRecoveryResult.reject("No approved invitations found");
         }
-        if (approvedInvitations.size() > 1) {
-            return PairingRecoveryResult.reject("Ambiguous multiple approved invitations (" + approvedInvitations.size() + ")");
+
+        List<CandidateMatch> validCandidates = new ArrayList<>();
+        String lastRejectionReason = null;
+
+        for (Map<String, Object> inv : approvedInvitations) {
+            if (inv == null) continue;
+
+            String status = (String) inv.get("status");
+            if (!"APPROVED".equalsIgnoreCase(status)) {
+                lastRejectionReason = "Invitation status is not APPROVED: " + status;
+                continue;
+            }
+
+            String claimedByUid = (String) inv.get("claimedByUid");
+            if (!currentAuthUid.equals(claimedByUid)) {
+                lastRejectionReason = "Authenticated UID mismatch: expected " + currentAuthUid + ", found " + claimedByUid;
+                continue;
+            }
+
+            String claimedDeviceId = (String) inv.get("claimedDeviceId");
+            if (!currentInstallationId.equals(claimedDeviceId)) {
+                lastRejectionReason = "Installation ID mismatch: expected " + currentInstallationId + ", found " + claimedDeviceId;
+                continue;
+            }
+
+            String ownerUid = (String) inv.get("ownerUid");
+            if (ownerUid == null || ownerUid.trim().isEmpty()) {
+                lastRejectionReason = "Missing or empty ownerUid in invitation";
+                continue;
+            }
+
+            // Direction verification: owner cannot be the claimant device itself
+            if (ownerUid.equals(currentAuthUid)) {
+                lastRejectionReason = "Incorrect owner/target direction: ownerUid cannot match claiming device UID";
+                continue;
+            }
+
+            // Device document verification
+            Map<String, Object> devDoc = deviceDocumentsByOwner != null ? deviceDocumentsByOwner.get(ownerUid) : null;
+            if (devDoc == null) {
+                lastRejectionReason = "Device document does not exist under owner " + com.example.securetrack.utils.DeviceUtils.redactIdentifier(ownerUid);
+                continue;
+            }
+
+            String devStatus = (String) devDoc.get("status");
+            if ("REVOKED".equalsIgnoreCase(devStatus)) {
+                lastRejectionReason = "Device is REVOKED in Firestore under owner " + com.example.securetrack.utils.DeviceUtils.redactIdentifier(ownerUid);
+                continue;
+            }
+
+            // Verify installation ID and deviceAuthUid on device doc if present
+            String devInstallId = (String) devDoc.get("installationId");
+            if (devInstallId == null) devInstallId = (String) devDoc.get("id");
+            if (devInstallId != null && !currentInstallationId.equals(devInstallId)) {
+                lastRejectionReason = "Device document installationId mismatch: expected " + currentInstallationId + ", found " + devInstallId;
+                continue;
+            }
+
+            String devAuthUid = (String) devDoc.get("deviceAuthUid");
+            if (devAuthUid != null && !currentAuthUid.equals(devAuthUid)) {
+                lastRejectionReason = "Device document deviceAuthUid mismatch: expected " + currentAuthUid + ", found " + devAuthUid;
+                continue;
+            }
+
+            String invSecret = (String) inv.get("bleSharedSecret");
+            String devSecret = (String) devDoc.get("bleSharedSecret");
+
+            // If both invitation and device document have secrets, verify constant-time match
+            if (invSecret != null && devSecret != null) {
+                if (!com.example.securetrack.utils.DeviceUtils.constantTimeEquals(invSecret, devSecret)) {
+                    lastRejectionReason = "Pairing credentials mismatch between invitation and device document";
+                    continue;
+                }
+            }
+
+            // If expectedBleSecret is required, verify match
+            if (expectedBleSecret != null && !expectedBleSecret.trim().isEmpty()) {
+                String candidateSecret = invSecret != null ? invSecret : devSecret;
+                if (candidateSecret == null || !com.example.securetrack.utils.DeviceUtils.constantTimeEquals(expectedBleSecret, candidateSecret)) {
+                    lastRejectionReason = "Pairing credentials / shared secret mismatch with local session";
+                    continue;
+                }
+            }
+
+            String devName = (String) devDoc.get("deviceName");
+            if (devName == null || devName.trim().isEmpty()) {
+                devName = (String) devDoc.get("model");
+            }
+            if (devName == null || devName.trim().isEmpty()) {
+                devName = "Paired Android Device";
+            }
+
+            String effectiveSecret = invSecret != null ? invSecret : devSecret;
+            validCandidates.add(new CandidateMatch(ownerUid, devName, effectiveSecret));
         }
 
-        Map<String, Object> inv = approvedInvitations.get(0);
-        String status = (String) inv.get("status");
-        if (!"APPROVED".equalsIgnoreCase(status)) {
-            return PairingRecoveryResult.reject("Invitation status is not APPROVED: " + status);
+        if (validCandidates.isEmpty()) {
+            return PairingRecoveryResult.reject(lastRejectionReason != null
+                    ? lastRejectionReason
+                    : "No verified candidate invitations found matching target security policy");
         }
 
-        String claimedByUid = (String) inv.get("claimedByUid");
-        if (!currentAuthUid.equals(claimedByUid)) {
-            return PairingRecoveryResult.reject("Authenticated UID mismatch: expected " + currentAuthUid + ", found " + claimedByUid);
+        // Check for multiple conflicting owners
+        Set<String> distinctOwners = new HashSet<>();
+        for (CandidateMatch candidate : validCandidates) {
+            distinctOwners.add(candidate.ownerUid);
         }
 
-        String claimedDeviceId = (String) inv.get("claimedDeviceId");
-        if (!currentInstallationId.equals(claimedDeviceId)) {
-            return PairingRecoveryResult.reject("Installation ID mismatch: expected " + currentInstallationId + ", found " + claimedDeviceId);
+        if (distinctOwners.size() > 1) {
+            return PairingRecoveryResult.reject("Ownership conflict: Multiple conflicting owners claimed device. Requires fresh authorized pairing.");
         }
 
-        String ownerUid = (String) inv.get("ownerUid");
-        if (ownerUid == null || ownerUid.trim().isEmpty()) {
-            return PairingRecoveryResult.reject("Missing or empty ownerUid in invitation");
+        // All valid candidates share the exact same verified owner!
+        // Select candidate (prefer candidate with non-null bleSharedSecret if available)
+        CandidateMatch selected = validCandidates.get(0);
+        for (CandidateMatch candidate : validCandidates) {
+            if (candidate.bleSecret != null && !candidate.bleSecret.isEmpty()) {
+                selected = candidate;
+                break;
+            }
         }
 
-        if (deviceDocument == null) {
-            return PairingRecoveryResult.reject("Device document does not exist");
+        return PairingRecoveryResult.success(selected.ownerUid, selected.deviceName, selected.bleSecret);
+    }
+
+    private static class CandidateMatch {
+        final String ownerUid;
+        final String deviceName;
+        final String bleSecret;
+
+        CandidateMatch(String ownerUid, String deviceName, String bleSecret) {
+            this.ownerUid = ownerUid;
+            this.deviceName = deviceName;
+            this.bleSecret = bleSecret;
         }
-
-        String devStatus = (String) deviceDocument.get("status");
-        if ("REVOKED".equalsIgnoreCase(devStatus)) {
-            return PairingRecoveryResult.reject("Device is REVOKED in Firestore");
-        }
-
-        String devName = (String) deviceDocument.get("deviceName");
-        String bleSecret = (String) inv.get("bleSharedSecret");
-
-        return PairingRecoveryResult.success(ownerUid, devName, bleSecret);
     }
 
     /**
@@ -309,7 +447,7 @@ public class CommandExecutionManager {
 
             Log.d(TAG, "Checking pairing recovery for authUid=" + currentAuthUid + ", installationId=" + currentInstallationId);
 
-            pairingRecoveryService.checkRecovery(currentAuthUid, currentInstallationId, new IPairingRecoveryService.RecoveryCallback() {
+            pairingRecoveryService.checkRecovery(currentAuthUid, currentInstallationId, sessionManager.getBleSharedSecret(), new IPairingRecoveryService.RecoveryCallback() {
                 @Override
                 public void onRecoverySuccess(String ownerUid, String deviceName, String bleSecret) {
                     Log.i(TAG, "Self-healing pairing state verified for installation " + currentInstallationId + " under owner " + ownerUid);

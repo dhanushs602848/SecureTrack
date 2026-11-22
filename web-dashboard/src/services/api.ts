@@ -323,6 +323,11 @@ export const deviceService = {
     const deviceId = invitation.claimedDeviceId;
     if (!deviceId) throw new Error('Missing claimed device ID');
 
+    // Generate 256-bit cryptographically secure shared pairing secret
+    const secretBytes = new Uint8Array(32);
+    window.crypto.getRandomValues(secretBytes);
+    const bleSharedSecret = Array.from(secretBytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+
     const batch = writeBatch(db);
 
     // 1. Create registered device document under owner account
@@ -339,17 +344,19 @@ export const deviceService = {
       paired: true,
       protectionEnabled: true,
       installationId: deviceId,
+      bleSharedSecret: bleSharedSecret,
       lastSeen: serverTimestamp(),
       locationStatus: 'ENABLED',
       trackingStatus: 'ACTIVE',
       networkStatus: 'CONNECTED'
     }, { merge: true });
 
-    // 2. Mark invitation APPROVED atomically
+    // 2. Mark invitation APPROVED atomically with shared secret
     const invRef = doc(db, 'pairing_invitations', tokenHash);
     batch.update(invRef, {
       status: 'APPROVED',
-      approvedAt: serverTimestamp()
+      approvedAt: serverTimestamp(),
+      bleSharedSecret: bleSharedSecret
     });
 
     await batch.commit();

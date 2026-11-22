@@ -58,4 +58,25 @@ public class DeviceUtils {
             return Character.toUpperCase(first) + str.substring(1);
         }
     }
+
+    /**
+     * Redacts sensitive identifiers for audit logs and error messages.
+     * Never logs complete tokens, secrets or UIDs.
+     */
+    public static String redactIdentifier(String id) {
+        if (id == null) return "null";
+        if (id.length() <= 8) return "***";
+        return id.substring(0, 4) + "..." + id.substring(id.length() - 4);
+    }
+
+    /**
+     * Constant-time string comparison to prevent timing side-channel attacks on pairing secrets.
+     */
+    public static boolean constantTimeEquals(String a, String b) {
+        if (a == null && b == null) return true;
+        if (a == null || b == null) return false;
+        byte[] aBytes = a.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] bBytes = b.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        return java.security.MessageDigest.isEqual(aBytes, bBytes);
+    }
 }

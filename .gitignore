@@ -35,3 +35,5 @@ google-services.json
 *.png
 ui_*.xml
 release/
+*.apk
+web-dashboard/public/*.apk

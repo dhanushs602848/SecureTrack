@@ -401,3 +401,82 @@ exports.revokePairedDevice = functions
 
     return { success: true, deviceStatus: 'REVOKED' };
   });
+
+/**
+ * Firestore trigger: When a remote command is issued by an owner or web dashboard,
+ * send a high-priority FCM push wake-up data message to the target device.
+ */
+exports.onDeviceCommandCreated = functions.firestore
+  .document('users/{userId}/devices/{deviceId}/commands/{commandId}')
+  .onCreate(async (snap, context) => {
+    const { userId, deviceId, commandId } = context.params;
+    const commandData = snap.data();
+
+    if (!commandData) {
+      console.log(`Command ${commandId} contains no data, skipping FCM dispatch.`);
+      return null;
+    }
+
+    try {
+      // 1. Fetch target device document to retrieve its registered FCM token
+      const deviceRef = db.collection('users').doc(userId).collection('devices').doc(deviceId);
+      const deviceDoc = await deviceRef.get();
+
+      if (!deviceDoc.exists) {
+        console.warn(`Target device ${deviceId} under owner ${userId} not found.`);
+        return null;
+      }
+
+      const deviceData = deviceDoc.data();
+      const fcmToken = deviceData.fcmToken;
+
+      if (!fcmToken || typeof fcmToken !== 'string' || fcmToken.trim().length === 0) {
+        console.log(`Device ${deviceId} has no FCM token registered; skipping FCM push.`);
+        return null;
+      }
+
+      // 2. Build high-priority data-only payload
+      const payload = {
+        token: fcmToken.trim(),
+        data: {
+          commandId: String(commandId),
+          targetDeviceId: String(deviceId),
+          ownerUid: String(userId),
+          type: String(commandData.commandType || commandData.type || 'COMMAND_WAKE'),
+          requestId: String(commandData.requestId || commandId),
+          timestamp: String(commandData.createdAt || Date.now())
+        },
+        android: {
+          priority: 'high'
+        }
+      };
+
+      // 3. Send message via Firebase Admin Messaging
+      const response = await admin.messaging().send(payload);
+      console.log(`FCM push wake-up sent for command ${commandId} to device ${deviceId}: ${response}`);
+
+      await snap.ref.update({
+        fcmDispatchedAt: admin.firestore.FieldValue.serverTimestamp(),
+        fcmMessageId: response
+      }).catch(err => console.warn(`Could not update fcmDispatchedAt on command: ${err.message}`));
+
+      return response;
+    } catch (error) {
+      console.error(`Error sending FCM push for command ${commandId}:`, error);
+
+      // Clean up stale or invalid tokens automatically
+      if (error.code === 'messaging/registration-token-not-registered' ||
+          error.code === 'messaging/invalid-registration-token') {
+        console.warn(`Stale FCM token detected for device ${deviceId}. Clearing token.`);
+        try {
+          await db.collection('users').doc(userId).collection('devices').doc(deviceId).update({
+            fcmToken: admin.firestore.FieldValue.delete(),
+            fcmTokenInvalidatedAt: admin.firestore.FieldValue.serverTimestamp()
+          });
+        } catch (cleanupErr) {
+          console.error(`Failed to clear invalid FCM token: ${cleanupErr.message}`);
+        }
+      }
+      return null;
+    }
+  });

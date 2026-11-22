@@ -27,5 +27,6 @@ public class SecureTrackApp extends Application {
 
         com.example.securetrack.sync.DurableSyncManager.initializePeriodicSync(this);
         com.example.securetrack.security.CommandExecutionManager.getInstance(this).startListeningToCommands();
+        com.example.securetrack.fcm.FcmTokenManager.registerOrRefreshFcmToken(this);
     }
 }
