@@ -82,6 +82,47 @@ public class MainActivity extends AppCompatActivity {
 
         handleNavigationIntent(getIntent());
         checkUserRequestedExit();
+        checkBiometricAuthentication();
+    }
+
+    private static boolean isSessionAuthenticated = false;
+
+    public static void resetSessionAuthentication() {
+        isSessionAuthenticated = false;
+    }
+
+    private void checkBiometricAuthentication() {
+        com.example.securetrack.utils.SessionManager sm = new com.example.securetrack.utils.SessionManager(this);
+        if (sm.isBiometricLockEnabled() && !isSessionAuthenticated && !sm.isPairedSecondaryDevice()) {
+            if (com.example.securetrack.security.BiometricAuthHelper.canAuthenticate(this)) {
+                binding.getRoot().setVisibility(android.view.View.INVISIBLE);
+                com.example.securetrack.security.BiometricAuthHelper.authenticate(
+                        this,
+                        "SecureTrack Identity Verification",
+                        "Scan fingerprint, face, or enter device PIN to access SecureTrack",
+                        new com.example.securetrack.security.BiometricAuthHelper.AuthCallback() {
+                            @Override
+                            public void onAuthSuccess() {
+                                isSessionAuthenticated = true;
+                                binding.getRoot().setVisibility(android.view.View.VISIBLE);
+                            }
+
+                            @Override
+                            public void onAuthError(int errorCode, @androidx.annotation.NonNull CharSequence errString) {
+                                android.widget.Toast.makeText(MainActivity.this, "Authentication required to access SecureTrack", android.widget.Toast.LENGTH_SHORT).show();
+                                finish();
+                            }
+
+                            @Override
+                            public void onAuthFailed() {
+                                // Biometric prompt allows retries or fallback to device credential
+                            }
+                        }
+                );
+            }
+        } else {
+            binding.getRoot().setVisibility(android.view.View.VISIBLE);
+        }
     }
 
     @Override
@@ -104,6 +145,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        checkBiometricAuthentication();
         // Check location state when the app resumes to identify missed transitions
         LocationSecurityManager.getInstance(this).checkLocationState();
         // Update device heartbeat on app resume

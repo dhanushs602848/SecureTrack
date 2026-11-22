@@ -42,6 +42,7 @@ public class ProfileFragment extends Fragment {
         binding.btnLogout.setOnClickListener(v -> {
             FirebaseAuth.getInstance().signOut();
             sessionManager.logout();
+            com.example.securetrack.MainActivity.resetSessionAuthentication();
             Intent intent = new Intent(requireContext(), LoginActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             startActivity(intent);

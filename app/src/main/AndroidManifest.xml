@@ -60,6 +60,13 @@
         <activity android:name=".activities.LocationHistoryActivity" android:exported="false" />
         <activity android:name=".activities.DeviceSecurityActivity" android:exported="false" />
         <activity android:name=".activities.LostDeviceActivity" android:exported="false" />
+        <activity
+            android:name=".activities.EmergencyLockActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true" />
         <activity android:name=".activities.SettingsActivity" android:exported="false" />
         <activity android:name=".activities.DiagnosticsActivity" android:exported="false" />
 

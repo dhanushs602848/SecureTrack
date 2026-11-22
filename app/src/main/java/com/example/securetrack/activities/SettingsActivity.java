@@ -63,6 +63,17 @@ public class SettingsActivity extends AppCompatActivity {
             Toast.makeText(this, isChecked ? "Background GPS enabled" : "Background GPS disabled", Toast.LENGTH_SHORT).show();
         });
 
+        binding.switchBiometricLock.setChecked(sessionManager.isBiometricLockEnabled());
+        binding.switchBiometricLock.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked && !com.example.securetrack.security.BiometricAuthHelper.canAuthenticate(this)) {
+                binding.switchBiometricLock.setChecked(false);
+                Toast.makeText(this, "Biometrics or device lock credentials are not configured on this phone.", Toast.LENGTH_LONG).show();
+                return;
+            }
+            sessionManager.setBiometricLockEnabled(isChecked);
+            Toast.makeText(this, isChecked ? "Biometric App Shield enabled" : "Biometric App Shield disabled", Toast.LENGTH_SHORT).show();
+        });
+
         // 3. Device Administrator Privilege
         binding.btnManageAdmin.setOnClickListener(v -> {
             boolean isAdmin = SecureAdminReceiver.isAdminActive(this);

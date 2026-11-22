@@ -367,7 +367,7 @@ Continuous verification is enforced across Android and Web:
 1. **Hardware Power-Off**: Like all commercial Android security products, software cannot execute while a physical battery is depleted or when a device is completely powered down.
 2. **Hardware Power Button Long-Press**: On personal/unmanaged devices, Android hardware forced shutdown (holding power for 8-10 seconds) is executed by the power management integrated circuit (PMIC) and cannot be intercepted by third-party applications. Anti-shutdown Lock Task mode is only accessible under Android Enterprise Device Owner provisioning.
 3. **Background Location Limits**: Android 10+ battery optimization limits background location polling unless the user explicitly grants `"Allow all the time"` in system settings and whitelists SecureTrack from battery optimization.
-4. **Single-Device Testing Environment**: Physical verification performed using Samsung Galaxy A07 (`SM-A076B`). Multi-device pairing tested through single-device enrollment and web dashboard administration.
+4. **Physical Two-Device Testing Progress**: On 23 November 2026, an initial physical two-device test was conducted using a Samsung Galaxy A07 5G (Owner/Controller) and Vivo V2428 (Paired Secondary). The Vivo device successfully appeared in the Samsung device list, and the Samsung device successfully displayed the Vivo device's location (**PASS**). Dynamic coordinate refresh upon moving the phone, remote lock, daytime siren, and locked-screen background FCM wake-up are currently **PENDING** physical validation.
 
 ---
 

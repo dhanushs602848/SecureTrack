@@ -123,3 +123,4 @@ SecureTrack is engineered to operate across different Android OEMs and form fact
 | **Web Dashboard Unit Suite** | Web Tests | **PASS** | 5 passed, 0 failed (`node --test test/auth.test.js`) |
 | **Firestore Security Rules** | Rules Config | **PASS** | Rules compiled and verified |
 | **Self-Healing Pairing Logic** | Architecture & Code | **PASS** | Enrolled devices retain owner UID across Google account sign-ins |
+| **Physical Two-Device Testing (23 Nov 2026)** | Samsung + Vivo | **PARTIAL PASS** | Device list visibility & initial location display: **PASS**; Dynamic coordinate refresh, lock, daytime siren, locked-screen FCM wake-up: **PENDING** |

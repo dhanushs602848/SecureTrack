@@ -51,7 +51,24 @@ When testing on physical Android test hardware:
 2. **Permissions Flow**: Location (fine + background), Camera, and Device Admin prompts appear in sequence.
 3. **QR Code Pairing**: Web dashboard displays fresh QR code; camera scans and links device in under 2 seconds.
 4. **Live Telemetry Stream**: Device battery percentage and GPS coordinates update on the web dashboard map.
-5. **Command Execution (Status: Unverified / In-Progress)**:
-   - `Ring Alarm`: Triggers audible ringtone on device (needs physical multi-device validation across manufacturer aggressive power management).
-   - `Lock Device`: Invokes DevicePolicyManager to lock screen (needs confirmation across Android 14/15 OEM lockscreen policies).
+5. **Command Execution**:
+   - `Ring Alarm`: Triggers audible ringtone on device (deferred to daytime testing).
+   - `Lock Device`: Invokes DevicePolicyManager to lock screen.
 6. **Device Revocation**: Web dashboard "Revoke" button cleanly removes target device registration without `internal [0]` errors.
+
+---
+
+## 4. Physical Two-Device Acceptance Testing (23 November 2026)
+
+Initial physical two-device validation performed with **Samsung Galaxy A07 5G** (Owner/Controller) and **Vivo V2428** (Paired Secondary):
+
+| Test ID | Scenario | Status | Verified Details & Pending Scope |
+|---|---|---|---|
+| **PHY-01** | Device List Visibility | **PASS** | Vivo device appears in the Samsung SecureTrack device list with accurate name, model, and online status. |
+| **PHY-02** | Initial Location Display | **PASS** | Samsung device successfully displays the Vivo device's reported location coordinates. |
+| **PHY-03** | Move Vivo & Refresh Coordinates ("Locate Now") | **PENDING** | Move Vivo device and press Locate Now on Samsung to verify fresh GPS coordinates are received. |
+| **PHY-04** | Location Timestamp Update | **PENDING** | Verify that the location timestamp updates accurately upon telemetry ingestion. |
+| **PHY-05** | Remote Lock Functionality | **PENDING** | Verify screen lock invocation via DevicePolicyManager on Vivo. |
+| **PHY-06** | Remote Siren Functionality | **PENDING** | Verify 5-second synthesized alarm siren on Vivo (deferred until daytime). |
+| **PHY-07** | Locked-Screen FCM Background Wake-up | **PENDING** | Verify high-priority FCM wake-up on Vivo with screen locked under OEM power management. |
+| **PHY-08** | End-to-End Real-World Conditions | **PENDING** | Verify complete two-device workflow under realistic loss/theft field conditions. |

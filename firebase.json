@@ -8,6 +8,18 @@
         "**/.*",
         "**/node_modules/**"
       ],
+      "redirects": [
+        {
+          "source": "/SecureTrack.apk",
+          "destination": "https://github.com/dhanushs602848/SecureTrack/releases/download/v1.7/SecureTrack.apk",
+          "type": 302
+        },
+        {
+          "source": "/download",
+          "destination": "https://github.com/dhanushs602848/SecureTrack/releases/download/v1.7/SecureTrack.apk",
+          "type": 302
+        }
+      ],
       "rewrites": [
         {
           "source": "**",
@@ -24,6 +36,16 @@
         "**/node_modules/**"
       ],
       "redirects": [
+        {
+          "source": "/SecureTrack.apk",
+          "destination": "https://github.com/dhanushs602848/SecureTrack/releases/download/v1.7/SecureTrack.apk",
+          "type": 302
+        },
+        {
+          "source": "/download",
+          "destination": "https://github.com/dhanushs602848/SecureTrack/releases/download/v1.7/SecureTrack.apk",
+          "type": 302
+        },
         {
           "source": "/:path*",
           "destination": "https://track-99c90-track.web.app/:path",

@@ -31,6 +31,7 @@ public class SessionManager {
     private static final String KEY_IS_PAIRED_DEVICE = "is_paired_secondary_device";
     private static final String KEY_PAIRED_OWNER_UID = "paired_owner_uid";
     private static final String KEY_IS_ANONYMOUS = "is_anonymous_user";
+    private static final String KEY_BIOMETRIC_LOCK = "biometric_lock_enabled";
 
     public static final String THEME_LIGHT = "LIGHT";
     public static final String THEME_DARK = "DARK";
@@ -318,6 +319,14 @@ public class SessionManager {
 
     public void setLowBatteryAlertEnabled(boolean enabled) {
         prefs.edit().putBoolean(KEY_LOW_BATTERY_ALERT, enabled).apply();
+    }
+
+    public boolean isBiometricLockEnabled() {
+        return prefs.getBoolean(KEY_BIOMETRIC_LOCK, false);
+    }
+
+    public void setBiometricLockEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_BIOMETRIC_LOCK, enabled).apply();
     }
 
     private static final String KEY_BLE_SHARED_SECRET = "ble_shared_secret";

@@ -24,3 +24,19 @@ In accordance with strict technical integrity and engineering standards, this do
 
 2. **Background Location Frequency**:
    - Android 10+ restricts background location polling frequency when apps are not foregrounded. SecureTrack maintains real-time tracking by operating an explicit **Foreground Service** with an ongoing notification. If the user revokes the foreground notification or forces battery optimization to "Restricted", the OS may throttle location updates to interval batches.
+
+---
+
+## 3. Physical Two-Device Testing Status (23 November 2026)
+
+- **Completed & Verified (PASS):**
+  - Samsung Galaxy A07 5G (Owner) + Vivo V2428 (Paired Secondary) initial connectivity.
+  - Vivo device successfully appears in the Samsung SecureTrack device list.
+  - Samsung device successfully displays the Vivo device's current location.
+- **Pending Daytime & Field Validation (PENDING):**
+  - Moving the Vivo device and executing "Locate Now" from Samsung to verify fresh GPS coordinate transmission.
+  - Verifying real-time location timestamp updates upon fresh telemetry ingestion.
+  - Remote Lock execution via DevicePolicyManager on the target handset.
+  - Remote Siren acoustic alarm playback (intentionally deferred until daytime).
+  - High-priority FCM wake-up while the Vivo device screen is locked.
+  - Complete end-to-end multi-device workflow under realistic loss/theft field conditions.
