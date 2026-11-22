@@ -2,7 +2,9 @@ name: SecureTrack Continuous Integration
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - fix/securetrack-global-two-device-release
   pull_request:
     branches: [ main ]
 

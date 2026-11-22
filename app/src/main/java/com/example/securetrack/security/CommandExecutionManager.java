@@ -149,30 +149,68 @@ public class CommandExecutionManager {
         return processedCommandIds.contains(commandId);
     }
 
+    public interface IAuthUserProvider {
+        boolean hasCurrentUser();
+        boolean isCurrentUserAnonymous();
+        String getCurrentUserUid();
+    }
+
+    private IAuthUserProvider authUserProvider;
+
+    public void setAuthUserProvider(IAuthUserProvider authUserProvider) {
+        this.authUserProvider = authUserProvider;
+    }
+
     private String getUid() {
+        if (authUserProvider != null) {
+            if (authUserProvider.hasCurrentUser() && !authUserProvider.isCurrentUserAnonymous()) {
+                String ownerUid = authUserProvider.getCurrentUserUid();
+                sessionManager.setPairedSecondaryDevice(false);
+                sessionManager.setOwnerUid(ownerUid);
+                return ownerUid;
+            }
+        } else {
+            FirebaseAuth auth = null;
+            try {
+                auth = FirebaseAuth.getInstance();
+            } catch (Exception ignored) {}
+            if (auth != null && auth.getCurrentUser() != null && !auth.getCurrentUser().isAnonymous()) {
+                String ownerUid = auth.getCurrentUser().getUid();
+                sessionManager.setPairedSecondaryDevice(false);
+                sessionManager.setOwnerUid(ownerUid);
+                return ownerUid;
+            }
+        }
+
         if (sessionManager.isPairedSecondaryDevice()) {
             String pairedOwnerUid = sessionManager.getPairedOwnerUid();
             if (pairedOwnerUid != null && !pairedOwnerUid.isEmpty()) {
                 return pairedOwnerUid;
             }
         }
-        FirebaseAuth auth = null;
-        try {
-            auth = FirebaseAuth.getInstance();
-        } catch (Exception ignored) {}
-        if (auth != null && auth.getCurrentUser() != null) {
-            if (auth.getCurrentUser().isAnonymous()) {
+
+        if (authUserProvider != null) {
+            if (authUserProvider.hasCurrentUser() && authUserProvider.isCurrentUserAnonymous()) {
                 String ownerUid = sessionManager.getOwnerUid();
                 if (ownerUid != null && !ownerUid.isEmpty()) {
                     return ownerUid;
                 }
-            } else {
-                if (!sessionManager.isPairedSecondaryDevice()) {
-                    sessionManager.setOwnerUid(auth.getCurrentUser().getUid());
-                    return auth.getCurrentUser().getUid();
+                return authUserProvider.getCurrentUserUid();
+            }
+        } else {
+            FirebaseAuth auth = null;
+            try {
+                auth = FirebaseAuth.getInstance();
+            } catch (Exception ignored) {}
+            if (auth != null && auth.getCurrentUser() != null && auth.getCurrentUser().isAnonymous()) {
+                String ownerUid = sessionManager.getOwnerUid();
+                if (ownerUid != null && !ownerUid.isEmpty()) {
+                    return ownerUid;
                 }
+                return auth.getCurrentUser().getUid();
             }
         }
+
         return sessionManager.getOwnerUid();
     }
 
@@ -425,27 +463,46 @@ public class CommandExecutionManager {
     public synchronized void startListeningToCommands() {
         stopListeningToCommands();
 
-        FirebaseAuth auth = null;
-        try {
-            auth = FirebaseAuth.getInstance();
-        } catch (Exception ignored) {}
-        String currentInstallationId = sessionManager.getInstallationId();
-
+        boolean isAnonymousDeviceUser = false;
         String currentAuthUid = null;
-        if (auth != null && auth.getCurrentUser() != null) {
-            currentAuthUid = auth.getCurrentUser().getUid();
-        } else if (sessionManager.getFirebaseUid() != null) {
-            currentAuthUid = sessionManager.getFirebaseUid();
+
+        if (authUserProvider != null) {
+            if (authUserProvider.hasCurrentUser()) {
+                if (authUserProvider.isCurrentUserAnonymous()) {
+                    isAnonymousDeviceUser = true;
+                    currentAuthUid = authUserProvider.getCurrentUserUid();
+                } else {
+                    isAnonymousDeviceUser = false;
+                }
+            }
+        } else {
+            FirebaseAuth auth = null;
+            try {
+                auth = FirebaseAuth.getInstance();
+            } catch (Exception ignored) {}
+            com.google.firebase.auth.FirebaseUser currentUser = (auth != null) ? auth.getCurrentUser() : null;
+
+            if (currentUser != null) {
+                if (currentUser.isAnonymous()) {
+                    isAnonymousDeviceUser = true;
+                    currentAuthUid = currentUser.getUid();
+                }
+            } else if (sessionManager != null && sessionManager.isAnonymous()) {
+                isAnonymousDeviceUser = true;
+                currentAuthUid = sessionManager.getFirebaseUid();
+            }
         }
 
-        // Exact pairing recovery: Self-heal secondary enrollment using exact claimedDeviceId + authUid + status
-        if (currentAuthUid != null && !sessionManager.isPairedSecondaryDevice()) {
+        String currentInstallationId = sessionManager.getInstallationId();
+
+        // Exact pairing recovery: Self-heal secondary enrollment strictly for authenticated anonymous Firebase device users
+        if (isAnonymousDeviceUser && currentAuthUid != null && !sessionManager.isPairedSecondaryDevice()) {
             if (currentInstallationId == null || currentInstallationId.isEmpty()) {
                 Log.w(TAG, "Cannot attempt pairing recovery: missing installationId");
                 return;
             }
 
-            Log.d(TAG, "Checking pairing recovery for authUid=" + currentAuthUid + ", installationId=" + currentInstallationId);
+            Log.d(TAG, "Checking pairing recovery for anonymous authUid=" + currentAuthUid + ", installationId=" + currentInstallationId);
 
             pairingRecoveryService.checkRecovery(currentAuthUid, currentInstallationId, sessionManager.getBleSharedSecret(), new IPairingRecoveryService.RecoveryCallback() {
                 @Override

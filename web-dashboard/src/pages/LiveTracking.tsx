@@ -14,10 +14,16 @@ export const LiveTracking: React.FC = () => {
   useEffect(() => {
     const unsubDevices = deviceService.subscribeToDevices((data) => {
       setDevices(data);
-      if (data.length > 0 && !selectedDeviceId) {
-        setSelectedDeviceId(data[0].id);
-      }
+
+      setSelectedDeviceId((currentId) => {
+        if (currentId && data.some((device) => device.id === currentId)) {
+          return currentId;
+        }
+
+        return data[0]?.id ?? '';
+      });
     });
+
     return () => unsubDevices();
   }, []);
 

@@ -82,4 +82,51 @@ test('SecureTrack Web Dashboard Auth & Command Integrity Suite', async (t) => {
     assert.equal(correlateLocationResponse(reqId, matchingRecord).match, true);
     assert.equal(correlateLocationResponse(reqId, mismatchRecord).match, false);
   });
+
+  await t.test('Device selector state updater retains selected device across Firestore snapshot updates', () => {
+    function resolveNextDeviceId(currentId, data) {
+      if (currentId && data.some((device) => device.id === currentId)) {
+        return currentId;
+      }
+      return data[0]?.id ?? '';
+    }
+
+    const initialDevices = [
+      { id: 'vivo-v23', deviceName: 'Vivo V23', model: 'V2130', status: 'ONLINE' },
+      { id: 'samsung-s22', deviceName: 'Samsung Galaxy S22', model: 'SM-S901B', status: 'ONLINE' }
+    ];
+
+    // 1. Initial empty selection falls back to the first available device (Vivo)
+    let selectedId = '';
+    selectedId = resolveNextDeviceId(selectedId, initialDevices);
+    assert.equal(selectedId, 'vivo-v23', 'Initial snapshot selects first device (Vivo)');
+
+    // 2. Select Vivo - Vivo remains selected
+    selectedId = 'vivo-v23';
+    selectedId = resolveNextDeviceId(selectedId, initialDevices);
+    assert.equal(selectedId, 'vivo-v23', 'Vivo selection persists');
+
+    // 3. User switches selection to Samsung
+    selectedId = 'samsung-s22';
+    assert.equal(selectedId, 'samsung-s22', 'Selected Samsung device');
+
+    // 4. Trigger subsequent Firestore device snapshot update (e.g., telemetry update)
+    const updatedDevicesSnapshot = [
+      { id: 'vivo-v23', deviceName: 'Vivo V23', model: 'V2130', status: 'ONLINE', batteryLevel: 82 },
+      { id: 'samsung-s22', deviceName: 'Samsung Galaxy S22', model: 'SM-S901B', status: 'ONLINE', batteryLevel: 95 }
+    ];
+    selectedId = resolveNextDeviceId(selectedId, updatedDevicesSnapshot);
+    assert.equal(selectedId, 'samsung-s22', 'Samsung remains selected after Firestore snapshot update');
+
+    // 5. If selected device is removed, safely falls back to the first available device
+    const devicesWithoutSamsung = [
+      { id: 'vivo-v23', deviceName: 'Vivo V23', model: 'V2130', status: 'ONLINE' }
+    ];
+    selectedId = resolveNextDeviceId(selectedId, devicesWithoutSamsung);
+    assert.equal(selectedId, 'vivo-v23', 'Falls back to Vivo when Samsung is removed');
+
+    // Safe fallback when device list is empty
+    selectedId = resolveNextDeviceId(selectedId, []);
+    assert.equal(selectedId, '', 'Falls back to empty string when no devices available');
+  });
 });

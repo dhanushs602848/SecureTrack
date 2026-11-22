@@ -30,6 +30,7 @@ public class SessionManager {
     private static final String KEY_LOW_BATTERY_ALERT = "low_battery_alert_enabled";
     private static final String KEY_IS_PAIRED_DEVICE = "is_paired_secondary_device";
     private static final String KEY_PAIRED_OWNER_UID = "paired_owner_uid";
+    private static final String KEY_IS_ANONYMOUS = "is_anonymous_user";
 
     public static final String THEME_LIGHT = "LIGHT";
     public static final String THEME_DARK = "DARK";
@@ -61,11 +62,26 @@ public class SessionManager {
         SharedPreferences.Editor editor = prefs.edit()
                 .putString(KEY_FIREBASE_UID, uid)
                 .putString(KEY_USER_EMAIL, email)
-                .putString(KEY_USER_NAME, fullName);
+                .putString(KEY_USER_NAME, fullName)
+                .putBoolean(KEY_IS_ANONYMOUS, false);
         if (!isPairedSecondaryDevice()) {
             editor.putString(KEY_OWNER_UID, uid);
         }
         editor.apply();
+    }
+
+    public boolean isAnonymous() {
+        try {
+            com.google.firebase.auth.FirebaseAuth auth = com.google.firebase.auth.FirebaseAuth.getInstance();
+            if (auth.getCurrentUser() != null) {
+                return auth.getCurrentUser().isAnonymous();
+            }
+        } catch (Exception ignored) {}
+        return prefs.getBoolean(KEY_IS_ANONYMOUS, false);
+    }
+
+    public void setAnonymous(boolean isAnonymous) {
+        prefs.edit().putBoolean(KEY_IS_ANONYMOUS, isAnonymous).apply();
     }
 
     public String getToken() {
@@ -76,8 +92,8 @@ public class SessionManager {
         String uid = prefs.getString(KEY_FIREBASE_UID, null);
         if (uid == null) {
             try {
-                if (FirebaseAuth.getInstance().getCurrentUser() != null) {
-                    uid = FirebaseAuth.getInstance().getCurrentUser().getUid();
+                if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
+                    uid = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getUid();
                 }
             } catch (Exception ignored) {}
         }
@@ -97,7 +113,11 @@ public class SessionManager {
     }
 
     public void setPairedOwnerUid(String ownerUid) {
-        prefs.edit().putString(KEY_PAIRED_OWNER_UID, ownerUid).apply();
+        if (ownerUid == null) {
+            prefs.edit().remove(KEY_PAIRED_OWNER_UID).apply();
+        } else {
+            prefs.edit().putString(KEY_PAIRED_OWNER_UID, ownerUid).apply();
+        }
     }
 
     /**

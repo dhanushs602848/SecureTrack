@@ -99,9 +99,17 @@ public class SplashActivity extends AppCompatActivity {
                 String uid = currentUser.getUid();
                 String email = currentUser.getEmail() != null ? currentUser.getEmail() : "";
                 String name = currentUser.getDisplayName() != null ? currentUser.getDisplayName() : email;
-                String existingOwner = sessionManager.getOwnerUid();
-                if (existingOwner == null || existingOwner.isEmpty()) {
+
+                if (!currentUser.isAnonymous()) {
+                    sessionManager.setPairedSecondaryDevice(false);
+                    sessionManager.setPairedOwnerUid(null);
+                    sessionManager.setOwnerUid(uid);
                     sessionManager.saveFirebaseAuthSession(uid, email, name);
+                } else {
+                    String existingOwner = sessionManager.getOwnerUid();
+                    if (existingOwner == null || existingOwner.isEmpty()) {
+                        sessionManager.saveFirebaseAuthSession(uid, email, name);
+                    }
                 }
                 targetActivity = MainActivity.class;
             } else if (sessionManager.isLoggedIn()) {

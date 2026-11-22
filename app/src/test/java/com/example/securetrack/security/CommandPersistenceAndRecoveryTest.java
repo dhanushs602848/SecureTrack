@@ -3,6 +3,7 @@ package com.example.securetrack.security;
 import android.content.SharedPreferences;
 import com.example.securetrack.database.CommandEntity;
 import com.example.securetrack.database.LocationEntity;
+import com.example.securetrack.repositories.DeviceRepository;
 import com.example.securetrack.utils.SessionManager;
 import org.junit.Before;
 import org.junit.Test;
@@ -487,7 +488,26 @@ public class CommandPersistenceAndRecoveryTest {
         // Mock session with anonymous/secondary auth user
         sessionManager.setInstallationId("inst-samsung-001");
         sessionManager.setPairedSecondaryDevice(false);
-        sessionManager.saveFirebaseAuthSession("secondary-auth-uid-123", "sec@test.com", "Secondary User");
+        sessionManager.setAnonymous(true);
+        sessionManager.saveFirebaseAuthSession("secondary-auth-uid-123", "", "Secondary Device");
+        sessionManager.setAnonymous(true);
+
+        manager.setAuthUserProvider(new CommandExecutionManager.IAuthUserProvider() {
+            @Override
+            public boolean hasCurrentUser() {
+                return true;
+            }
+
+            @Override
+            public boolean isCurrentUserAnonymous() {
+                return true;
+            }
+
+            @Override
+            public String getCurrentUserUid() {
+                return "secondary-auth-uid-123";
+            }
+        });
 
         // Configure recovery to be REJECTED (e.g. device is revoked)
         fakeRecovery.mode = FakePairingRecoveryService.Mode.REJECTED;
@@ -507,7 +527,26 @@ public class CommandPersistenceAndRecoveryTest {
     public void testListenerStartupProceedsWhenSecondaryPairingIsVerified() {
         sessionManager.setInstallationId("inst-samsung-001");
         sessionManager.setPairedSecondaryDevice(false);
-        sessionManager.saveFirebaseAuthSession("secondary-auth-uid-123", "sec@test.com", "Secondary User");
+        sessionManager.setAnonymous(true);
+        sessionManager.saveFirebaseAuthSession("secondary-auth-uid-123", "", "Secondary Device");
+        sessionManager.setAnonymous(true);
+
+        manager.setAuthUserProvider(new CommandExecutionManager.IAuthUserProvider() {
+            @Override
+            public boolean hasCurrentUser() {
+                return true;
+            }
+
+            @Override
+            public boolean isCurrentUserAnonymous() {
+                return true;
+            }
+
+            @Override
+            public String getCurrentUserUid() {
+                return "secondary-auth-uid-123";
+            }
+        });
 
         fakeRecovery.mode = FakePairingRecoveryService.Mode.SUCCESS;
         fakeRecovery.ownerUid = "verified-owner-789";
@@ -521,6 +560,169 @@ public class CommandPersistenceAndRecoveryTest {
         assertEquals("verified-owner-789", sessionManager.getPairedOwnerUid());
         assertEquals("Samsung Galaxy A07", sessionManager.getDeviceName());
         assertEquals("ble-secret-xyz", sessionManager.getBleSharedSecret());
+    }
+
+    // =========================================================================
+    // 12. HUMAN OWNER SESSION INTEGRITY & REVERSE INVITATION SHIELD
+    // =========================================================================
+
+    @Test
+    public void testHistoricalReverseInvitationDoesNotReEnrolAuthenticatedHumanOwner() {
+        // Authenticated human owner signed in with Email / Google
+        sessionManager.setInstallationId("synthetic-samsung-inst-001");
+        sessionManager.setPairedSecondaryDevice(false);
+        sessionManager.saveFirebaseAuthSession("synthetic-owner-uid-101", "owner@securetrack.synthetic", "Synthetic Owner");
+        sessionManager.setAnonymous(false);
+
+        // Historical reverse invitation exists where secondary device was owner and primary claimed it
+        fakeRecovery.mode = FakePairingRecoveryService.Mode.SUCCESS;
+        fakeRecovery.ownerUid = "synthetic-target-uid-202";
+        fakeRecovery.deviceName = "Samsung SM-A076B";
+        fakeRecovery.bleSecret = "ble-reverse-secret";
+
+        // Invoke startListeningToCommands
+        manager.startListeningToCommands();
+
+        // Verify that human owner was NOT hijacked into secondary device
+        assertFalse("Authenticated human owner must NEVER be enrolled as secondary device via historical recovery",
+                sessionManager.isPairedSecondaryDevice());
+        assertNull("Paired owner UID must remain null for authenticated human owner",
+                sessionManager.getPairedOwnerUid());
+        assertEquals("Owner UID must remain authenticated owner UID",
+                "synthetic-owner-uid-101", sessionManager.getOwnerUid());
+    }
+
+    @Test
+    public void testHumanOwnerWithStaleSecondaryFlagIsRecoveredToOwner() {
+        // Precondition: Owner device was contaminated with stale secondary flag from previous test
+        sessionManager.setInstallationId("synthetic-samsung-inst-001");
+        sessionManager.setPairedSecondaryDevice(true);
+        sessionManager.setPairedOwnerUid("synthetic-target-uid-202");
+        sessionManager.setOwnerUid("synthetic-target-uid-202");
+
+        // SplashActivity execution order for authenticated non-anonymous human owner:
+        // 1. Clear secondary flag
+        sessionManager.setPairedSecondaryDevice(false);
+        // 2. Clear stale paired owner UID
+        sessionManager.setPairedOwnerUid(null);
+        // 3. Set owner UID to current authenticated Firebase UID
+        sessionManager.setOwnerUid("synthetic-owner-uid-101");
+        // 4. Save current Firebase authentication session
+        sessionManager.saveFirebaseAuthSession("synthetic-owner-uid-101", "owner@securetrack.synthetic", "Synthetic Owner");
+
+        // Verify full session recovery
+        assertFalse("Secondary flag must be false", sessionManager.isPairedSecondaryDevice());
+        assertNull("Paired owner UID must be cleared", sessionManager.getPairedOwnerUid());
+        assertEquals("synthetic-owner-uid-101", sessionManager.getOwnerUid());
+        assertEquals("synthetic-owner-uid-101", sessionManager.getFirebaseUid());
+        assertFalse("Session must not be anonymous", sessionManager.isAnonymous());
+    }
+
+    @Test
+    public void testAnonymousSecondaryDevicePreservesSecondaryState() {
+        // Legitimate enrolled secondary phone (e.g. Vivo V2428)
+        sessionManager.setInstallationId("synthetic-vivo-inst-002");
+        sessionManager.setAnonymous(true);
+        sessionManager.setPairedSecondaryDevice(true);
+        sessionManager.setPairedOwnerUid("synthetic-owner-uid-101");
+        sessionManager.setOwnerUid("synthetic-owner-uid-101");
+
+        assertTrue("Secondary flag must remain true for enrolled secondary", sessionManager.isPairedSecondaryDevice());
+        assertEquals("synthetic-owner-uid-101", sessionManager.getPairedOwnerUid());
+        assertEquals("synthetic-owner-uid-101", sessionManager.getOwnerUid());
+    }
+
+    // =========================================================================
+    // 13. DEDICATED ROUTING AND AUTH PROVIDER TESTS
+    // =========================================================================
+
+    @Test
+    public void testDeviceRepository_HumanOwnerWithStaleSecondaryFlag_UsesCollectionQueryRoute() {
+        sessionManager.setPairedSecondaryDevice(true);
+        sessionManager.setOwnerUid("synthetic-target-uid-202");
+        sessionManager.setPairedOwnerUid("synthetic-target-uid-202");
+
+        DeviceRepository repo = new DeviceRepository(null, null, sessionManager);
+        repo.setAuthUserProvider(new DeviceRepository.IAuthUserProvider() {
+            @Override
+            public boolean hasCurrentUser() {
+                return true;
+            }
+
+            @Override
+            public boolean isCurrentUserAnonymous() {
+                return false;
+            }
+
+            @Override
+            public String getCurrentUserUid() {
+                return "synthetic-owner-uid-101";
+            }
+        });
+
+        assertFalse("Authenticated human owner must NOT use secondary single-device route",
+                repo.shouldUseSecondaryDeviceQueryRoute());
+    }
+
+    @Test
+    public void testDeviceRepository_AnonymousSecondaryDevice_UsesSecondaryDeviceQueryRoute() {
+        sessionManager.setPairedSecondaryDevice(true);
+        sessionManager.setOwnerUid("synthetic-owner-uid-101");
+        sessionManager.setPairedOwnerUid("synthetic-owner-uid-101");
+
+        DeviceRepository repo = new DeviceRepository(null, null, sessionManager);
+        repo.setAuthUserProvider(new DeviceRepository.IAuthUserProvider() {
+            @Override
+            public boolean hasCurrentUser() {
+                return true;
+            }
+
+            @Override
+            public boolean isCurrentUserAnonymous() {
+                return true;
+            }
+
+            @Override
+            public String getCurrentUserUid() {
+                return "synthetic-target-uid-202";
+            }
+        });
+
+        assertTrue("Anonymous secondary device must use secondary single-device route",
+                repo.shouldUseSecondaryDeviceQueryRoute());
+    }
+
+    @Test
+    public void testCommandExecutionManager_AuthUserProviderBlocksOwnerRecovery() {
+        sessionManager.setInstallationId("synthetic-samsung-inst-001");
+        sessionManager.setPairedSecondaryDevice(false);
+        sessionManager.setOwnerUid("synthetic-owner-uid-101");
+
+        manager.setAuthUserProvider(new CommandExecutionManager.IAuthUserProvider() {
+            @Override
+            public boolean hasCurrentUser() {
+                return true;
+            }
+
+            @Override
+            public boolean isCurrentUserAnonymous() {
+                return false;
+            }
+
+            @Override
+            public String getCurrentUserUid() {
+                return "synthetic-owner-uid-101";
+            }
+        });
+
+        fakeRecovery.mode = FakePairingRecoveryService.Mode.SUCCESS;
+        fakeRecovery.ownerUid = "synthetic-target-uid-202";
+
+        manager.startListeningToCommands();
+
+        assertFalse("Authenticated human owner via authUserProvider must NOT be enrolled as secondary",
+                sessionManager.isPairedSecondaryDevice());
+        assertNull("Paired owner UID must remain null", sessionManager.getPairedOwnerUid());
     }
 
     // =========================================================================

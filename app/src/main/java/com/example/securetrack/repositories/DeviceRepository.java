@@ -38,9 +38,47 @@ public class DeviceRepository {
     private final Context context;
 
     public DeviceRepository(Context context) {
-        this.context = context.getApplicationContext();
+        this.context = context != null ? context.getApplicationContext() : null;
         this.db = FirebaseFirestore.getInstance();
         this.sessionManager = new SessionManager(this.context);
+    }
+
+    public DeviceRepository(Context context, FirebaseFirestore db, SessionManager sessionManager) {
+        this.context = context != null ? context.getApplicationContext() : null;
+        FirebaseFirestore resolvedDb = db;
+        if (resolvedDb == null) {
+            try {
+                resolvedDb = FirebaseFirestore.getInstance();
+            } catch (Exception ignored) {}
+        }
+        this.db = resolvedDb;
+        this.sessionManager = sessionManager != null ? sessionManager : (this.context != null ? new SessionManager(this.context) : null);
+    }
+
+    public interface IAuthUserProvider {
+        boolean hasCurrentUser();
+        boolean isCurrentUserAnonymous();
+        String getCurrentUserUid();
+    }
+
+    private IAuthUserProvider authUserProvider;
+
+    public void setAuthUserProvider(IAuthUserProvider authUserProvider) {
+        this.authUserProvider = authUserProvider;
+    }
+
+    public boolean shouldUseSecondaryDeviceQueryRoute() {
+        boolean isHumanOwner = false;
+        if (authUserProvider != null) {
+            isHumanOwner = authUserProvider.hasCurrentUser() && !authUserProvider.isCurrentUserAnonymous();
+        } else {
+            FirebaseAuth auth = null;
+            try {
+                auth = FirebaseAuth.getInstance();
+            } catch (Exception ignored) {}
+            isHumanOwner = (auth != null && auth.getCurrentUser() != null && !auth.getCurrentUser().isAnonymous());
+        }
+        return !isHumanOwner && sessionManager.isPairedSecondaryDevice();
     }
 
     public interface ApiCallback<T> {
@@ -49,26 +87,55 @@ public class DeviceRepository {
     }
 
     private String getUid() {
+        if (authUserProvider != null) {
+            if (authUserProvider.hasCurrentUser() && !authUserProvider.isCurrentUserAnonymous()) {
+                String ownerUid = authUserProvider.getCurrentUserUid();
+                sessionManager.setPairedSecondaryDevice(false);
+                sessionManager.setOwnerUid(ownerUid);
+                return ownerUid;
+            }
+        } else {
+            FirebaseAuth auth = null;
+            try {
+                auth = FirebaseAuth.getInstance();
+            } catch (Exception ignored) {}
+            if (auth != null && auth.getCurrentUser() != null && !auth.getCurrentUser().isAnonymous()) {
+                String ownerUid = auth.getCurrentUser().getUid();
+                sessionManager.setPairedSecondaryDevice(false);
+                sessionManager.setOwnerUid(ownerUid);
+                return ownerUid;
+            }
+        }
+
         if (sessionManager.isPairedSecondaryDevice()) {
             String pairedOwnerUid = sessionManager.getPairedOwnerUid();
             if (pairedOwnerUid != null && !pairedOwnerUid.isEmpty()) {
                 return pairedOwnerUid;
             }
         }
-        FirebaseAuth auth = FirebaseAuth.getInstance();
-        if (auth.getCurrentUser() != null) {
-            if (auth.getCurrentUser().isAnonymous()) {
+
+        if (authUserProvider != null) {
+            if (authUserProvider.hasCurrentUser() && authUserProvider.isCurrentUserAnonymous()) {
                 String ownerUid = sessionManager.getOwnerUid();
                 if (ownerUid != null && !ownerUid.isEmpty()) {
                     return ownerUid;
                 }
-            } else {
-                if (!sessionManager.isPairedSecondaryDevice()) {
-                    sessionManager.setOwnerUid(auth.getCurrentUser().getUid());
-                }
+                return authUserProvider.getCurrentUserUid();
             }
-            return auth.getCurrentUser().getUid();
+        } else {
+            FirebaseAuth auth = null;
+            try {
+                auth = FirebaseAuth.getInstance();
+            } catch (Exception ignored) {}
+            if (auth != null && auth.getCurrentUser() != null && auth.getCurrentUser().isAnonymous()) {
+                String ownerUid = sessionManager.getOwnerUid();
+                if (ownerUid != null && !ownerUid.isEmpty()) {
+                    return ownerUid;
+                }
+                return auth.getCurrentUser().getUid();
+            }
         }
+
         return sessionManager.getOwnerUid();
     }
 
@@ -186,10 +253,7 @@ public class DeviceRepository {
             return;
         }
 
-        String firebaseUid = sessionManager.getFirebaseUid();
-        boolean isSecondary = firebaseUid != null && !firebaseUid.equals(uid);
-
-        if (isSecondary) {
+        if (shouldUseSecondaryDeviceQueryRoute()) {
             String currentDeviceId = sessionManager.getCurrentDeviceId();
             if (currentDeviceId == null) {
                 currentDeviceId = sessionManager.getInstallationId();
@@ -226,10 +290,7 @@ public class DeviceRepository {
         String uid = getUid();
         if (uid == null) return null;
 
-        String firebaseUid = sessionManager.getFirebaseUid();
-        boolean isSecondary = firebaseUid != null && !firebaseUid.equals(uid);
-
-        if (isSecondary) {
+        if (shouldUseSecondaryDeviceQueryRoute()) {
             String currentDeviceId = sessionManager.getCurrentDeviceId();
             if (currentDeviceId == null) {
                 currentDeviceId = sessionManager.getInstallationId();
