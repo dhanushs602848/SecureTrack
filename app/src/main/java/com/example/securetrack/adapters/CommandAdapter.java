@@ -41,12 +41,15 @@ public class CommandAdapter extends RecyclerView.Adapter<CommandAdapter.ViewHold
         String status = cmd.getStatus() != null ? cmd.getStatus().toUpperCase() : "QUEUED";
         holder.binding.tvCmdStatus.setText(status);
 
-        if ("EXECUTED".equals(status) || "DELIVERED".equals(status) || "SUCCESS".equals(status)) {
+        if ("EXECUTED".equals(status) || "DELIVERED".equals(status) || "SUCCESS".equals(status) || "COMPLETED".equals(status)) {
             holder.binding.tvCmdStatus.setBackgroundResource(R.drawable.bg_badge_success);
             holder.binding.tvCmdStatus.setTextColor(Color.parseColor("#2E7456"));
         } else if ("FAILED".equals(status) || "ERROR".equals(status)) {
             holder.binding.tvCmdStatus.setBackgroundResource(R.drawable.bg_badge_error);
             holder.binding.tvCmdStatus.setTextColor(Color.parseColor("#BA1A1A"));
+        } else if ("EXPIRED".equals(status)) {
+            holder.binding.tvCmdStatus.setBackgroundResource(R.drawable.bg_badge_warning);
+            holder.binding.tvCmdStatus.setTextColor(Color.parseColor("#854D0E"));
         } else {
             holder.binding.tvCmdStatus.setBackgroundResource(R.drawable.bg_badge_info);
             holder.binding.tvCmdStatus.setTextColor(Color.parseColor("#255DA8"));

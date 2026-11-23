@@ -41,7 +41,7 @@ public class CommandExecutionManager {
     private static final String TAG = "CommandExecutionMgr";
 
     private static final long EXPIRY_LOCK_ALARM_MS = 15 * 60 * 1000L; // 15 mins
-    private static final long EXPIRY_LOCATE_MS = 30 * 60 * 1000L;     // 30 mins
+    private static final long EXPIRY_LOCATE_MS = 15 * 60 * 1000L;     // 15 mins
 
     private static volatile CommandExecutionManager instance;
 

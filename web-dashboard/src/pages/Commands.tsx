@@ -45,6 +45,39 @@ export const Commands: React.FC = () => {
     }
   };
 
+  const QUEUE_LIMIT_MS = 15 * 60 * 1000; // 15 minutes
+
+  const getEffectiveCommandStatus = (cmd: any): string => {
+    const rawStatus = (cmd.status || 'QUEUED').toUpperCase();
+    if (rawStatus === 'EXECUTED' || rawStatus === 'COMPLETED' || rawStatus === 'DELIVERED') {
+      return 'EXECUTED';
+    }
+    if (rawStatus === 'FAILED' || rawStatus === 'EXPIRED') {
+      return rawStatus;
+    }
+    // Command is still in queue (QUEUED, PENDING, CREATED, or stale CLAIMED/EXECUTING)
+    if (cmd.createdAt) {
+      const createdMillis = typeof cmd.createdAt === 'number'
+        ? cmd.createdAt
+        : new Date(cmd.createdAt).getTime();
+      if (!isNaN(createdMillis) && (Date.now() - createdMillis > QUEUE_LIMIT_MS)) {
+        return 'EXPIRED';
+      }
+    }
+    return rawStatus;
+  };
+
+  const getEffectiveResult = (cmd: any): string => {
+    const effectiveStatus = getEffectiveCommandStatus(cmd);
+    if (effectiveStatus === 'EXPIRED') {
+      return cmd.result || 'Command expired in queue (>15 min)';
+    }
+    if (effectiveStatus === 'EXECUTED') {
+      return cmd.result || 'Executed successfully';
+    }
+    return cmd.result || cmd.payload || 'In Queue';
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'COMPLETED':
@@ -151,7 +184,7 @@ export const Commands: React.FC = () => {
             <Terminal className="w-5 h-5 text-indigo-600 dark:text-cyan-400" />
             <h3 className="font-bold text-slate-900 dark:text-white text-sm font-mono">Command Execution History</h3>
           </div>
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">Auto-expires stale commands after 15m</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">Queue limit: 15m • Auto-expires stale commands</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left text-slate-700 dark:text-slate-200">
@@ -174,29 +207,32 @@ export const Commands: React.FC = () => {
                   <td colSpan={5} className="px-6 py-12 text-center text-slate-400 font-mono">No commands recorded for this device.</td>
                 </tr>
               ) : (
-                commands.map((cmd) => (
-                  <tr key={cmd.id} className="hover:bg-slate-50 dark:hover:bg-[#162032] transition-colors">
-                    <td className="px-6 py-4 font-mono text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                      {cmd.createdAt ? new Date(cmd.createdAt).toLocaleString() : 'Recent'}
-                    </td>
-                    <td className="px-6 py-4 font-bold text-slate-900 dark:text-white font-mono">
-                      {cmd.commandType}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
-                        {cmd.transport || 'CLOUD'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider ${getStatusBadge(cmd.status)}`}>
-                        {cmd.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-xs text-slate-500 dark:text-slate-400">
-                      {cmd.result || cmd.payload || '—'}
-                    </td>
-                  </tr>
-                ))
+                commands.map((cmd) => {
+                  const effectiveStatus = getEffectiveCommandStatus(cmd);
+                  return (
+                    <tr key={cmd.id} className="hover:bg-slate-50 dark:hover:bg-[#162032] transition-colors">
+                      <td className="px-6 py-4 font-mono text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                        {cmd.createdAt ? new Date(cmd.createdAt).toLocaleString() : 'Recent'}
+                      </td>
+                      <td className="px-6 py-4 font-bold text-slate-900 dark:text-white font-mono">
+                        {cmd.commandType}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+                          {cmd.transport || 'CLOUD'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider ${getStatusBadge(effectiveStatus)}`}>
+                          {effectiveStatus}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-xs text-slate-500 dark:text-slate-400">
+                        {getEffectiveResult(cmd)}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

@@ -129,4 +129,35 @@ test('SecureTrack Web Dashboard Auth & Command Integrity Suite', async (t) => {
     selectedId = resolveNextDeviceId(selectedId, []);
     assert.equal(selectedId, '', 'Falls back to empty string when no devices available');
   });
+
+  await t.test('Command queue 15-minute expiry evaluation', () => {
+    function resolveEffectiveCommandStatus(cmd, nowMs) {
+      const QUEUE_LIMIT_MS = 15 * 60 * 1000;
+      const rawStatus = (cmd.status || 'QUEUED').toUpperCase();
+      if (['EXECUTED', 'COMPLETED', 'DELIVERED'].includes(rawStatus)) {
+        return 'EXECUTED';
+      }
+      if (['FAILED', 'EXPIRED'].includes(rawStatus)) {
+        return rawStatus;
+      }
+      if (cmd.createdAt) {
+        const createdMs = typeof cmd.createdAt === 'number' ? cmd.createdAt : new Date(cmd.createdAt).getTime();
+        if (!isNaN(createdMs) && (nowMs - createdMs > QUEUE_LIMIT_MS)) {
+          return 'EXPIRED';
+        }
+      }
+      return rawStatus;
+    }
+
+    const now = Date.now();
+    const queuedRecent = { status: 'QUEUED', createdAt: new Date(now - 5 * 60 * 1000).toISOString() }; // 5m ago
+    const queuedStale = { status: 'QUEUED', createdAt: new Date(now - 16 * 60 * 1000).toISOString() }; // 16m ago
+    const executedStale = { status: 'EXECUTED', createdAt: new Date(now - 30 * 60 * 1000).toISOString() }; // 30m ago
+    const completedStale = { status: 'COMPLETED', createdAt: new Date(now - 25 * 60 * 1000).toISOString() };
+
+    assert.equal(resolveEffectiveCommandStatus(queuedRecent, now), 'QUEUED', 'Recent command remains in QUEUED status');
+    assert.equal(resolveEffectiveCommandStatus(queuedStale, now), 'EXPIRED', 'Command queued >15m must display EXPIRED');
+    assert.equal(resolveEffectiveCommandStatus(executedStale, now), 'EXECUTED', 'Executed command displays EXECUTED regardless of age');
+    assert.equal(resolveEffectiveCommandStatus(completedStale, now), 'EXECUTED', 'Completed command displays EXECUTED');
+  });
 });
