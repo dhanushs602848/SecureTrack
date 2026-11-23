@@ -1,25 +1,49 @@
 graph TD
-    subgraph ClientLayer ["Client Devices & Interfaces"]
-        Browser["Web Browser (React 18 + TS Dashboard)"]
-        Phone["Android Device (SecureTrack Mobile App)"]
+    subgraph ClientLayer ["Client Layer"]
+        Browser["Web Operations Console<br/>(React 18 + TypeScript + Vite)"]
+        Phone["Android Smartphone Client<br/>(SecureTrack v1.8.0 / Target SDK 35)"]
     end
 
-    subgraph CloudLayer ["Firebase Cloud Backend (track-99c90)"]
-        Auth["Firebase Authentication (Email/Password)"]
-        Firestore["Cloud Firestore (Real-time NoSQL)"]
-        Hosting["Firebase Hosting (SPA CDN)"]
+    subgraph SecurityAuth ["Authentication & Security"]
+        Auth["Firebase Authentication<br/>(Zero-Trust Email & Password)"]
+        SecurityRules["Firestore Security Rules<br/>(Per-User Data Isolation)"]
     end
 
-    subgraph EnterpriseRef ["Optional Reference Implementation"]
-        SpringBoot["Spring Boot 3 REST API"]
-        MySQL["MySQL Relational DB"]
+    subgraph CloudLayer ["Cloud Infrastructure (track-99c90)"]
+        Hosting["Firebase Hosting<br/>(SPA Delivery & Global CDN)"]
+        Firestore["Cloud Firestore<br/>(Real-Time Distributed NoSQL)"]
+        Functions["Cloud Functions (Node.js 18)<br/>(onDeviceCommandCreated & Pairing API)"]
+        FCM["Firebase Cloud Messaging (FCM)<br/>(High-Priority Wake-Up Dispatch)"]
     end
 
-    Browser -->|HTTPS / Hosting| Hosting
-    Browser -->|Auth Tokens| Auth
-    Browser -->|Read / Write Telemetry & Commands| Firestore
+    subgraph LocalPersistence ["Android On-Device Storage"]
+        RoomDB["Android Room SQLite DB<br/>(Offline Cache & Incident Log)"]
+        EncryptedPrefs["EncryptedSharedPreferences<br/>(AES-256 Master Key Token Store)"]
+    end
 
-    Phone -->|QR Handshake & Telemetry Ingestion| Firestore
-    Phone -->|Listen for Anti-Theft Commands| Firestore
-    Phone -.->|Optional Reference Telemetry| SpringBoot
-    SpringBoot -.->|JDBC Persistence| MySQL
+    subgraph AndroidInternal ["Android Client Engine"]
+        ForegroundService["LocationTrackingService<br/>(Persistent Foreground GPS Engine)"]
+        FCMService["SecureFirebaseMessagingService<br/>(Push Wake-Up & Pre-Execution)"]
+        CommandManager["CommandExecutionManager<br/>(15m TTL Expiry & Atomic Execution)"]
+        AdminReceiver["SecureAdminReceiver<br/>(DevicePolicyManager Remote Lock)"]
+    end
+
+    Browser -->|HTTPS CDN Fetch| Hosting
+    Browser -->|JWT Authentication Tokens| Auth
+    Browser -->|Real-Time Snapshot Listeners| Firestore
+    Browser -->|Dispatch Remote Anti-Theft Commands| Firestore
+
+    Firestore -->|Document Trigger onCreate| Functions
+    Functions -->|High-Priority Data Message| FCM
+    FCM -->|Push Wake-Up Packet| FCMService
+    FCMService -->|Execute Queued Command| CommandManager
+
+    Phone -->|Continuous GPS Telemetry Stream| Firestore
+    Phone -->|Snapshot Listener: commands| Firestore
+    Phone -->|Atomic Status Update EXECUTED or EXPIRED| Firestore
+
+    Phone --> ForegroundService
+    Phone --> CommandManager
+    CommandManager -->|Screen Lock Action| AdminReceiver
+    Phone --> RoomDB
+    Phone --> EncryptedPrefs

@@ -20,6 +20,7 @@
 
 ## 📋 Table of Contents
 - [Overview](#-overview)
+- [About SecureTrack](#-about-securetrack)
 - [Release 1.8.0 Highlights](#-release-180-build-7-highlights)
 - [System Architecture](#-system-architecture)
 - [Database Architectures (NoSQL vs Relational)](#-database-architectures-cloud-nosql-vs-local-sqlite)
@@ -55,6 +56,31 @@
 
 ---
 
+## ℹ️ About SecureTrack
+
+SecureTrack was conceived and engineered as an advanced final-year project in **Database Management Systems (DBMS) and Mobile Cybersecurity**, bridging distributed cloud data architecture with native Android system internals.
+
+### 🎯 Mission & Philosophy
+Most conventional tracking applications rely on passive user-space polling and fragile centralized servers. SecureTrack re-architects mobile security around three core principles:
+1. **Zero-Trust Telemetry & Verification**: Every telemetry packet and anti-theft command is cryptographically authenticated and scoped strictly to the verified owner UID under strict Cloud Firestore Security Rules.
+2. **Dual-Database Architecture (Cloud NoSQL + Local SQLite)**: Distributed real-time synchronization via Google Cloud Firestore is coupled with on-device persistence via Android Room (SQLite) and AES-256 EncryptedSharedPreferences, ensuring resilience against network loss or tampering.
+3. **Deterministic Incident Response**: Anti-theft commands (`LOCATE_NOW`, `LOCK_DEVICE`, `ALARM_ALERT`, and guarded `WIPE_DEVICE`) are backed by atomic Firestore claiming, a strict **15-minute queue expiration window (TTL)** to eliminate stale command replay, and a strict **5.0-second safety cutoff** on audible sirens.
+
+### 👥 Project Leadership & Academic Guidance
+- **Academic Guide / DBMS Mentor**: **Mohankumar H M** — DBMS Project Guide & Academic Mentor (Database Architecture, Relational Modeling & Academic Review)
+- **Project Lead, Owner & Primary Author**: **Dhanush S** ([@dhanushs602848](https://github.com/dhanushs602848)) — System Architecture, Cloud Firestore Integration, Android Security & Release Management
+- **Core Engineering Team**:
+  - **Deeksith H G** — Core Security Architecture, Telemetry Systems & Verification
+  - **Deeksith K** — Android Client Engineering & Feature Integration
+  - **Puneethkumar N E** — Database Architecture, Multi-Device Testing & Verification
+  - **Deeksith Raj N** — UI/UX Implementation & Geospatial Mapping Integration
+  - **Deepak D S** — Quality Assurance, Hardware Field Testing & Documentation
+
+### 📄 Licensing
+SecureTrack is released as open-source software under the official **Apache License, Version 2.0** (`Copyright 2026 Dhanush S`).
+
+---
+
 ## 🚀 Release 1.8.0 (Build 7) Highlights
 
 - **Biometric Power Protection & Pre-Shutdown Telemetry**:
@@ -83,40 +109,63 @@
 
 ## 🏛 System Architecture
 
-SecureTrack employs an authenticated, reactive multi-tier architecture:
+SecureTrack employs an authenticated, reactive multi-tier cloud-and-device architecture:
 
 ```mermaid
 graph TD
-    subgraph ClientLayer ["Client Devices & Interfaces"]
-        Browser["Web Browser (React 18 + TS Dashboard)"]
-        Phone["Android Device (SecureTrack v1.8.0 Client)"]
+    subgraph ClientLayer ["Client Interfaces & Devices"]
+        Browser["Web Operations Console<br/>(React 18 + TypeScript + Vite)"]
+        Phone["Android Smartphone Client<br/>(SecureTrack v1.8.0 / Target SDK 35)"]
     end
 
     subgraph CloudLayer ["Firebase Cloud Backend (track-99c90)"]
-        Auth["Firebase Authentication (Email / Password)"]
-        Firestore["Cloud Firestore (Real-time NoSQL)"]
-        Hosting["Firebase Hosting (SPA CDN)"]
-        FCM["Firebase Cloud Messaging (High-Priority Wakeup)"]
+        Hosting["Firebase Hosting<br/>(SPA Delivery & Global CDN)"]
+        Auth["Firebase Authentication<br/>(Zero-Trust Email & Password)"]
+        Firestore["Cloud Firestore<br/>(Real-Time Distributed NoSQL)"]
+        CloudFunctions["Cloud Functions (Node.js 18)<br/>(onDeviceCommandCreated & Token API)"]
+        FCM["Firebase Cloud Messaging (FCM)<br/>(High-Priority Wake-Up Dispatch)"]
     end
 
-    subgraph LocalPersistence ["Android On-Device Storage"]
-        RoomDB["Android Room SQLite DB (Local Cache & Offline Alerts)"]
-        EncryptedPrefs["Encrypted SharedPreferences (Tokens & Keys)"]
+    subgraph AndroidInternal ["Android Client Engine & On-Device Storage"]
+        ForegroundService["LocationTrackingService<br/>(Persistent Foreground GPS Engine)"]
+        FCMService["SecureFirebaseMessagingService<br/>(Push Wake-Up & Pre-Execution)"]
+        CommandManager["CommandExecutionManager<br/>(15m TTL Expiry & Atomic Execution)"]
+        AdminReceiver["SecureAdminReceiver<br/>(DevicePolicyManager Remote Lock)"]
+        RoomDB["Android Room SQLite DB<br/>(Offline Cache & Incident Log)"]
+        EncryptedPrefs["EncryptedSharedPreferences<br/>(AES-256 Master Key Token Store)"]
     end
 
-    Browser -->|HTTPS / Hosting| Hosting
-    Browser -->|Auth Tokens (JWT)| Auth
-    Browser -->|Real-time Snapshot Listeners| Firestore
-    Browser -->|Dispatch Remote Commands| Firestore
+    Browser -->|HTTPS / Hosting Bundle| Hosting
+    Browser -->|JWT Authentication Tokens| Auth
+    Browser -->|Real-Time Snapshot Listeners| Firestore
+    Browser -->|Dispatch Remote Anti-Theft Commands| Firestore
 
-    Firestore -->|FCM Push Notification Wakeup| FCM
-    FCM -->|High-Priority Payload| Phone
+    Firestore -->|onCreate Document Trigger| CloudFunctions
+    CloudFunctions -->|High-Priority Data Message| FCM
+    FCM -->|Push Wake-Up Packet| FCMService
+    FCMService -->|Execute Queued Command| CommandManager
 
-    Phone -->|Encrypted Telemetry Ingestion| Firestore
+    Phone -->|Continuous GPS Telemetry Stream| Firestore
     Phone -->|Snapshot Listener: commands| Firestore
-    Phone -->|Local Offline Persistence| RoomDB
-    Phone -->|Secure Key Storage| EncryptedPrefs
+    Phone -->|Atomic Status Update EXECUTED or EXPIRED| Firestore
+
+    Phone --> ForegroundService
+    Phone --> CommandManager
+    CommandManager -->|Screen Lock Action| AdminReceiver
+    Phone --> RoomDB
+    Phone --> EncryptedPrefs
 ```
+
+### 🔄 End-to-End Command Dispatch & Execution Lifecycle
+1. **Operator Command Dispatch**: The security operator triggers an anti-theft action (`LOCATE_NOW`, `LOCK_DEVICE`, `ALARM_ALERT`, or guarded `WIPE_DEVICE`) from the Web Console. A command record is written to `users/{uid}/devices/{deviceId}/commands/{commandId}` with state `QUEUED` and timestamp `createdAt`.
+2. **Cloud Functions Wake-Up**: The Firebase Cloud Function `onDeviceCommandCreated` triggers instantaneously on document creation, fetches the target device's registered FCM registration token, and dispatches a high-priority push data payload through FCM.
+3. **Android Wake-Up & Atomic Claim**: `SecureFirebaseMessagingService` receives the wake-up intent and routes execution to `CommandExecutionManager`. The manager validates the **15-minute queue expiry window** (`currentTime - queuedAt <= 15 minutes`). If expired, it atomically writes status `EXPIRED` to Firestore and terminates. If valid, it atomically transitions state to `EXECUTING` with client `requestId` deduplication.
+4. **Action Execution**:
+   - `LOCATE_NOW`: Forces high-accuracy GPS fix via `FusedLocationProviderClient` and synchronizes fresh location record to `locations/{locationId}`.
+   - `LOCK_DEVICE`: Invokes `DevicePolicyManager.lockNow()` via `SecureAdminReceiver`.
+   - `ALARM_ALERT`: Triggers audio siren via `AlarmSoundManager` with a strict **5.0-second maximum duration cutoff**.
+   - `WIPE_DEVICE`: Protected by fail-closed safety confirmation locks; requires administrative master confirmation.
+5. **Final Status Reconciliation**: The handset updates the command status in Firestore to `EXECUTED` (or `FAILED` with diagnostics). Both Web Console and local Room SQLite cache mirror the verified outcome in real-time.
 
 ---
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sun, Moon, Laptop, Shield, User, CheckCircle2, Lock, Radio } from 'lucide-react';
+import { Sun, Moon, Laptop, Shield, User, CheckCircle2, Lock, Radio, Info, ExternalLink, GraduationCap, Github } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme, ThemeMode } from '../context/ThemeContext';
 
@@ -271,6 +271,93 @@ export const Settings: React.FC = () => {
             <span className="font-mono text-indigo-600 dark:text-cyan-400 font-semibold">
               SecureTrack Web v1.8.0 (Release)
             </span>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. ABOUT SECURETRACK & PROJECT CREDITS */}
+      <div className="bg-white dark:bg-[#121927] p-6 rounded-2xl border border-slate-200 dark:border-[#223049] shadow-sm space-y-5 transition-colors">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Info className="w-4 h-4 text-indigo-600 dark:text-cyan-400" />
+            <h3 className="text-base font-bold font-mono text-slate-900 dark:text-white">
+              About SecureTrack
+            </h3>
+          </div>
+          <span className="text-[11px] font-mono px-2.5 py-1 rounded-full font-semibold border bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800">
+            Apache 2.0 Open Source
+          </span>
+        </div>
+
+        <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+          <strong>SecureTrack</strong> is an enterprise-grade mobile telemetry, loss prevention, and anti-theft defense platform engineered for Android devices, synchronized with a real-time cybersecurity web operations center. Engineered as an advanced academic project in <strong>Database Management Systems (DBMS) and Mobile Cybersecurity</strong>.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs pt-1">
+          {/* Project Owner */}
+          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#162032] border border-slate-200 dark:border-slate-800 space-y-1">
+            <div className="flex items-center gap-1.5 text-indigo-600 dark:text-cyan-400 font-mono text-[11px] font-semibold">
+              <User className="w-3.5 h-3.5" />
+              Project Lead, Owner &amp; Author
+            </div>
+            <p className="font-bold text-slate-900 dark:text-white text-sm font-mono">
+              Dhanush S
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              System Architecture, Cloud Firestore Integration &amp; Release Management
+            </p>
+          </div>
+
+          {/* Academic Guide */}
+          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#162032] border border-slate-200 dark:border-slate-800 space-y-1">
+            <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-mono text-[11px] font-semibold">
+              <GraduationCap className="w-3.5 h-3.5" />
+              Academic &amp; DBMS Project Guide
+            </div>
+            <p className="font-bold text-slate-900 dark:text-white text-sm font-mono">
+              Mohankumar H M
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Database Architecture, Relational Modeling &amp; Academic Review
+            </p>
+          </div>
+
+          {/* Engineering Team */}
+          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#162032] border border-slate-200 dark:border-slate-800 space-y-1 md:col-span-2">
+            <div className="text-[10px] uppercase font-mono tracking-wider text-slate-500 dark:text-slate-400 font-semibold">
+              Core Engineering Team &amp; Contributors
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-1 font-mono text-[11px]">
+              <div className="text-slate-700 dark:text-slate-300">• Deeksith H G <span className="text-slate-400 text-[10px]">(Security)</span></div>
+              <div className="text-slate-700 dark:text-slate-300">• Deeksith K <span className="text-slate-400 text-[10px]">(Android Client)</span></div>
+              <div className="text-slate-700 dark:text-slate-300">• Puneethkumar N E <span className="text-slate-400 text-[10px]">(Database &amp; QA)</span></div>
+              <div className="text-slate-700 dark:text-slate-300">• Deeksith Raj N <span className="text-slate-400 text-[10px]">(UI/UX &amp; Maps)</span></div>
+              <div className="text-slate-700 dark:text-slate-300">• Deepak D S <span className="text-slate-400 text-[10px]">(QA &amp; Docs)</span></div>
+            </div>
+          </div>
+
+          {/* Project Coordinates */}
+          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#162032] border border-slate-200 dark:border-slate-800 md:col-span-2 flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <div className="font-mono text-xs font-bold text-slate-900 dark:text-white">
+                SecureTrack v1.8.0 (Build 7)
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Licensed under Apache-2.0 • Copyright &copy; 2026 Dhanush S
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <a
+                href="https://github.com/dhanushs602848/SecureTrack"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#1E293B] text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <Github className="w-3.5 h-3.5" />
+                GitHub
+                <ExternalLink className="w-3 h-3 text-slate-400" />
+              </a>
+            </div>
           </div>
         </div>
       </div>
