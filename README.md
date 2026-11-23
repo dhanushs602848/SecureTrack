@@ -416,7 +416,7 @@ Continuous verification is enforced across Android and Web:
 ### 🎓 Academic Project Guide
 - **Mohankumar H M** — DBMS Project Guide & Academic Mentor (Database Architecture, Relational Modeling & Academic Review)
 
-### 👨‍💻 Project Lead & Author
+### 👨‍💻 Project Lead, Owner & Author
 - **Dhanush S** ([@dhanushs602848](https://github.com/dhanushs602848)) — System Architecture, Cloud Firestore Integration, Android Security & Release Management
 
 ### 🤝 Project Contributors & Engineers

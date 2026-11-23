@@ -9,7 +9,7 @@ We would like to acknowledge and thank all contributors and academic mentors who
 
 ---
 
-## 👨‍💻 Project Lead & Primary Author
+## 👨‍💻 Project Lead, Owner & Primary Author
 - **Dhanush S** ([@dhanushs602848](https://github.com/dhanushs602848)) — System Architecture, Cloud Firestore Integration, Android Security & Release Management
 
 ---
