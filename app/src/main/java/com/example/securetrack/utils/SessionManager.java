@@ -339,6 +339,16 @@ public class SessionManager {
         prefs.edit().putBoolean(KEY_POWER_PROTECTION, enabled).apply();
     }
 
+    private static final String KEY_GEOFENCE_LOST_MODE = "geofence_lost_mode_active";
+
+    public boolean isGeofenceLostMode() {
+        return prefs.getBoolean(KEY_GEOFENCE_LOST_MODE, false);
+    }
+
+    public void setGeofenceLostMode(boolean active) {
+        prefs.edit().putBoolean(KEY_GEOFENCE_LOST_MODE, active).apply();
+    }
+
     private static final String KEY_BLE_SHARED_SECRET = "ble_shared_secret";
     private static final String KEY_BLE_DEVICE_SECRETS_PREFIX = "ble_secret_dev_";
 

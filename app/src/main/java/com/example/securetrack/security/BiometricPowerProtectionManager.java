@@ -5,11 +5,12 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.BatteryManager;
-import android.os.Build;
 import android.util.Log;
 import androidx.annotation.NonNull;
-import androidx.biometric.BiometricPrompt;
+import androidx.annotation.Nullable;
 import androidx.fragment.app.FragmentActivity;
+import com.example.securetrack.models.SecurityEvent;
+import com.example.securetrack.repositories.SecurityRepository;
 import com.example.securetrack.utils.SessionManager;
 
 /**
@@ -18,7 +19,7 @@ import com.example.securetrack.utils.SessionManager;
  * Platform Capabilities & Security Guardrails:
  * 1. Third-party Android apps cannot reliably intercept system power menus to universally block
  *    hardware switch-off/reboot without root or Accessibility abuse.
- * 2. Authenticates sensitive power and lockdown actions via BiometricPrompt.
+ * 2. Authenticates sensitive power and administrative actions via BiometricPrompt.
  * 3. Detects Android Device Owner status at runtime (Device Admin != Device Owner).
  * 4. Captures impending shutdown broadcasts (ACTION_SHUTDOWN / ACTION_QUICKBOOT_POWEROFF)
  *    to record a high-priority telemetry checkpoint before power is lost.
@@ -48,15 +49,28 @@ public class BiometricPowerProtectionManager {
         return instance;
     }
 
-    public BiometricPowerProtectionManager(Context context) {
-        this.context = context.getApplicationContext();
-        this.sessionManager = new SessionManager(context);
+    public BiometricPowerProtectionManager(@NonNull Context context) {
+        this(context, new SessionManager(context));
+    }
+
+    public BiometricPowerProtectionManager(@Nullable Context context, @NonNull SessionManager sessionManager) {
+        this.context = context != null ? context.getApplicationContext() : null;
+        this.sessionManager = sessionManager;
+    }
+
+    public boolean isPowerProtectionEnabled() {
+        return sessionManager.isPowerProtectionEnabled();
+    }
+
+    public void setPowerProtectionEnabled(boolean enabled) {
+        sessionManager.setPowerProtectionEnabled(enabled);
     }
 
     /**
      * Checks if this application is provisioned as an Android Device Owner.
      */
     public boolean isDeviceOwner() {
+        if (context == null) return false;
         try {
             DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
             if (dpm != null) {
@@ -72,7 +86,7 @@ public class BiometricPowerProtectionManager {
      * Evaluates current platform capability state for power protection.
      */
     public CapabilityState getCapabilityState() {
-        if (!BiometricAuthHelper.canAuthenticate(context)) {
+        if (context == null || !BiometricAuthHelper.canAuthenticate(context)) {
             return CapabilityState.UNSUPPORTED;
         }
 
@@ -88,6 +102,7 @@ public class BiometricPowerProtectionManager {
 
     /**
      * Authenticates an impending sensitive power or administrative action.
+     * Uses BiometricPrompt with secure device credential fallback (PIN/pattern/password).
      */
     public void authenticateSensitiveAction(
             @NonNull FragmentActivity activity,
@@ -108,10 +123,11 @@ public class BiometricPowerProtectionManager {
     }
 
     /**
-     * Records telemetry checkpoint before shutdown.
+     * Records telemetry checkpoint before device shutdown.
      */
     public void recordImpendingShutdownEvent() {
         Log.i(TAG, "Recording impending device shutdown telemetry checkpoint.");
+        if (context == null) return;
         try {
             IntentFilter ifilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
             Intent batteryStatus = context.registerReceiver(null, ifilter);
@@ -124,6 +140,28 @@ public class BiometricPowerProtectionManager {
                 }
             }
             Log.i(TAG, "Battery level at shutdown: " + level + "%");
+
+            String deviceId = sessionManager.getCurrentDeviceId();
+            if (deviceId != null && sessionManager.getOwnerUid() != null) {
+                SecurityRepository repo = new SecurityRepository(context);
+                SecurityEvent event = new SecurityEvent(
+                        deviceId,
+                        "DEVICE_SHUTDOWN",
+                        "WARNING",
+                        "Impending device shutdown initiated. Battery at " + (level >= 0 ? level + "%" : "unknown")
+                );
+                repo.recordSecurityEvent(event, new SecurityRepository.ApiCallback<SecurityEvent>() {
+                    @Override
+                    public void onSuccess(SecurityEvent result) {
+                        Log.i(TAG, "Shutdown security checkpoint saved");
+                    }
+
+                    @Override
+                    public void onError(String errorMessage) {
+                        Log.w(TAG, "Could not record shutdown event to cloud: " + errorMessage);
+                    }
+                });
+            }
         } catch (Exception e) {
             Log.w(TAG, "Could not capture battery state at shutdown: " + e.getMessage());
         }

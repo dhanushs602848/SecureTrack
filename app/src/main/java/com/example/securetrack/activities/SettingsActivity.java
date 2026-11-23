@@ -74,6 +74,19 @@ public class SettingsActivity extends AppCompatActivity {
             Toast.makeText(this, isChecked ? "Biometric App Shield enabled" : "Biometric App Shield disabled", Toast.LENGTH_SHORT).show();
         });
 
+        binding.switchPowerProtection.setChecked(sessionManager.isPowerProtectionEnabled());
+        updatePowerProtectionCapability();
+        binding.switchPowerProtection.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked && !com.example.securetrack.security.BiometricAuthHelper.canAuthenticate(this)) {
+                binding.switchPowerProtection.setChecked(false);
+                Toast.makeText(this, "Biometrics or device lock credentials are not configured on this phone.", Toast.LENGTH_LONG).show();
+                return;
+            }
+            sessionManager.setPowerProtectionEnabled(isChecked);
+            updatePowerProtectionCapability();
+            Toast.makeText(this, isChecked ? "Biometric Power Protection enabled" : "Biometric Power Protection disabled", Toast.LENGTH_SHORT).show();
+        });
+
         // 3. Device Administrator Privilege
         binding.btnManageAdmin.setOnClickListener(v -> {
             boolean isAdmin = SecureAdminReceiver.isAdminActive(this);
@@ -128,6 +141,33 @@ public class SettingsActivity extends AppCompatActivity {
         super.onResume();
         updateAdminStatus();
         updateDiagnosticsSummary();
+        updatePowerProtectionCapability();
+    }
+
+    private void updatePowerProtectionCapability() {
+        if (binding.tvPowerProtectionStatus != null) {
+            com.example.securetrack.security.BiometricPowerProtectionManager.CapabilityState state =
+                    com.example.securetrack.security.BiometricPowerProtectionManager.getInstance(this).getCapabilityState();
+            switch (state) {
+                case DEVICE_OWNER_CAPABLE:
+                    binding.tvPowerProtectionStatus.setText("Capability: Active (Device Owner Provisioned)");
+                    binding.tvPowerProtectionStatus.setTextColor(getColor(R.color.status_success));
+                    break;
+                case POWER_PROTECTION_ENABLED:
+                    binding.tvPowerProtectionStatus.setText("Capability: Active (Biometric Prompt & Telemetry)");
+                    binding.tvPowerProtectionStatus.setTextColor(getColor(R.color.status_success));
+                    break;
+                case BEST_EFFORT_MONITORING:
+                    binding.tvPowerProtectionStatus.setText("Capability: Standby (Monitoring Enabled)");
+                    binding.tvPowerProtectionStatus.setTextColor(getColor(R.color.status_warning));
+                    break;
+                case UNSUPPORTED:
+                default:
+                    binding.tvPowerProtectionStatus.setText("Capability: Biometric/Lock Hardware Unsupported");
+                    binding.tvPowerProtectionStatus.setTextColor(getColor(R.color.status_error));
+                    break;
+            }
+        }
     }
 
     private void updateDiagnosticsSummary() {

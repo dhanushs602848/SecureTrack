@@ -7,7 +7,6 @@ import android.location.Location;
 import android.util.Log;
 import com.example.securetrack.models.SecurityEvent;
 import com.example.securetrack.repositories.SecurityRepository;
-import com.example.securetrack.utils.DeviceUtils;
 import com.example.securetrack.utils.SessionManager;
 import com.google.android.gms.location.Geofence;
 import com.google.android.gms.location.GeofenceStatusCodes;
@@ -24,8 +23,9 @@ import java.util.Map;
  *
  * Responsibilities:
  * 1. Validates geofence transitions (EXIT vs ENTER).
- * 2. On EXIT: Logs security event, transitions device to OUT_OF_ZONE, and enables Lost Mode.
- * 3. On ENTER: Logs security event, restores normal zone state.
+ * 2. On EXIT: Logs security event, transitions device to OUT_OF_ZONE, and enables geofence Lost Mode.
+ * 3. On ENTER: Logs security event, transitions device to IN_ZONE, and clears Lost Mode
+ *    strictly if it was triggered by geofencing (never overriding manual Lost Mode).
  * 4. Captures triggering location coordinates if available in the GeofencingEvent.
  */
 public class GeofenceBroadcastReceiver extends BroadcastReceiver {
@@ -69,9 +69,13 @@ public class GeofenceBroadcastReceiver extends BroadcastReceiver {
 
             for (Geofence geofence : triggeringGeofences) {
                 String zoneId = geofence.getRequestId();
-                String desc = isExit ?
-                        "Device exited safe zone: " + zoneId + ". Automatic out-of-zone protection engaged." :
-                        "Device entered safe zone: " + zoneId;
+                String desc;
+                if (isExit) {
+                    desc = "Device exited safe zone: " + zoneId + ". Automatic out-of-zone protection engaged.";
+                    sessionManager.setGeofenceLostMode(true);
+                } else {
+                    desc = "Device entered safe zone: " + zoneId + ". Safe zone confirmed.";
+                }
 
                 SecurityEvent event = new SecurityEvent(deviceId, transitionType, severity, desc);
                 repo.recordSecurityEvent(event, new SecurityRepository.ApiCallback<SecurityEvent>() {
@@ -92,8 +96,20 @@ public class GeofenceBroadcastReceiver extends BroadcastReceiver {
                     updates.put("lastZoneId", zoneId);
                     updates.put("lastZoneTransition", transitionType);
                     updates.put("lastZoneTransitionTime", FieldValue.serverTimestamp());
+
                     if (isExit) {
                         updates.put("isLostMode", true);
+                        updates.put("lostModeSource", "GEOFENCE");
+                    } else {
+                        // On ENTER: restore lost mode ONLY if it was triggered by geofence
+                        if (sessionManager.isGeofenceLostMode()) {
+                            updates.put("isLostMode", false);
+                            updates.put("lostModeSource", "RECOVERED_IN_ZONE");
+                            sessionManager.setGeofenceLostMode(false);
+                            Log.i(TAG, "Restored geofence-triggered Lost Mode upon safe zone re-entry");
+                        } else {
+                            Log.i(TAG, "Preserving manual Lost Mode state upon safe zone re-entry");
+                        }
                     }
 
                     if (triggeringLocation != null) {

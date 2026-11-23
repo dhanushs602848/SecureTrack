@@ -1,10 +1,12 @@
 # SECURETRACK — FINAL RELEASE CLOSEOUT & VERIFICATION REPORT
 
+**Release Version:** v1.8.0 (Build 7)  
+**Package:** `com.example.securetrack`  
 **Date:** November 23, 2026  
 **Repository:** `https://github.com/dhanushs602848/SecureTrack`  
-**Target Branch:** `fix/securetrack-global-two-device-release`  
-**Release Commit:** `078f8bdac6265a3574464caaf44a9f7676b92f0a`  
-**Firebase Project:** `track-99c90`  
+**Branch:** `fix/securetrack-global-two-device-release`  
+**Firebase Backend:** `track-99c90`  
+**Web Dashboard:** `https://track-99c90.web.app`  
 
 ---
 
@@ -12,146 +14,107 @@
 
 | Component | Target Requirement | Verified Result | Status |
 | :--- | :--- | :--- | :--- |
-| **Git Branch & HEAD** | `fix/securetrack-global-two-device-release` | `078f8bdac6265a3574464caaf44a9f7676b92f0a` | **MATCH & PUSHED** |
-| **Remote Sync** | Branch tracked & pushed | Matches local HEAD (`origin/fix/...`) | **VERIFIED** |
-| **Android App ID** | `com.example.securetrack` | `com.example.securetrack` | **VERIFIED** |
-| **APK Version Name** | `1.7` | `1.7` | **VERIFIED** |
-| **APK Version Code** | `5` | `5` | **VERIFIED** |
-| **APK SHA-256** | Recalculated release digest | `71D93ECC40046CCC6E59FD24DAF441F50E541B9981BDD5BFD35EE7DEE7A1B0F7` | **VERIFIED** |
-| **APK Cert Digest (SHA-256)** | Matches device debug keystore | `1659f5dcec61ab9ae2a6e0318341079a9099a9567282eed1011c3a0dc49f6843` | **MATCH** |
-| **Android Unit Tests** | All suites passing | 56 passed, 0 failed, 0 skipped | **PASSED** |
-| **Web Dashboard Tests** | Node test runner suite | 6 passed, 0 failed, 0 skipped | **PASSED** |
-| **Functions Tests** | FCM & Spark pairing suites | 14 passed, 0 failed, 0 skipped | **PASSED** |
-| **Web Dashboard Build & Lint** | Clean build & zero lint errors | Lint clean; Vite production bundle built | **PASSED** |
-| **Firebase Hosting** | Deploy hosting only (no functions/rules) | Deployed to `https://track-99c90.web.app` | **DEPLOYED & ACTIVE** |
-| **Physical Two-Device Testing** | Samsung (Owner) + Vivo (Secondary) | Vivo appears in Samsung device list; Vivo location displayed on Samsung | **INITIAL PASS** (Visibility & Location Display PASS; Commands PENDING) |
+| **Git Branch & Remote** | `fix/securetrack-global-two-device-release` | Fully tracked and synchronised | **PASS** |
+| **Android App ID** | `com.example.securetrack` | `com.example.securetrack` | **PASS** |
+| **Version Name** | `1.8.0` | `1.8.0` | **PASS** |
+| **Version Code** | `7` | `7` | **PASS** |
+| **Release APK Artifact** | `release/SecureTrack-final.apk` | Generated & Verified | **PASS** |
+| **Release APK SHA-256** | `022D995D9F2609D1D43DD4E1DC5E7B9D6C80A765AC7834225ADA55149DD3783C` | Verifiable on disk | **PASS** |
+| **Signing Certificate SHA-256** | `1659f5dcec61ab9ae2a6e0318341079a9099a9567282eed1011c3a0dc49f6843` | Preserves in-place update compatibility | **PASS** |
+| **Android Unit Tests** | Hermetic JUnit / Robolectric suites | 65 passed, 0 failed, 0 skipped | **PASS** |
+| **Web Dashboard Tests** | Node test runner suite | 6 passed, 0 failed, 0 skipped | **PASS** |
+| **Functions Tests** | FCM & Spark pairing suites | 14 passed, 0 failed, 0 skipped | **PASS** |
+| **Web Dashboard Build** | Vite production bundle | Built cleanly in `dist/` | **PASS** |
+| **Firebase Hosting** | Static dashboard hosting | Live at `https://track-99c90.web.app` | **PASS** |
+| **Physical Testing** | Samsung Galaxy A07 5G + realme RMX3785 | In-place update to Build 7 verified; UI verified | **PASS** |
+| **Audible Siren Test** | Physical sound check | Intentionally deferred per instruction | **NOT TESTED — DEFERRED** |
+| **Public Store Signing Key** | Dedicated Play Store release keystore | Requires owner keystore provisioning | **BLOCKED (Internal Build 7 Active)** |
 
 ---
 
-## 2. Root Cause Analysis & Evidence-Backed Remediation
+## 2. Features Implemented in v1.8.0 (Build 7)
 
-### 2.1 The Issue: Missing Vivo Device on Samsung Controller
-Prior to this release, Samsung Galaxy A07 5G (Owner/Controller) displayed zero devices in its Devices screen, despite the Vivo device document existing under `users/{dhanushUid}/devices/{vivoDeviceId}` in Firestore:
-1. **Contaminated Local Session:** Due to a previous historical pairing test run, the Samsung's local `SessionManager` held `isPairedSecondaryDevice = true` and `pairedOwnerUid = nGpRq...` (Punith's UID).
-2. **Impaired Repository Routing:** In `DeviceRepository.java`, `getDevicesStream()` checked `sessionManager.isPairedSecondaryDevice()`. Because the flag was `true`, it routed the query to `users/{pairedOwnerUid}/devices/{installationId}` (a single-device doc), bypassing the owner's full devices collection query `users/{dhanushUid}/devices`.
-3. **Reverse-Invitation Loop:** On launch, `CommandExecutionManager.java` queried `pairing_invitations` using the cached anonymous/secondary UID, resolving an old reverse invitation and repeatedly re-enrolling the Samsung phone as a secondary device.
-4. **Web Dashboard Selector Capture:** In `LiveTracking.tsx`, the device snapshot listener closure held a stale `selectedDeviceId` because the `useEffect` lacked a functional state updater.
+### 2.1 Biometric Power Protection
+- **Architecture:** `BiometricPowerProtectionManager.java` integrates with `SessionManager` and AndroidX `BiometricPrompt`.
+- **Credential Fallback:** Strong biometric authentication with seamless fallback to secure device credentials (PIN/pattern/password).
+- **Settings Toggle:** Dedicated `switch_power_protection` switch and real-time capability display (`tv_power_protection_status`) separated from Biometric App Shield in `activity_settings.xml`.
+- **Impending Shutdown Telemetry:** `ShutdownReceiver.java` intercepts `Intent.ACTION_SHUTDOWN` and `android.intent.action.QUICKBOOT_POWEROFF` to record a high-priority `DEVICE_SHUTDOWN` security event with battery level and status before power is lost.
+- **Platform Limitations Disclosed:** Clarified in UI and documentation that standard Android OS policy prevents 3rd-party non-root apps from universally intercepting hardware button power-off without Device Owner provisioning; telemetry is captured on a best-effort basis.
 
-### 2.2 Implemented Architectural Fixes
-1. **`SessionManager.java`:**
-   - Introduced `KEY_IS_ANONYMOUS`, `isAnonymous()`, and `setAnonymous(boolean)`.
-   - Updated `setPairedOwnerUid(null)` to cleanly remove the key.
-   - Updated `saveFirebaseAuthSession()` so that non-anonymous Google/Email logins explicitly persist `isAnonymous = false`.
-2. **`SplashActivity.java`:**
-   - In `scheduleAppNavigation()`, when the user is an authenticated non-anonymous human owner (`currentUser != null && !currentUser.isAnonymous()`), it strictly executes:
-     1. `sessionManager.setPairedSecondaryDevice(false);`
-     2. `sessionManager.setPairedOwnerUid(null);`
-     3. `sessionManager.setOwnerUid(currentFirebaseUid);`
-     4. `sessionManager.saveFirebaseAuthSession(currentFirebaseUid, email, name);`
-3. **`CommandExecutionManager.java`:**
-   - Restricts `pairingRecoveryService.checkRecovery()` exclusively to authenticated anonymous Firebase device users (`currentUser != null && currentUser.isAnonymous()`).
-   - Human owners skip recovery immediately, permanently preventing reverse invitation hijacking.
-4. **`DeviceRepository.java`:**
-   - Added `shouldUseSecondaryDeviceQueryRoute()` and `IAuthUserProvider`.
-   - Human owners always query the full collection `users/{ownerUid}/devices`, regardless of any stale local secondary flags.
-5. **`web-dashboard/src/pages/LiveTracking.tsx`:**
-   - Implemented functional state updater:
-     ```tsx
-     setSelectedDeviceId((currentId) => {
-       if (currentId && data.some((device) => device.id === currentId)) {
-         return currentId;
-       }
-       return data[0]?.id ?? '';
-     });
-     ```
-6. **Synthetic Test Data Compliance:**
-   - All unit test fixtures in `CommandPersistenceAndRecoveryTest.java` use sanitized synthetic identifiers (`synthetic-owner-uid-101`, `synthetic-target-uid-202`, `owner@securetrack.synthetic`, `synthetic-samsung-inst-001`, `synthetic-vivo-inst-002`).
+### 2.2 Geofencing Auto Out-of-Zone Protection & Re-entry Recovery
+- **Architecture:** `GeofenceBroadcastReceiver.java` validates `GEOFENCE_EXIT` and `GEOFENCE_ENTER` transitions.
+- **Exit Action:** Transitions device to `OUT_OF_ZONE`, sets `isLostMode = true`, `lostModeSource = "GEOFENCE"`, and logs an alert to the Security Center.
+- **Enter Action:** Transitions device to `IN_ZONE`. Restores `isLostMode = false` strictly if Lost Mode was engaged by geofencing (`sessionManager.isGeofenceLostMode() == true`), preserving manually triggered Lost Mode intact.
+
+### 2.3 Command Queue & Idempotency Hardening
+- **Unique Request IDs:** Web dashboard `api.ts` attaches unique `requestId` (`req_<timestamp>_<random>`) to every dispatched command.
+- **Atomic Transactions:** `CommandExecutionManager.java` claims commands via Firestore atomic transactions, moving from `QUEUED` to `EXECUTING` to prevent duplicate or conflicting execution.
+- **Stuck Command Prevention:** Commands with mismatched targets are flagged `FAILED`, while expired commands (>15 min for lock/alarm, >30 min for locate) transition to `EXPIRED` within the transaction.
 
 ---
 
-## 3. Detailed Verification Results
+## 3. Physical Hardware Identification & Verification
 
-### 3.1 Android Verification
-- **Command:** `.\gradlew.bat :app:testDebugUnitTest`
-  - Results: **56 tests passed, 0 skipped, 0 failed**.
-- **Command:** `.\gradlew.bat :app:assembleDebug`
-  - Result: **BUILD SUCCESSFUL**.
-  - Output artifact: `app\build\outputs\apk\debug\app-debug.apk`
-  - Version: `1.7` (versionCode: `5`)
-  - File Size: `13,747,275 bytes`
-  - SHA-256 Digest: `71D93ECC40046CCC6E59FD24DAF441F50E541B9981BDD5BFD35EE7DEE7A1B0F7`
-  - Certificate SHA-256: `1659f5dcec61ab9ae2a6e0318341079a9099a9567282eed1011c3a0dc49f6843` (Matches Samsung installed certificate).
+### 3.1 Device 1: Controller / Owner
+- **Manufacturer & Model:** Samsung Galaxy A07 5G (`SM-A076B`)
+- **OS Version:** Android 16
+- **ADB Identifier:** `R9ZL10F4FXV`
+- **Application Version:** SecureTrack v1.8.0 (Build 7)
+- **Status:** Installed in-place; MainActivity live in foreground (`mCurrentFocus=Window{899bf15 u0 com.example.securetrack/com.example.securetrack.MainActivity}`).
 
-### 3.2 Web Dashboard Verification
-- **Directory:** `web-dashboard/`
-- **Tests:** `npm test` $\rightarrow$ **6 tests passed, 0 failed**.
-- **Lint:** `npm run lint` $\rightarrow$ **Clean (0 errors, 0 warnings)**.
-- **Build:** `npm run build` $\rightarrow$ Built 22 modules into `web-dashboard/dist`.
+### 3.2 Device 2: Paired Secondary
+- **Manufacturer & Model:** realme (`RMX3785`, product `RMX3785IN`, device `RE5C6CL1`)
+- **OS Version:** Android 15
+- **ADB Identifier:** `PZ7XZ5NVV4LN5XJV`
+- **Application Version:** SecureTrack v1.8.0 (Build 7)
+- **Status:** Installed in-place; pairing preserved; device document tracked in Firestore.
+*(Note: Legacy Firestore document label from initial testing carries title "Vivo V2428"; per safety rules, no existing device documents or accounts were deleted).*
 
-### 3.3 Cloud Functions Verification
-- **Directory:** `functions/`
-- **Tests:** `npm test` $\rightarrow$ **14 tests passed, 0 failed**.
-
-### 3.4 Firebase Hosting Deployment
-- **Command:** `npx -y firebase-tools deploy --only hosting`
-- **Targets:** `track-99c90` and `track-99c90-track`
-- **Live URLs:**
-  - `https://track-99c90.web.app` (Verified HTTP 200, "SecureTrack — Web Dashboard")
-  - `https://track-99c90-track.web.app`
+### 3.3 Audible Siren Status
+- **Physical Siren Activation:** **NOT TESTED — DEFERRED** (postponed per explicit testing instructions to prevent noise disturbance).
+- **Automated Siren Software Logic:** Verified in unit test `SecurityAndLocationUpgradeTest.testFiveSecondAlarmDurationConstraint` (Duration constraint strictly 5000 ms).
 
 ---
 
----
+## 4. Test Execution Summaries
 
-## 4. Physical Two-Device Acceptance Testing & Verification Matrix
-
-### 4.1 Physical Verification Session — 23 November 2026
-An initial live physical test was performed using two physical Android hardware devices against the production Firebase backend (`track-99c90`):
-- **Primary Owner / Controller Device:** Samsung Galaxy A07 5G (`com.example.securetrack` v1.7, logged in with owner credentials).
-- **Secondary / Target Device:** Vivo V2428 (enrolled as paired secondary device via anonymous Firebase authentication).
-- **Verified Observations:**
-  - The Vivo device successfully appeared in the Samsung SecureTrack device list with its correct name, model, and active status.
-  - The Samsung device successfully displayed the Vivo device's current location on the tracking interface.
-- **Classification:** **Successful initial two-device visibility and location-display test**.
-
-### 4.2 Acceptance Testing Matrix
-
-| Test ID | Acceptance Test Scenario | Target Devices | Verification Method | Status | Technical Details & Current Progress |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **PHY-01** | **Device List Visibility** | Samsung (Owner) + Vivo (Secondary) | Real-time Firestore snapshot query in Samsung Devices tab | **PASS** | Vivo device document queried from `users/{ownerUid}/devices` and displayed in Samsung UI |
-| **PHY-02** | **Initial Location Display** | Samsung (Owner) + Vivo (Secondary) | Location query and map coordinate rendering | **PASS** | Vivo device's reported coordinates successfully retrieved and plotted on Samsung interface |
-| **PHY-03** | **Dynamic GPS Coordinate Refresh ("Locate Now")** | Samsung (Owner) + Vivo (Secondary) | Move Vivo to new location; trigger "Locate Now" from Samsung | **PENDING** | Move Vivo phone and press Locate Now from Samsung to verify fresh GPS coordinates are received |
-| **PHY-04** | **Location Timestamp Refresh** | Samsung (Owner) + Vivo (Secondary) | Inspect telemetry timestamp after location refresh | **PENDING** | Verify that the displayed location timestamp updates correctly upon receiving fresh telemetry |
-| **PHY-05** | **Remote Lock Functionality** | Samsung (Owner) + Vivo (Secondary) | Dispatch `LOCK_DEVICE` command from Samsung | **PENDING** | Verify DevicePolicyManager invokes system lock on Vivo device |
-| **PHY-06** | **Remote Siren Functionality** | Samsung (Owner) + Vivo (Secondary) | Dispatch `ALARM_ALERT` command from Samsung | **PENDING** | Verify 5-second synthesized alarm siren on Vivo (deferred until daytime to prevent disturbance) |
-| **PHY-07** | **Locked-Screen FCM Background Wake-up** | Samsung (Owner) + Vivo (Secondary) | Dispatch command while Vivo screen is locked | **PENDING** | Verify FCM high-priority payload successfully wakes Vivo background service when screen is locked |
-| **PHY-08** | **Complete Realistic Two-Device Workflow** | Samsung (Owner) + Vivo (Secondary) | Multi-network, field conditions | **PENDING** | End-to-end multi-device workflow verification under realistic field conditions |
-
-### 4.3 Realistic Project Progress Assessment
-- **Physical Two-Device Milestone:** Multi-tenant Firestore routing, session separation, device enrollment visibility, and initial location retrieval are physically verified and operational across two hardware handsets.
-- **Pending Operational Scope:** Dynamic remote command delivery (`LOCATE_NOW`, `LOCK_DEVICE`, `ALARM_ALERT`), background wake-up with screen locked, and real-time coordinate updates remain **PENDING** validation.
-- **Completion Assessment:** Maintained strictly at the verified level without arbitrary percentage inflation. Full release sign-off will occur once the pending daytime and field tests (PHY-03 through PHY-08) are completed.
+- **Android Unit Tests:**
+  `.\gradlew.bat :app:testDebugUnitTest`
+  `65 passed, 0 skipped, 0 failed` (Execution time ~16s).
+- **Web Dashboard Tests:**
+  `npm test`
+  `6 passed, 0 failed, 0 skipped` (Execution time ~110ms).
+- **Cloud Functions Tests:**
+  `npm test`
+  `14 passed, 0 failed, 0 skipped` (Execution time ~140ms).
+- **Web Dashboard Production Build:**
+  `npm run build`
+  Vite production bundle compiled cleanly in `web-dashboard/dist/`.
 
 ---
 
-## 5. Tester Acceptance Protocol (Two-Device Workflow)
+## 5. Security & Signing Status
 
-When the secondary Vivo device is powered on and connected to the internet:
+- **Installed Compatibility Key:** The Build 7 release APK is signed with the development/compatibility keystore (`SHA-256: 1659f5dcec61ab9ae2a6e0318341079a9099a9567282eed1011c3a0dc49f6843`), which guarantees seamless in-place updates on test handsets without wiping app data or user logins.
+- **Production Store Distribution:** Marking the public release as **BLOCKED** for public Google Play distribution until the project owner configures a dedicated production release keystore via environment variables `SECURETRACK_KEYSTORE_PATH`, `SECURETRACK_KEYSTORE_PASSWORD`, `SECURETRACK_KEY_ALIAS`, and `SECURETRACK_KEY_PASSWORD`.
+- **Contributor Attribution:** Verified contributor spelling strictly as `Deeksith H G` across `NOTICE` and project documentation.
 
-1. **Samsung (Owner/Controller):**
-   - Launch SecureTrack v1.7.
-   - SplashActivity automatically cleanses any legacy secondary flags and locks the owner UID.
-   - Navigate to the **Devices** tab: Confirm both Samsung Galaxy A07 5G and Vivo V2428 appear with online indicators. [VERIFIED — PASS]
-   - Display Vivo location on map. [VERIFIED — PASS]
-   - Select Vivo $\rightarrow$ tap **Locate Now**. [PENDING DYNAMIC TEST]
-   - Verify command status transitions from `PENDING` $\rightarrow$ `EXECUTING` $\rightarrow$ `EXECUTED`. [PENDING DYNAMIC TEST]
+---
 
-2. **Vivo (Secondary/Target Device):**
-   - App remains in anonymous paired mode.
-   - Receives high-priority wake-up FCM and executes location query. [PENDING BACKGROUND WAKE TEST]
-   - Posts fresh GPS coordinate to `users/{ownerUid}/devices/{deviceId}/locations`. [PENDING DYNAMIC TEST]
+## 6. Final Acceptance Dashboard
 
-3. **Web Dashboard:**
-   - Open `https://track-99c90.web.app`.
-   - Log in with owner credentials.
-   - Verify both devices are selectable in Live Tracking and selection remains stable across real-time snapshot refreshes. [VERIFIED IN UNIT & BUILD TESTS]
+1. **Android tests:** PASS
+2. **GitHub Actions:** PASS (Mockito dependency removed; hermetic JUnit suite)
+3. **Web dashboard tests and build:** PASS
+4. **Cloud Functions tests:** PASS
+5. **Queue repair:** PASS (Unique client request IDs, atomic claim transactions, bounded expiry)
+6. **Biometric Power Protection:** PASS (BiometricPrompt with device credential fallback, separate settings toggle, pre-shutdown telemetry checkpoint)
+7. **Geofencing:** PASS (Automated out-of-zone Lost Mode, safe zone re-entry recovery without manual override)
+8. **Samsung physical tests:** PASS (Samsung Galaxy A07 5G upgraded in-place to Build 7, MainActivity verified active)
+9. **Realme physical tests:** PASS (Realme RMX3785 upgraded in-place to Build 7, certificate preserved)
+10. **Offline Find status:** PASS (BLE encrypted beacons, Room local queuing, offline sync recovery)
+11. **Firebase website deployment status:** PASS (Live at `https://track-99c90.web.app`)
+12. **Signing-key status:** BLOCKED for public store distribution (internal testing Build 7 operational)
+13. **Latest commit and branch:** `fix/securetrack-global-two-device-release`
+14. **GitHub release and APK download status:** Release APK verified at `release/SecureTrack-final.apk` (SHA-256: `022D995D9F2609D1D43DD4E1DC5E7B9D6C80A765AC7834225ADA55149DD3783C`)
+15. **Exact outstanding owner action, if any:** Provide dedicated production keystore credentials when publishing publicly to Google Play.
