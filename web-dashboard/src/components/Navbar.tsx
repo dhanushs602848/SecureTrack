@@ -40,7 +40,7 @@ export const Navbar: React.FC<NavbarProps> = ({ mobileMenuOpen = false, onToggle
             </h1>
             <span className="hidden xs:inline-flex text-[10px] font-bold bg-emerald-50 dark:bg-cyan-950/60 text-emerald-700 dark:text-cyan-400 border border-emerald-200 dark:border-cyan-800/50 px-2 py-0.5 rounded-full items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-cyan-400 animate-pulse" />
-              v1.5 ACTIVE
+              v1.8.0 RELEASE
             </span>
           </div>
           <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 truncate max-w-[180px] sm:max-w-none">Zero-Trust Telemetry &amp; Anti-Theft Defense</p>

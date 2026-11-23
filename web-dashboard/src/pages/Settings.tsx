@@ -269,7 +269,7 @@ export const Settings: React.FC = () => {
           <div className="flex items-center justify-between py-2">
             <span className="font-medium">Console Release Version</span>
             <span className="font-mono text-indigo-600 dark:text-cyan-400 font-semibold">
-              SecureTrack Web v1.2.0 (Premium)
+              SecureTrack Web v1.8.0 (Release)
             </span>
           </div>
         </div>

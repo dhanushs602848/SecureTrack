@@ -620,8 +620,8 @@ public class CommandPersistenceAndRecoveryTest {
 
     @Test
     public void testAnonymousSecondaryDevicePreservesSecondaryState() {
-        // Legitimate enrolled secondary phone (e.g. Vivo V2428)
-        sessionManager.setInstallationId("synthetic-vivo-inst-002");
+        // Legitimate enrolled secondary phone (e.g. OnePlus / Secondary Device)
+        sessionManager.setInstallationId("synthetic-secondary-inst-002");
         sessionManager.setAnonymous(true);
         sessionManager.setPairedSecondaryDevice(true);
         sessionManager.setPairedOwnerUid("synthetic-owner-uid-101");

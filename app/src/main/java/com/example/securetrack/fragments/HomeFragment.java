@@ -40,6 +40,7 @@ public class HomeFragment extends Fragment {
         sessionManager = new SessionManager(requireContext());
 
         binding.tvUserName.setText("Hello, " + sessionManager.getUserName());
+        binding.tvAppVersionSubtitle.setText("SecureTrack " + com.example.securetrack.BuildConfig.VERSION_NAME + " • Fleet Defense Active");
 
         // Observe active alert count reactively from Room source of truth
         securityRepository.getActiveAlertCountLiveData().observe(getViewLifecycleOwner(), count -> {
@@ -91,24 +92,36 @@ public class HomeFragment extends Fragment {
                     if (com.example.securetrack.utils.ProtectionHealthEvaluator.STATUS_ACTIVE.equals(report.status)) {
                         binding.tvProtectionStatus.setText("Active & Protected");
                         binding.tvProtectionStatus.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), com.example.securetrack.R.color.status_success));
+                        binding.tvSystemShieldPill.setText("● SHIELD ON");
+                        binding.tvSystemShieldPill.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), com.example.securetrack.R.color.status_success));
                     } else if (com.example.securetrack.utils.ProtectionHealthEvaluator.STATUS_DEGRADED.equals(report.status)) {
                         binding.tvProtectionStatus.setText("Degraded: " + report.reason);
                         binding.tvProtectionStatus.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), com.example.securetrack.R.color.status_warning));
+                        binding.tvSystemShieldPill.setText("● DEGRADED");
+                        binding.tvSystemShieldPill.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), com.example.securetrack.R.color.status_warning));
                     } else if (com.example.securetrack.utils.ProtectionHealthEvaluator.STATUS_NEEDS_ATTENTION.equals(report.status)) {
                         binding.tvProtectionStatus.setText("Action Needed: " + report.reason);
                         binding.tvProtectionStatus.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), com.example.securetrack.R.color.status_error));
+                        binding.tvSystemShieldPill.setText("● ATTENTION");
+                        binding.tvSystemShieldPill.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), com.example.securetrack.R.color.status_error));
                     } else {
                         binding.tvProtectionStatus.setText("Offline (No Connection)");
                         binding.tvProtectionStatus.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), com.example.securetrack.R.color.text_secondary));
+                        binding.tvSystemShieldPill.setText("● OFFLINE");
+                        binding.tvSystemShieldPill.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), com.example.securetrack.R.color.text_secondary));
                     }
                     sessionManager.setCurrentDeviceId(thisDevice.getId());
                     sessionManager.setDeviceName(thisDevice.getDeviceName());
                 } else if (!devices.isEmpty()) {
                     binding.tvPrimaryDeviceName.setText(sessionManager.getDeviceName() + " (Unregistered)");
                     binding.tvProtectionStatus.setText("Tap to Register");
+                    binding.tvSystemShieldPill.setText("● UNREGISTERED");
+                    binding.tvSystemShieldPill.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), com.example.securetrack.R.color.status_warning));
                 } else {
                     binding.tvPrimaryDeviceName.setText("No Device Found");
                     binding.tvProtectionStatus.setText("N/A");
+                    binding.tvSystemShieldPill.setText("● NO DEVICE");
+                    binding.tvSystemShieldPill.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), com.example.securetrack.R.color.text_secondary));
                 }
 
                 loadSecurityEvents();

@@ -11,15 +11,42 @@ android {
         applicationId = "com.example.securetrack"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.7"
+        versionCode = 6
+        versionName = "1.8.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        create("release") {
+            // Production keystore configuration via environment variables or local properties
+            val customStoreFile = project.findProperty("SECURETRACK_KEYSTORE_PATH") as String?
+                ?: System.getenv("SECURETRACK_KEYSTORE_PATH")
+            if (customStoreFile != null && file(customStoreFile).exists()) {
+                storeFile = file(customStoreFile)
+                storePassword = (project.findProperty("SECURETRACK_STORE_PASSWORD") as String?)
+                    ?: System.getenv("SECURETRACK_STORE_PASSWORD") ?: ""
+                keyAlias = (project.findProperty("SECURETRACK_KEY_ALIAS") as String?)
+                    ?: System.getenv("SECURETRACK_KEY_ALIAS") ?: ""
+                keyPassword = (project.findProperty("SECURETRACK_KEY_PASSWORD") as String?)
+                    ?: System.getenv("SECURETRACK_KEY_PASSWORD") ?: ""
+            } else {
+                // Compatibility fallback: preserves existing installation signing key on physical test fleet
+                val defaultKeystore = file(System.getProperty("user.home") + "/.android/debug.keystore")
+                if (defaultKeystore.exists()) {
+                    storeFile = defaultKeystore
+                    storePassword = "android"
+                    keyAlias = "androiddebugkey"
+                    keyPassword = "android"
+                }
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

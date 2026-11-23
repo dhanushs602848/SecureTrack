@@ -10,13 +10,18 @@
       ],
       "redirects": [
         {
+          "source": "/SecureTrack-final.apk",
+          "destination": "https://github.com/dhanushs602848/SecureTrack/releases/download/v1.8.0/SecureTrack-final.apk",
+          "type": 302
+        },
+        {
           "source": "/SecureTrack.apk",
-          "destination": "https://github.com/dhanushs602848/SecureTrack/releases/download/v1.7/SecureTrack.apk",
+          "destination": "https://github.com/dhanushs602848/SecureTrack/releases/download/v1.8.0/SecureTrack-final.apk",
           "type": 302
         },
         {
           "source": "/download",
-          "destination": "https://github.com/dhanushs602848/SecureTrack/releases/download/v1.7/SecureTrack.apk",
+          "destination": "https://github.com/dhanushs602848/SecureTrack/releases/download/v1.8.0/SecureTrack-final.apk",
           "type": 302
         }
       ],

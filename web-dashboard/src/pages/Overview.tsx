@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Smartphone, ShieldAlert, Activity, Wifi, Battery, MapPin } from 'lucide-react';
+import { Smartphone, ShieldAlert, Activity, Wifi, Battery, MapPin, Download } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { deviceService, securityService, locationService } from '../services/api';
 import { Device, SecurityEvent, LocationRecord } from '../types';
@@ -74,7 +74,16 @@ export const Overview: React.FC = () => {
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight font-mono">Telemetry Overview</h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Real-time status of protected Android fleet and security barriers</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <a
+            href="/download"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Download APK (v1.8.0)
+          </a>
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/60 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
             <span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
             Zero-Trust Fleet Active

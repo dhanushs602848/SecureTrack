@@ -40,10 +40,11 @@
                         android:fontFamily="sans-serif-black" />
 
                     <TextView
+                        android:id="@+id/tv_app_version_subtitle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:text="SecureTrack 1.2 • Fleet Defense Active"
+                        android:text="SecureTrack • Fleet Defense Active"
                         android:textColor="@color/text_secondary"
                         android:textSize="13sp" />
                 </LinearLayout>
