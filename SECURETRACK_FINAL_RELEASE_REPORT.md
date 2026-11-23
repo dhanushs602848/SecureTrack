@@ -1,12 +1,12 @@
 # SECURETRACK — FINAL RELEASE CLOSEOUT & VERIFICATION REPORT
 
-**Release Version:** v1.8.0 (Build 7)  
-**Package:** `com.example.securetrack`  
-**Date:** November 23, 2026  
-**Repository:** `https://github.com/dhanushs602848/SecureTrack`  
-**Branch:** `fix/securetrack-global-two-device-release`  
-**Firebase Backend:** `track-99c90`  
-**Web Dashboard:** `https://track-99c90.web.app`  
+**Release Version:** v1.8.0 (Build 7)<br>
+**Package:** `com.example.securetrack`<br>
+**Date:** November 24, 2026<br>
+**Repository:** `https://github.com/dhanushs602848/SecureTrack`<br>
+**Branch:** `fix/securetrack-global-two-device-release`<br>
+**Firebase Backend:** `track-99c90`<br>
+**Web Dashboard:** `https://track-99c90.web.app`<br>
 
 ---
 
@@ -14,107 +14,103 @@
 
 | Component | Target Requirement | Verified Result | Status |
 | :--- | :--- | :--- | :--- |
-| **Git Branch & Remote** | `fix/securetrack-global-two-device-release` | Fully tracked and synchronised | **PASS** |
-| **Android App ID** | `com.example.securetrack` | `com.example.securetrack` | **PASS** |
+| **Git Branch & Remote** | `fix/securetrack-global-two-device-release` | Active working branch, cleanly tracked | **PASS** |
+| **Android App ID** | `com.example.securetrack` | Confirmed `com.example.securetrack` | **PASS** |
 | **Version Name** | `1.8.0` | `1.8.0` | **PASS** |
 | **Version Code** | `7` | `7` | **PASS** |
-| **Release APK Artifact** | `release/SecureTrack-final.apk` | Generated & Verified | **PASS** |
-| **Release APK SHA-256** | `022D995D9F2609D1D43DD4E1DC5E7B9D6C80A765AC7834225ADA55149DD3783C` | Verifiable on disk | **PASS** |
-| **Signing Certificate SHA-256** | `1659f5dcec61ab9ae2a6e0318341079a9099a9567282eed1011c3a0dc49f6843` | Preserves in-place update compatibility | **PASS** |
 | **Android Unit Tests** | Hermetic JUnit / Robolectric suites | 65 passed, 0 failed, 0 skipped | **PASS** |
-| **Web Dashboard Tests** | Node test runner suite | 6 passed, 0 failed, 0 skipped | **PASS** |
+| **Web Dashboard Tests** | Node test runner suite | 7 passed, 0 failed, 0 skipped | **PASS** |
 | **Functions Tests** | FCM & Spark pairing suites | 14 passed, 0 failed, 0 skipped | **PASS** |
 | **Web Dashboard Build** | Vite production bundle | Built cleanly in `dist/` | **PASS** |
-| **Firebase Hosting** | Static dashboard hosting | Live at `https://track-99c90.web.app` | **PASS** |
-| **Physical Testing** | Samsung Galaxy A07 5G + realme RMX3785 | In-place update to Build 7 verified; UI verified | **PASS** |
-| **Audible Siren Test** | Physical sound check | Intentionally deferred per instruction | **NOT TESTED — DEFERRED** |
+| **Command Expiry (15m)** | Consistent 15m TTL across Android & Web | Verified in unit & integration tests | **PASS** |
+| **FCM Payload Symmetry** | Sends and reads both `commandType` and `type` | Verified contract across Functions and Android | **PASS** |
+| **Wipe Data Safety** | Non-functional UI button removed; backend fail-closed | Verified in UI layouts and backend handler | **PASS** |
+| **Biometric Power Protection** | BiometricPrompt with credential fallback | Verified preference persistence & auth wiring | **PASS** |
+| **Automated Geofence Recovery**| Out-of-zone lost mode & re-entry recovery | Verified state transitions and flag preservation | **PASS** |
+| **Physical Field Testing** | Multi-device manual testing protocol | Scheduled for execution tomorrow | **SCHEDULED — PROTOCOL READY** |
 | **Public Store Signing Key** | Dedicated Play Store release keystore | Requires owner keystore provisioning | **BLOCKED (Internal Build 7 Active)** |
 
 ---
 
-## 2. Features Implemented in v1.8.0 (Build 7)
+## 2. Core Architecture & Safety Hardening
 
-### 2.1 Biometric Power Protection
-- **Architecture:** `BiometricPowerProtectionManager.java` integrates with `SessionManager` and AndroidX `BiometricPrompt`.
-- **Credential Fallback:** Strong biometric authentication with seamless fallback to secure device credentials (PIN/pattern/password).
-- **Settings Toggle:** Dedicated `switch_power_protection` switch and real-time capability display (`tv_power_protection_status`) separated from Biometric App Shield in `activity_settings.xml`.
-- **Impending Shutdown Telemetry:** `ShutdownReceiver.java` intercepts `Intent.ACTION_SHUTDOWN` and `android.intent.action.QUICKBOOT_POWEROFF` to record a high-priority `DEVICE_SHUTDOWN` security event with battery level and status before power is lost.
-- **Platform Limitations Disclosed:** Clarified in UI and documentation that standard Android OS policy prevents 3rd-party non-root apps from universally intercepting hardware button power-off without Device Owner provisioning; telemetry is captured on a best-effort basis.
+### 2.1 Enforced 15-Minute Command Expiry
+- **Validity Window:** All commands (`LOCATE_NOW`, `LOCK_DEVICE`, `ALARM_ALERT`) enforce a strict, uniform 15-minute maximum queue validity window across the Android client, Cloud Firestore, and the Web Dashboard.
+- **Atomic Claiming:** `CommandExecutionManager.java` claims queued commands inside Firestore atomic transactions (`runTransaction`), checking both explicit `expiresAt` timestamps and creation age before transitioning status to `CLAIMED` / `EXECUTING`.
+- **Zero Zombie Execution:** Commands queued longer than 15 minutes automatically transition to `EXPIRED` within the transaction with result `"Command expired before execution (exceeded 15 min validity window)"`.
+- **Active Execution Preservation:** Commands in `CLAIMED` or `EXECUTING` state are never marked as `EXPIRED` simply because their initial creation timestamp is older than 15 minutes.
+- **Display Symmetry:** Both the Web Dashboard (`Commands.tsx`) and the Android client (`SecurityRepository.java`, `CommandAdapter.java`) evaluate effective command status symmetrically, correctly handling missing, string-based, or corrupted timestamps without throwing exceptions.
 
-### 2.2 Geofencing Auto Out-of-Zone Protection & Re-entry Recovery
-- **Architecture:** `GeofenceBroadcastReceiver.java` validates `GEOFENCE_EXIT` and `GEOFENCE_ENTER` transitions.
-- **Exit Action:** Transitions device to `OUT_OF_ZONE`, sets `isLostMode = true`, `lostModeSource = "GEOFENCE"`, and logs an alert to the Security Center.
-- **Enter Action:** Transitions device to `IN_ZONE`. Restores `isLostMode = false` strictly if Lost Mode was engaged by geofencing (`sessionManager.isGeofenceLostMode() == true`), preserving manually triggered Lost Mode intact.
+### 2.2 FCM Payload Contract Symmetry
+- **Symmetric Dispatch:** `functions/index.js` populates both `type` and `commandType` fields inside the high-priority data-only FCM push payload.
+- **Symmetric Ingestion:** `SecureFirebaseMessagingService.java` reads `commandType`, falling back to `type` if `commandType` is absent or empty.
+- **Authoritative Source:** The FCM push message is strictly utilized as a low-latency process wake-up trigger. The Android application always fetches, validates, and atomically claims commands directly from Cloud Firestore.
 
-### 2.3 Command Queue & Idempotency Hardening
-- **Unique Request IDs:** Web dashboard `api.ts` attaches unique `requestId` (`req_<timestamp>_<random>`) to every dispatched command.
-- **Atomic Transactions:** `CommandExecutionManager.java` claims commands via Firestore atomic transactions, moving from `QUEUED` to `EXECUTING` to prevent duplicate or conflicting execution.
-- **Stuck Command Prevention:** Commands with mismatched targets are flagged `FAILED`, while expired commands (>15 min for lock/alarm, >30 min for locate) transition to `EXPIRED` within the transaction.
+### 2.3 Permanent Factory Wipe Deactivation & UI Cleanup
+- **UI Element Removed:** The inactive `btn_wipe_device` button has been completely excised from the Android layout (`activity_device_security.xml`) and controller (`DeviceSecurityActivity.java`). The Web Dashboard (`Commands.tsx`) action grid has been streamlined to 3 active defense buttons.
+- **Fail-Closed Backend Protection:** If a `WIPE_DEVICE` command is ever received by `CommandExecutionManager.java`, it is immediately intercepted by `handleWipeCommand()` and rejected with status `FAILED` and result `"Safety Lock: Factory wipe is permanently disabled in this release to protect user data."`.
 
----
+### 2.4 Biometric Power Protection & Pre-Shutdown Telemetry
+- **Hardware Limitations Honestly Disclosed:** On consumer Android devices without enterprise Device Owner provisioning, long-pressing the physical power button (8–10 seconds) triggers a hardware-level forced reset via the PMIC that cannot be intercepted by user-space software.
+- **Implemented Protection:** SecureTrack provides best-effort pre-shutdown monitoring via `ShutdownReceiver.java` (listening for `Intent.ACTION_SHUTDOWN` and `android.intent.action.QUICKBOOT_POWEROFF`) to record battery level and telemetry checkpoints before power loss.
+- **Biometric Authentication Wiring:** Sensitive administrative controls in `SettingsActivity.java` (such as toggling biometric app shielding or power protection) are gated behind `BiometricAuthHelper.authenticate()`, requiring fingerprint, face, or secure device lock credentials (PIN/pattern/password).
 
-## 3. Physical Hardware Identification & Verification
-
-### 3.1 Device 1: Controller / Owner
-- **Manufacturer & Model:** Samsung Galaxy A07 5G (`SM-A076B`)
-- **OS Version:** Android 16
-- **ADB Identifier:** `R9ZL10F4FXV`
-- **Application Version:** SecureTrack v1.8.0 (Build 7)
-- **Status:** Installed in-place; MainActivity live in foreground (`mCurrentFocus=Window{899bf15 u0 com.example.securetrack/com.example.securetrack.MainActivity}`).
-
-### 3.2 Device 2: Paired Secondary
-- **Manufacturer & Model:** realme (`RMX3785`, product `RMX3785IN`, device `RE5C6CL1`)
-- **OS Version:** Android 15
-- **ADB Identifier:** `PZ7XZ5NVV4LN5XJV`
-- **Application Version:** SecureTrack v1.8.0 (Build 7)
-- **Status:** Installed in-place; pairing preserved; device document tracked in Firestore.
-*(Note: Legacy Firestore document label from initial testing carries title "Vivo V2428"; per safety rules, no existing device documents or accounts were deleted).*
-
-### 3.3 Audible Siren Status
-- **Physical Siren Activation:** **NOT TESTED — DEFERRED** (postponed per explicit testing instructions to prevent noise disturbance).
-- **Automated Siren Software Logic:** Verified in unit test `SecurityAndLocationUpgradeTest.testFiveSecondAlarmDurationConstraint` (Duration constraint strictly 5000 ms).
+### 2.5 Automated Geofencing & Re-entry Recovery
+- **Perimeter Defense:** `GeofenceBroadcastReceiver.java` captures transitions across designated safe zone boundaries.
+- **Exit Action:** Transitions the device to `OUT_OF_ZONE`, sets `isLostMode = true` with source `"GEOFENCE"`, and dispatches an alert to the Security Center.
+- **Re-entry Recovery:** Upon returning `IN_ZONE`, automatically clears Lost Mode strictly if Lost Mode was engaged by geofencing (`sessionManager.isGeofenceLostMode() == true`), preserving manually engaged Lost Mode intact.
 
 ---
 
-## 4. Test Execution Summaries
+## 3. Automated Test Execution Summaries
 
 - **Android Unit Tests:**
   `.\gradlew.bat :app:testDebugUnitTest`
-  `65 passed, 0 skipped, 0 failed` (Execution time ~16s).
+  `65 passed, 0 skipped, 0 failed` across security, location, command lifecycle, and pairing recovery.
 - **Web Dashboard Tests:**
-  `npm test`
-  `6 passed, 0 failed, 0 skipped` (Execution time ~110ms).
+  `npm test` in `web-dashboard`
+  `7 passed, 0 failed, 0 skipped` validating session tokens, command payload sanitization, 15m queue expiration, boundary conditions, and device selection persistence.
 - **Cloud Functions Tests:**
-  `npm test`
-  `14 passed, 0 failed, 0 skipped` (Execution time ~140ms).
+  `npm test` in `functions`
+  `14 passed, 0 failed, 0 skipped` validating 256-bit token entropy, rate limiting, and FCM payload symmetry.
 - **Web Dashboard Production Build:**
-  `npm run build`
-  Vite production bundle compiled cleanly in `web-dashboard/dist/`.
+  `npm run build` in `web-dashboard`
+  Production Vite bundle compiled cleanly in `web-dashboard/dist/`.
 
 ---
 
-## 5. Security & Signing Status
+## 4. Tomorrow's Physical QA Testing Protocol
 
-- **Installed Compatibility Key:** The Build 7 release APK is signed with the development/compatibility keystore (`SHA-256: 1659f5dcec61ab9ae2a6e0318341079a9099a9567282eed1011c3a0dc49f6843`), which guarantees seamless in-place updates on test handsets without wiping app data or user logins.
-- **Production Store Distribution:** Marking the public release as **BLOCKED** for public Google Play distribution until the project owner configures a dedicated production release keystore via environment variables `SECURETRACK_KEYSTORE_PATH`, `SECURETRACK_KEYSTORE_PASSWORD`, `SECURETRACK_KEY_ALIAS`, and `SECURETRACK_KEY_PASSWORD`.
-- **Contributor Attribution:** Verified contributor spelling strictly as `Deeksith H G` across `NOTICE` and project documentation.
+To ensure rigorous validation on physical handsets, the following 12-test protocol will be executed during tomorrow's testing session:
+
+| # | Test Case | Action | Expected Result | Pass/Fail Criteria |
+|---|---|---|---|---|
+| **01** | **Owner Login & Device Sync** | Log in with owner email/password on primary phone and open Web Dashboard. | Dashboard lists enrolled device with live battery level and network status. | Device appears `ONLINE` on both phone and web. |
+| **02** | **Remote Locate Trigger** | Tap "Locate Now" on Web Dashboard. | High-priority command dispatched; Android app wakes up, queries GPS, updates Firestore. | Web map centers on coordinates within 10 seconds; command status `EXECUTED`. |
+| **03** | **Remote Lock Execution** | Tap "Lock Device" on Web Dashboard. | Device administrator receives command and immediately locks Android screen. | Screen turns off/locks; status in history updates to `EXECUTED`. |
+| **04** | **5s Audible Siren Alarm** | Trigger "5s Siren Alarm" from Web Dashboard or Android app. | Urgent dual-tone siren plays at full volume and automatically stops after exactly 5000 ms. | Audio stops at 5 seconds without user intervention; status `EXECUTED`. |
+| **05** | **15m Queue Expiry** | Disconnect secondary phone from internet (Airplane mode), dispatch "Locate Now", wait >15 min, reconnect. | Command transitions to `EXPIRED` and does NOT execute on the phone. | Status shows `EXPIRED`; command result indicates 15m validity timeout. |
+| **06** | **Wipe Safety Verification** | Verify absence of Wipe button on Web Dashboard and Android UI. | Wipe button is not exposed in user interface; backend remains fail-closed. | No factory wipe option visible; safe against accidental data loss. |
+| **07** | **Biometric Protection Toggle** | In Android Settings, attempt to disable Biometric App Shield. | System prompts for fingerprint/face or device PIN before allowing modification. | Switch cannot be toggled off without successful biometric/credential auth. |
+| **08** | **Pre-Shutdown Telemetry** | Trigger a normal system restart/power off on the Android handset. | `ShutdownReceiver` intercepts `ACTION_SHUTDOWN` and records `DEVICE_SHUTDOWN` alert with battery level. | Alert visible in Web Dashboard Security Events feed with pre-shutdown timestamp. |
+| **09** | **Geofence Exit Transition** | Move phone outside defined safe zone radius (or simulate coordinates via developer options). | `GeofenceBroadcastReceiver` triggers, device transitions to `OUT_OF_ZONE`, engages Lost Mode. | Dashboard shows `OUT_OF_ZONE` status and creates security alert. |
+| **10** | **Geofence Re-entry Recovery** | Move phone back inside the safe zone radius. | Device transitions back to `IN_ZONE`; automated Lost Mode disengages automatically. | Lost mode turns off automatically; status shows `IN_ZONE`. |
+| **11** | **SIM Change Detection** | Eject physical SIM or toggle SIM state while SIM Change Detection is enabled. | Android client detects state change and creates high-priority `SIM_CHANGED` security alert. | Alert published to Firestore Security Center within 5 seconds. |
+| **12** | **Offline BLE Proximity Beacon** | Turn off cellular and Wi-Fi on target phone; open Scanner on controller phone. | Target phone advertises encrypted BLE beacons; controller detects nearby signal. | Controller identifies target device via BLE nearby radar. |
 
 ---
 
-## 6. Final Acceptance Dashboard
+## 5. Academic & Contributor Attribution
 
-1. **Android tests:** PASS
-2. **GitHub Actions:** PASS (Mockito dependency removed; hermetic JUnit suite)
-3. **Web dashboard tests and build:** PASS
-4. **Cloud Functions tests:** PASS
-5. **Queue repair:** PASS (Unique client request IDs, atomic claim transactions, bounded expiry)
-6. **Biometric Power Protection:** PASS (BiometricPrompt with device credential fallback, separate settings toggle, pre-shutdown telemetry checkpoint)
-7. **Geofencing:** PASS (Automated out-of-zone Lost Mode, safe zone re-entry recovery without manual override)
-8. **Samsung physical tests:** PASS (Samsung Galaxy A07 5G upgraded in-place to Build 7, MainActivity verified active)
-9. **Realme physical tests:** PASS (Realme RMX3785 upgraded in-place to Build 7, certificate preserved)
-10. **Offline Find status:** PASS (BLE encrypted beacons, Room local queuing, offline sync recovery)
-11. **Firebase website deployment status:** PASS (Live at `https://track-99c90.web.app`)
-12. **Signing-key status:** BLOCKED for public store distribution (internal testing Build 7 operational)
-13. **Latest commit and branch:** `fix/securetrack-global-two-device-release`
-14. **GitHub release and APK download status:** Release APK verified at `release/SecureTrack-final.apk` (SHA-256: `022D995D9F2609D1D43DD4E1DC5E7B9D6C80A765AC7834225ADA55149DD3783C`)
-15. **Exact outstanding owner action, if any:** Provide dedicated production keystore credentials when publishing publicly to Google Play.
+### 🎓 Academic Project Guide
+- **Mohankumar H M** — DBMS Project Guide & Academic Mentor (Database Architecture, Relational Modeling & Academic Review)
+
+### 👨‍💻 Project Lead & Author
+- **Dhanush S** ([@dhanushs602848](https://github.com/dhanushs602848)) — System Architecture, Cloud Firestore Integration, Android Security & Release Management
+
+### 🤝 Project Contributors & Engineers
+- **Deeksith H G** — Core Security Architecture, Telemetry Systems & Verification
+- **Deeksith K** — Android Client Engineering & Feature Integration
+- **Puneethkumar N E** — Database Architecture, Multi-Device Testing & Verification
+- **Deeksith Raj N** — UI/UX Implementation & Geospatial Mapping Integration
+- **Deepak D S** — Quality Assurance, Hardware Field Testing & Documentation

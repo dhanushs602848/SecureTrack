@@ -65,6 +65,32 @@ public class SecurityAndLocationUpgradeTest {
         );
 
         assertFalse("Fresh command must not be expired", freshCmd.isExpired());
+
+        // Boundary condition: 14m 59s ago -> fresh
+        long fourteenFiftyNineAgo = now - (14 * 60 * 1000L + 59 * 1000L);
+        CommandEntity boundaryFresh = new CommandEntity(
+                "cmd-103", "target-phone-1", "LOCATE_NOW", "owner-uid-1", "",
+                CommandEntity.STATE_QUEUED_LOCAL, "", "CLOUD",
+                fourteenFiftyNineAgo, fourteenFiftyNineAgo + (15 * 60 * 1000L), 0, 0, "SYNCED", 0
+        );
+        assertFalse("Command created 14m59s ago with 15m validity must not be expired", boundaryFresh.isExpired());
+
+        // Boundary condition: 15m 1s ago -> expired
+        long fifteenZeroOneAgo = now - (15 * 60 * 1000L + 1000L);
+        CommandEntity boundaryExpired = new CommandEntity(
+                "cmd-104", "target-phone-1", "LOCATE_NOW", "owner-uid-1", "",
+                CommandEntity.STATE_QUEUED_LOCAL, "", "CLOUD",
+                fifteenZeroOneAgo, fifteenZeroOneAgo + (15 * 60 * 1000L), 0, 0, "SYNCED", 0
+        );
+        assertTrue("Command created 15m01s ago with 15m validity must be expired", boundaryExpired.isExpired());
+
+        // Zero / unconfigured expiresAt safely returns false (not expired)
+        CommandEntity zeroExpires = new CommandEntity(
+                "cmd-105", "target-phone-1", "LOCATE_NOW", "owner-uid-1", "",
+                CommandEntity.STATE_QUEUED_LOCAL, "", "CLOUD",
+                now, 0L, 0, 0, "SYNCED", 0
+        );
+        assertFalse("Command with zero expiresAt must not report expired", zeroExpires.isExpired());
     }
 
     @Test

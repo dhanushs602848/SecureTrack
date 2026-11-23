@@ -443,6 +443,7 @@ exports.onDeviceCommandCreated = functions.firestore
           targetDeviceId: String(deviceId),
           ownerUid: String(userId),
           type: String(commandData.commandType || commandData.type || 'COMMAND_WAKE'),
+          commandType: String(commandData.commandType || commandData.type || 'COMMAND_WAKE'),
           requestId: String(commandData.requestId || commandId),
           timestamp: String(commandData.createdAt || Date.now())
         },

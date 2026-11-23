@@ -6,6 +6,7 @@ import androidx.lifecycle.LiveData;
 import com.example.securetrack.database.AppDatabase;
 import com.example.securetrack.database.SecurityAlertEntity;
 import com.example.securetrack.models.*;
+import com.example.securetrack.utils.DeviceUtils;
 import com.example.securetrack.utils.SessionManager;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
@@ -341,6 +342,8 @@ public class SecurityRepository {
         map.put("payload", command.getPayload());
         map.put("result", command.getResult());
         map.put("createdAt", FieldValue.serverTimestamp());
+        long expiresAtMillis = System.currentTimeMillis() + 15 * 60 * 1000L;
+        map.put("expiresAt", new com.google.firebase.Timestamp(new java.util.Date(expiresAtMillis)));
 
         db.collection("users").document(uid)
                 .collection("devices").document(targetDeviceId)
@@ -389,15 +392,28 @@ public class SecurityRepository {
                             String payload = doc.getString("payload");
                             String result = doc.getString("result");
 
+                            com.google.firebase.Timestamp ts = doc.getTimestamp("createdAt");
+                            long createdMillis = ts != null ? ts.toDate().getTime() : DeviceUtils.parseFlexibleTimestamp(doc.get("createdAt"));
+                            long expiresMillis = DeviceUtils.parseFlexibleTimestamp(doc.get("expiresAt"));
+                            String normalizedStatus = status != null ? status.toUpperCase() : "QUEUED";
+                            if ("QUEUED".equals(normalizedStatus) || "PENDING".equals(normalizedStatus) || "CREATED".equals(normalizedStatus)) {
+                                if ((expiresMillis > 0 && System.currentTimeMillis() > expiresMillis) ||
+                                        (createdMillis > 0 && System.currentTimeMillis() - createdMillis > 15 * 60 * 1000L)) {
+                                    normalizedStatus = "EXPIRED";
+                                    if (result == null || result.trim().isEmpty()) {
+                                        result = "Command expired in queue (>15 min)";
+                                    }
+                                }
+                            }
+
                             DeviceCommand cmd = new DeviceCommand(
                                     type != null ? type : "COMMAND",
-                                    status != null ? status : "QUEUED",
+                                    normalizedStatus,
                                     payload,
                                     result
                             );
                             cmd.setId(id);
                             cmd.setDeviceId(targetDeviceId);
-                            com.google.firebase.Timestamp ts = doc.getTimestamp("createdAt");
                             if (ts != null) {
                                 java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("MMM dd, yyyy • HH:mm", java.util.Locale.getDefault());
                                 cmd.setCreatedAt(sdf.format(ts.toDate()));
@@ -431,13 +447,26 @@ public class SecurityRepository {
                         String payload = doc.getString("payload");
                         String result = doc.getString("result");
 
+                        com.google.firebase.Timestamp ts = doc.getTimestamp("createdAt");
+                        long createdMillis = ts != null ? ts.toDate().getTime() : DeviceUtils.parseFlexibleTimestamp(doc.get("createdAt"));
+                        long expiresMillis = DeviceUtils.parseFlexibleTimestamp(doc.get("expiresAt"));
+                        String normalizedStatus = status != null ? status.toUpperCase() : "QUEUED";
+                        if ("QUEUED".equals(normalizedStatus) || "PENDING".equals(normalizedStatus) || "CREATED".equals(normalizedStatus)) {
+                            if ((expiresMillis > 0 && System.currentTimeMillis() > expiresMillis) ||
+                                    (createdMillis > 0 && System.currentTimeMillis() - createdMillis > 15 * 60 * 1000L)) {
+                                normalizedStatus = "EXPIRED";
+                                if (result == null || result.trim().isEmpty()) {
+                                    result = "Command expired in queue (>15 min)";
+                                }
+                            }
+                        }
+
                         DeviceCommand cmd = new DeviceCommand(
                                 type != null ? type : "COMMAND",
-                                status != null ? status : "QUEUED",
+                                normalizedStatus,
                                 payload,
                                 result
                         );
-                        com.google.firebase.Timestamp ts = doc.getTimestamp("createdAt");
                         if (ts != null) {
                             java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("MMM dd, yyyy • HH:mm", java.util.Locale.getDefault());
                             cmd.setCreatedAt(sdf.format(ts.toDate()));

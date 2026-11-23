@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Terminal, Shield, Lock, Trash2, MapPin, Volume2 } from 'lucide-react';
+import { Terminal, Lock, MapPin, Volume2 } from 'lucide-react';
 import { commandService, deviceService } from '../services/api';
 import { Device, DeviceCommand } from '../types';
 
@@ -55,7 +55,22 @@ export const Commands: React.FC = () => {
     if (rawStatus === 'FAILED' || rawStatus === 'EXPIRED') {
       return rawStatus;
     }
-    // Command is still in queue (QUEUED, PENDING, CREATED, or stale CLAIMED/EXECUTING)
+    // Actively executing or claimed commands must NEVER be marked as expired
+    if (rawStatus === 'EXECUTING' || rawStatus === 'CLAIMED') {
+      return rawStatus;
+    }
+
+    // Explicit expiresAt check
+    if (cmd.expiresAt) {
+      const expiresMillis = typeof cmd.expiresAt === 'number'
+        ? cmd.expiresAt
+        : new Date(cmd.expiresAt).getTime();
+      if (!isNaN(expiresMillis) && Date.now() > expiresMillis) {
+        return 'EXPIRED';
+      }
+    }
+
+    // Command is still in queue (QUEUED, PENDING, CREATED)
     if (cmd.createdAt) {
       const createdMillis = typeof cmd.createdAt === 'number'
         ? cmd.createdAt
@@ -119,7 +134,7 @@ export const Commands: React.FC = () => {
       </div>
 
       {/* Action Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Locate Now */}
         <button
           onClick={() => handleSendCommand('LOCATE_NOW')}
@@ -159,20 +174,6 @@ export const Commands: React.FC = () => {
           <div className="text-center">
             <h3 className="font-bold text-sm text-slate-900 dark:text-white font-mono">5s Siren Alarm</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Auto-stop at 5 sec</p>
-          </div>
-        </button>
-
-        {/* Wipe Data */}
-        <button
-          onClick={() => handleSendCommand('WIPE_DEVICE')}
-          className="flex flex-col items-center justify-center gap-3 p-5 bg-white dark:bg-[#121927] border border-slate-200 dark:border-[#223049] hover:border-rose-500 dark:hover:border-rose-400 rounded-2xl shadow-sm dark:shadow-lg transition-all group opacity-85"
-        >
-          <div className="w-11 h-11 bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/50 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform shadow-[0_0_10px_rgba(239,68,68,0.15)]">
-            <Trash2 className="w-5 h-5" />
-          </div>
-          <div className="text-center">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white font-mono">Wipe Data</h3>
-            <p className="text-xs text-rose-500 dark:text-rose-400 mt-0.5">Safety Disabled</p>
           </div>
         </button>
       </div>

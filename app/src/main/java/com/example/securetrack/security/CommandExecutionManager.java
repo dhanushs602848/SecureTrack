@@ -678,19 +678,27 @@ public class CommandExecutionManager {
             }
 
             com.google.firebase.Timestamp createdAt = snapshot.getTimestamp("createdAt");
+            long createdMillis = createdAt != null ? createdAt.toDate().getTime() : DeviceUtils.parseFlexibleTimestamp(snapshot.get("createdAt"));
+            long expiresAtMillis = DeviceUtils.parseFlexibleTimestamp(snapshot.get("expiresAt"));
+
             long maxAge = ("LOCK_DEVICE".equalsIgnoreCase(type) || "ALARM_ALERT".equalsIgnoreCase(type))
                     ? EXPIRY_LOCK_ALARM_MS : EXPIRY_LOCATE_MS;
 
-            if (createdAt != null) {
-                long ageMillis = System.currentTimeMillis() - createdAt.toDate().getTime();
-                if (ageMillis > maxAge) {
-                    Map<String, Object> expireUpdates = new HashMap<>();
-                    expireUpdates.put("status", "EXPIRED");
-                    expireUpdates.put("result", "Command expired before execution (exceeded " + (maxAge / 60000) + " min validity window)");
-                    expireUpdates.put("executedAt", FieldValue.serverTimestamp());
-                    transaction.update(cmdRef, expireUpdates);
-                    return new TxResult("EXPIRED", snapshot);
-                }
+            long now = System.currentTimeMillis();
+            boolean isExpired = false;
+            if (expiresAtMillis > 0 && now > expiresAtMillis) {
+                isExpired = true;
+            } else if (createdMillis > 0 && (now - createdMillis > maxAge)) {
+                isExpired = true;
+            }
+
+            if (isExpired) {
+                Map<String, Object> expireUpdates = new HashMap<>();
+                expireUpdates.put("status", "EXPIRED");
+                expireUpdates.put("result", "Command expired before execution (exceeded " + (maxAge / 60000) + " min validity window)");
+                expireUpdates.put("executedAt", FieldValue.serverTimestamp());
+                transaction.update(cmdRef, expireUpdates);
+                return new TxResult("EXPIRED", snapshot);
             }
 
             Map<String, Object> claimUpdates = new HashMap<>();
@@ -748,8 +756,18 @@ public class CommandExecutionManager {
 
         final String finalType = type;
         com.google.firebase.Timestamp createdAt = claimedDoc.getTimestamp("createdAt");
+        long createdTime = createdAt != null ? createdAt.toDate().getTime() : DeviceUtils.parseFlexibleTimestamp(claimedDoc.get("createdAt"));
+        if (createdTime <= 0) createdTime = System.currentTimeMillis();
+
+        long expiresTime = DeviceUtils.parseFlexibleTimestamp(claimedDoc.get("expiresAt"));
         long maxAge = ("LOCK_DEVICE".equalsIgnoreCase(type) || "ALARM_ALERT".equalsIgnoreCase(type))
                 ? EXPIRY_LOCK_ALARM_MS : EXPIRY_LOCATE_MS;
+        if (expiresTime <= 0) {
+            expiresTime = createdTime + maxAge;
+        }
+
+        final long finalCreatedTime = createdTime;
+        final long finalExpiresTime = expiresTime;
 
         backgroundExecutor.execute(() -> {
             try {
@@ -762,8 +780,8 @@ public class CommandExecutionManager {
                         CommandEntity.STATE_EXECUTING,
                         "Executing on target device",
                         CommandEntity.TRANSPORT_CLOUD,
-                        createdAt != null ? createdAt.toDate().getTime() : System.currentTimeMillis(),
-                        System.currentTimeMillis() + maxAge,
+                        finalCreatedTime,
+                        finalExpiresTime,
                         System.currentTimeMillis(),
                         0,
                         "SYNCED",

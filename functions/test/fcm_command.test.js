@@ -18,6 +18,7 @@ test('FCM Command Dispatch & Payload Verification Suite', async (t) => {
         targetDeviceId: String(deviceId),
         ownerUid: String(ownerUid),
         type: String(commandType),
+        commandType: String(commandType),
         requestId: String(requestId),
         timestamp: String(timestamp)
       },
@@ -32,6 +33,7 @@ test('FCM Command Dispatch & Payload Verification Suite', async (t) => {
     assert.equal(payload.data.targetDeviceId, deviceId);
     assert.equal(payload.data.ownerUid, ownerUid);
     assert.equal(payload.data.type, 'REFRESH_LOCATION');
+    assert.equal(payload.data.commandType, 'REFRESH_LOCATION');
     assert.equal(payload.data.requestId, 'req-loc-001');
     // Ensure no notification field is present to guarantee background processing without visual clutter
     assert.equal(payload.notification, undefined, 'Payload must be data-only without notification banner');

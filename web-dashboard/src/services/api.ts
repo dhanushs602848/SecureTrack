@@ -591,6 +591,7 @@ export const commandService = {
           result: data.result,
           transport: data.transport || 'CLOUD',
           createdAt: convertTimestamp(data.createdAt),
+          expiresAt: convertTimestamp(data.expiresAt),
           executedAt: convertTimestamp(data.executedAt)
         });
       });
@@ -603,6 +604,7 @@ export const commandService = {
     if (!uid) throw new Error('User not authenticated');
 
     const requestId = 'req_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+    const expiresAtDate = new Date(Date.now() + 15 * 60 * 1000);
 
     const commandDoc = await addDoc(
       collection(db, 'users', uid, 'devices', deviceId, 'commands'),
@@ -615,7 +617,8 @@ export const commandService = {
         status: 'QUEUED',
         transport: 'CLOUD',
         result: '',
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        expiresAt: Timestamp.fromDate(expiresAtDate)
       }
     );
 
@@ -627,7 +630,8 @@ export const commandService = {
       status: 'QUEUED',
       transport: 'CLOUD',
       requestId: requestId,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      expiresAt: expiresAtDate.toISOString()
     };
   },
 };

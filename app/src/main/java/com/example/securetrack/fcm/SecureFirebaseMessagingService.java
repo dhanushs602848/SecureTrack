@@ -54,6 +54,9 @@ public class SecureFirebaseMessagingService extends FirebaseMessagingService {
         String targetDeviceId = data.get("targetDeviceId");
         String ownerUid = data.get("ownerUid");
         String commandType = data.get("commandType");
+        if (commandType == null || commandType.trim().isEmpty()) {
+            commandType = data.get("type");
+        }
 
         Log.i(TAG, "Received FCM command notification: type=" + commandType
                 + ", cmdId=" + DeviceUtils.redactIdentifier(commandId)

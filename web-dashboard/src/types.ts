@@ -22,6 +22,7 @@ export interface DeviceCommand {
   result?: string;
   transport?: string;
   createdAt: string;
+  expiresAt?: string;
   executedAt?: string;
   claimedAt?: string;
   requestId?: string;

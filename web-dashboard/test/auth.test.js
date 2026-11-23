@@ -140,6 +140,16 @@ test('SecureTrack Web Dashboard Auth & Command Integrity Suite', async (t) => {
       if (['FAILED', 'EXPIRED'].includes(rawStatus)) {
         return rawStatus;
       }
+      // Actively executing or claimed commands must NEVER expire
+      if (rawStatus === 'EXECUTING' || rawStatus === 'CLAIMED') {
+        return rawStatus;
+      }
+      if (cmd.expiresAt) {
+        const expiresMs = typeof cmd.expiresAt === 'number' ? cmd.expiresAt : new Date(cmd.expiresAt).getTime();
+        if (!isNaN(expiresMs) && nowMs > expiresMs) {
+          return 'EXPIRED';
+        }
+      }
       if (cmd.createdAt) {
         const createdMs = typeof cmd.createdAt === 'number' ? cmd.createdAt : new Date(cmd.createdAt).getTime();
         if (!isNaN(createdMs) && (nowMs - createdMs > QUEUE_LIMIT_MS)) {
@@ -154,10 +164,35 @@ test('SecureTrack Web Dashboard Auth & Command Integrity Suite', async (t) => {
     const queuedStale = { status: 'QUEUED', createdAt: new Date(now - 16 * 60 * 1000).toISOString() }; // 16m ago
     const executedStale = { status: 'EXECUTED', createdAt: new Date(now - 30 * 60 * 1000).toISOString() }; // 30m ago
     const completedStale = { status: 'COMPLETED', createdAt: new Date(now - 25 * 60 * 1000).toISOString() };
+    const executingStale = { status: 'EXECUTING', createdAt: new Date(now - 20 * 60 * 1000).toISOString() }; // Actively executing
+    const claimedStale = { status: 'CLAIMED', createdAt: new Date(now - 20 * 60 * 1000).toISOString() };
+
+    // Boundary condition tests
+    const boundaryFresh = { status: 'QUEUED', createdAt: now - (14 * 60 * 1000 + 59 * 1000) }; // 14m 59s
+    const boundaryExpired = { status: 'QUEUED', createdAt: now - (15 * 60 * 1000 + 1000) }; // 15m 1s
+
+    // Explicit expiresAt
+    const explicitExpired = { status: 'QUEUED', createdAt: now - 5000, expiresAt: now - 1000 };
+    const explicitFresh = { status: 'QUEUED', createdAt: now - 5000, expiresAt: now + 60000 };
+
+    // Missing / malformed timestamps
+    const malformedTimestamp = { status: 'QUEUED', createdAt: 'invalid-date-string' };
+    const nullTimestamp = { status: 'QUEUED', createdAt: null };
 
     assert.equal(resolveEffectiveCommandStatus(queuedRecent, now), 'QUEUED', 'Recent command remains in QUEUED status');
     assert.equal(resolveEffectiveCommandStatus(queuedStale, now), 'EXPIRED', 'Command queued >15m must display EXPIRED');
     assert.equal(resolveEffectiveCommandStatus(executedStale, now), 'EXECUTED', 'Executed command displays EXECUTED regardless of age');
     assert.equal(resolveEffectiveCommandStatus(completedStale, now), 'EXECUTED', 'Completed command displays EXECUTED');
+    assert.equal(resolveEffectiveCommandStatus(executingStale, now), 'EXECUTING', 'Actively executing command must not be expired');
+    assert.equal(resolveEffectiveCommandStatus(claimedStale, now), 'CLAIMED', 'Claimed command must not be expired');
+
+    assert.equal(resolveEffectiveCommandStatus(boundaryFresh, now), 'QUEUED', '14m 59s command remains QUEUED');
+    assert.equal(resolveEffectiveCommandStatus(boundaryExpired, now), 'EXPIRED', '15m 1s command transitions to EXPIRED');
+
+    assert.equal(resolveEffectiveCommandStatus(explicitExpired, now), 'EXPIRED', 'Past expiresAt transitions to EXPIRED');
+    assert.equal(resolveEffectiveCommandStatus(explicitFresh, now), 'QUEUED', 'Future expiresAt remains QUEUED');
+
+    assert.equal(resolveEffectiveCommandStatus(malformedTimestamp, now), 'QUEUED', 'Malformed timestamp safely falls back to current status');
+    assert.equal(resolveEffectiveCommandStatus(nullTimestamp, now), 'QUEUED', 'Null timestamp safely falls back to current status');
   });
 });

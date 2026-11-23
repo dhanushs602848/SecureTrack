@@ -79,4 +79,38 @@ public class DeviceUtils {
         byte[] bBytes = b.getBytes(java.nio.charset.StandardCharsets.UTF_8);
         return java.security.MessageDigest.isEqual(aBytes, bBytes);
     }
+
+    /**
+     * Safely and flexibly parses various timestamp types (Timestamp, Number, Date, ISO-8601 String, epoch string).
+     */
+    public static long parseFlexibleTimestamp(Object raw) {
+        if (raw == null) return 0L;
+        if (raw instanceof Number) {
+            return ((Number) raw).longValue();
+        }
+        if (raw instanceof com.google.firebase.Timestamp) {
+            return ((com.google.firebase.Timestamp) raw).toDate().getTime();
+        }
+        if (raw instanceof java.util.Date) {
+            return ((java.util.Date) raw).getTime();
+        }
+        if (raw instanceof String) {
+            String str = ((String) raw).trim();
+            if (str.isEmpty()) return 0L;
+            try {
+                return Long.parseLong(str);
+            } catch (Exception e) {
+                try {
+                    return java.time.Instant.parse(str).toEpochMilli();
+                } catch (Exception ignored) {
+                    try {
+                        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSX", java.util.Locale.US);
+                        java.util.Date d = sdf.parse(str);
+                        if (d != null) return d.getTime();
+                    } catch (Exception ignored2) {}
+                }
+            }
+        }
+        return 0L;
+    }
 }

@@ -76,6 +76,7 @@ export interface DeviceCommand {
   result?: string;
   transport?: 'CLOUD' | 'BLE';
   createdAt: string;
+  expiresAt?: string;
   executedAt?: string;
 }
 

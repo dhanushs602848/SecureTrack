@@ -73,7 +73,6 @@ public class DeviceSecurityActivity extends AppCompatActivity {
             }
             dispatchCommand("ALARM_ALERT");
         });
-        binding.btnWipeDevice.setOnClickListener(v -> confirmWipeDevice());
         binding.btnRevokeDevice.setOnClickListener(v -> confirmRevocation());
 
         setupDeviceAdminSwitch();
@@ -230,14 +229,6 @@ public class DeviceSecurityActivity extends AppCompatActivity {
         });
     }
 
-    private void confirmWipeDevice() {
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("Remote Wipe Feature Disabled")
-                .setMessage("Factory wipe operations are strictly disabled in this build to protect against accidental data loss.")
-                .setIcon(android.R.drawable.ic_dialog_info)
-                .setPositiveButton("OK", null)
-                .show();
-    }
 
     private void confirmRevocation() {
         String deviceId = getTargetDeviceId();

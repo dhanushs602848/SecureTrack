@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.widget.Toast;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import com.example.securetrack.R;
 import com.example.securetrack.api.ApiClient;
@@ -64,27 +65,92 @@ public class SettingsActivity extends AppCompatActivity {
         });
 
         binding.switchBiometricLock.setChecked(sessionManager.isBiometricLockEnabled());
-        binding.switchBiometricLock.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if (isChecked && !com.example.securetrack.security.BiometricAuthHelper.canAuthenticate(this)) {
-                binding.switchBiometricLock.setChecked(false);
-                Toast.makeText(this, "Biometrics or device lock credentials are not configured on this phone.", Toast.LENGTH_LONG).show();
-                return;
+        binding.switchBiometricLock.setOnClickListener(v -> {
+            boolean requestedState = binding.switchBiometricLock.isChecked();
+            if (requestedState) {
+                if (!com.example.securetrack.security.BiometricAuthHelper.canAuthenticate(this)) {
+                    binding.switchBiometricLock.setChecked(false);
+                    Toast.makeText(this, "Biometrics or device lock credentials are not configured on this phone.", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                sessionManager.setBiometricLockEnabled(true);
+                Toast.makeText(this, "Biometric App Shield enabled", Toast.LENGTH_SHORT).show();
+            } else {
+                com.example.securetrack.security.BiometricAuthHelper.authenticate(
+                        this,
+                        "Disable Biometric Shield",
+                        "Verify your identity to disable biometric protection",
+                        new com.example.securetrack.security.BiometricAuthHelper.AuthCallback() {
+                            @Override
+                            public void onAuthSuccess() {
+                                sessionManager.setBiometricLockEnabled(false);
+                                binding.switchBiometricLock.setChecked(false);
+                                Toast.makeText(SettingsActivity.this, "Biometric App Shield disabled", Toast.LENGTH_SHORT).show();
+                            }
+
+                            @Override
+                            public void onAuthError(int errorCode, @NonNull CharSequence errString) {
+                                binding.switchBiometricLock.setChecked(true);
+                                Toast.makeText(SettingsActivity.this, "Authentication failed: " + errString, Toast.LENGTH_SHORT).show();
+                            }
+
+                            @Override
+                            public void onAuthFailed() {
+                                binding.switchBiometricLock.setChecked(true);
+                                Toast.makeText(SettingsActivity.this, "Authentication failed", Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                );
             }
-            sessionManager.setBiometricLockEnabled(isChecked);
-            Toast.makeText(this, isChecked ? "Biometric App Shield enabled" : "Biometric App Shield disabled", Toast.LENGTH_SHORT).show();
         });
 
         binding.switchPowerProtection.setChecked(sessionManager.isPowerProtectionEnabled());
         updatePowerProtectionCapability();
-        binding.switchPowerProtection.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if (isChecked && !com.example.securetrack.security.BiometricAuthHelper.canAuthenticate(this)) {
-                binding.switchPowerProtection.setChecked(false);
-                Toast.makeText(this, "Biometrics or device lock credentials are not configured on this phone.", Toast.LENGTH_LONG).show();
-                return;
+        binding.switchPowerProtection.setOnClickListener(v -> {
+            boolean requestedState = binding.switchPowerProtection.isChecked();
+            if (requestedState) {
+                if (!com.example.securetrack.security.BiometricAuthHelper.canAuthenticate(this)) {
+                    binding.switchPowerProtection.setChecked(false);
+                    Toast.makeText(this, "Biometrics or device lock credentials are not configured on this phone.", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                sessionManager.setPowerProtectionEnabled(true);
+                updatePowerProtectionCapability();
+                Toast.makeText(this, "Biometric Power Protection enabled", Toast.LENGTH_SHORT).show();
+            } else {
+                if (sessionManager.isBiometricLockEnabled()) {
+                    com.example.securetrack.security.BiometricAuthHelper.authenticate(
+                            this,
+                            "Disable Power Protection",
+                            "Verify your identity to disable biometric power protection",
+                            new com.example.securetrack.security.BiometricAuthHelper.AuthCallback() {
+                                @Override
+                                public void onAuthSuccess() {
+                                    sessionManager.setPowerProtectionEnabled(false);
+                                    binding.switchPowerProtection.setChecked(false);
+                                    updatePowerProtectionCapability();
+                                    Toast.makeText(SettingsActivity.this, "Biometric Power Protection disabled", Toast.LENGTH_SHORT).show();
+                                }
+
+                                @Override
+                                public void onAuthError(int errorCode, @NonNull CharSequence errString) {
+                                    binding.switchPowerProtection.setChecked(true);
+                                    Toast.makeText(SettingsActivity.this, "Authentication failed: " + errString, Toast.LENGTH_SHORT).show();
+                                }
+
+                                @Override
+                                public void onAuthFailed() {
+                                    binding.switchPowerProtection.setChecked(true);
+                                    Toast.makeText(SettingsActivity.this, "Authentication failed", Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                    );
+                } else {
+                    sessionManager.setPowerProtectionEnabled(false);
+                    updatePowerProtectionCapability();
+                    Toast.makeText(this, "Biometric Power Protection disabled", Toast.LENGTH_SHORT).show();
+                }
             }
-            sessionManager.setPowerProtectionEnabled(isChecked);
-            updatePowerProtectionCapability();
-            Toast.makeText(this, isChecked ? "Biometric Power Protection enabled" : "Biometric Power Protection disabled", Toast.LENGTH_SHORT).show();
         });
 
         // 3. Device Administrator Privilege
