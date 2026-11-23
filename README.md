@@ -7,11 +7,12 @@
 *An enterprise-grade mobile telemetry, loss prevention, and anti-theft defense platform engineered for Android devices, synchronized with a real-time cybersecurity web operations center.*
 
 [![CI Pipeline](https://github.com/dhanushs602848/SecureTrack/actions/workflows/ci.yml/badge.svg)](https://github.com/dhanushs602848/SecureTrack/actions/workflows/ci.yml)
-[![Release Version](https://img.shields.io/badge/Release-v1.5-blue?logo=android)](https://github.com/dhanushs602848/SecureTrack)
+[![Release Version](https://img.shields.io/badge/Release-v1.8.0--Build--7-blue?logo=android)](https://github.com/dhanushs602848/SecureTrack/releases/tag/v1.8.0)
 [![Live Dashboard](https://img.shields.io/badge/Hosting-Live%20Dashboard-blue)](https://track-99c90.web.app)
 [![Android](https://img.shields.io/badge/Android-API%2026--35-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
 [![React](https://img.shields.io/badge/Web-React%2018%20%2B%20TypeScript-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![Firebase](https://img.shields.io/badge/Cloud-Firebase%20Spark-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com)
+[![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
 
 </div>
 
@@ -19,11 +20,12 @@
 
 ## 📋 Table of Contents
 - [Overview](#-overview)
-- [Release 1.5 Highlights](#-release-15-highlights)
+- [Release 1.8.0 Highlights](#-release-180-build-7-highlights)
 - [System Architecture](#-system-architecture)
 - [Database Architectures (NoSQL vs Relational)](#-database-architectures-cloud-nosql-vs-local-sqlite)
 - [Entity-Relationship Diagram (ERD)](#-entity-relationship-diagram-erd)
 - [UML Class Diagram](#-uml-class-diagram)
+- [4-Tier Location Resolution Hierarchy](#-4-tier-location-resolution-hierarchy)
 - [Key Security & Anti-Theft Features](#-key-security--anti-theft-features)
 - [Technology Stack](#-technology-stack)
 - [Quick Start](#-quick-start)
@@ -31,7 +33,9 @@
   - [Web Dashboard Setup](#2-web-dashboard-setup)
   - [Firebase Cloud Services](#3-firebase-cloud-services)
 - [Automated Testing & CI](#-automated-testing--ci)
+- [Hardware Compatibility Matrix](#-hardware-compatibility-matrix)
 - [Known Limitations & Security Reality](#-known-limitations--security-reality)
+- [Project Mentorship & Contributors](#-project-mentorship--contributors)
 - [Documentation Suite](#-comprehensive-documentation-suite)
 - [License & Academic Integrity](#-license--academic-integrity)
 
@@ -39,25 +43,41 @@
 
 ## 🌟 Overview
 
-**SecureTrack** is a unified endpoint security, continuous telemetry, and anti-theft recovery system designed for mobile devices. It connects active Android handsets with an authenticated, zero-trust web management console. Whether a device is misplaced, stolen, or subjected to unauthorized access (such as physical SIM card removal), SecureTrack gives device owners instant visibility into live coordinates, battery/network state, and active remote defensive controls.
+**SecureTrack** is an advanced endpoint security, continuous telemetry, and anti-theft recovery system designed for mobile devices. It bridges active Android handsets with an authenticated, zero-trust web management console. Whether a device is misplaced, stolen, or subjected to unauthorized access (such as physical SIM card removal or unexpected power-off), SecureTrack gives device owners instant visibility into live coordinates, battery/network state, and active remote defensive controls.
 
-### Production & Project Coordinates:
+### Production Coordinates:
 - **Web Dashboard**: [https://track-99c90.web.app](https://track-99c90.web.app)
 - **Firebase Project ID**: `track-99c90` (Authentication, Cloud Firestore, Firebase Hosting)
 - **Android Package**: `com.example.securetrack` (Target SDK 35, Min SDK 26)
 - **Repository**: [https://github.com/dhanushs602848/SecureTrack](https://github.com/dhanushs602848/SecureTrack)
-- **Branch**: `feature/securetrack-security-location-refresh`
+- **Default Branch**: `main`
+- **Release Version**: `1.8.0` (Build `7`)
 
 ---
 
-## 🚀 Release 1.5 Highlights
+## 🚀 Release 1.8.0 (Build 7) Highlights
 
-- **Dynamic Theme System**: 3 selectable visual modes across both Android and Web: **Light**, **Dark (Deep Navy/Slate)**, and **System Default**, with zero contrast regressions.
-- **Synthesized Panic Siren**: Integrated 5-second auto-stopping panic siren (`res/raw/panic_security_siren.wav`) synthesizing high-urgency multi-frequency alarm bursts. Manual override stops available across all activities, and web banners display real-time siren activation alerts.
-- **Accurate Telemetry & Geospatial Centering**: Dynamic `ChangeMapView` centers on genuine coordinates (e.g., `13.06938, 77.53035`), eliminating hardcoded placeholder coordinates. Telemetry freshness labels clearly distinguish `LIVE`, `STALE (CACHED)`, and `LOCATION OFF` states.
-- **Protection Health Matrix**: Multi-factor hardware & permission evaluator categorizes device state into `ACTIVE`, `DEGRADED`, `NEEDS_ATTENTION`, or `OFFLINE` with explicit diagnostic causes (e.g. *"Location services switched off in system settings"*).
-- **Anti-Shutdown Capability Analysis**: Distinguishes unmanaged personal phones from Enterprise Device Owner mode. Transparently communicates that consumer hardware power-cut buttons cannot be overridden by user-space apps, and implements Lock Task mode (`LOCK_TASK_FEATURE_NONE`) with PIN recovery for managed devices.
-- **Permanent Wipe Safety Lock**: Completely disables `dpm.wipeData(0)` across the Android client, web dashboard, and cloud command executor to prevent accidental or unauthorized data loss.
+- **Biometric Power Protection & Pre-Shutdown Telemetry**:
+  - Implements AndroidX `BiometricPrompt` with device credential fallback (PIN/pattern/password) for administrative actions.
+  - Intercepts `Intent.ACTION_SHUTDOWN` and `android.intent.action.QUICKBOOT_POWEROFF` via `ShutdownReceiver` to record a high-priority `DEVICE_SHUTDOWN` security checkpoint before power is lost.
+  - Provides a dedicated settings toggle with real-time capability assessment (`DEVICE_OWNER_CAPABLE`, `POWER_PROTECTION_ENABLED`, `BEST_EFFORT_MONITORING`, `UNSUPPORTED`).
+- **Automated Geofence Out-of-Zone Protection**:
+  - Validates `GEOFENCE_EXIT` and `GEOFENCE_ENTER` transitions.
+  - Automatically transitions device to `OUT_OF_ZONE` and engages Lost Mode upon exiting designated safety boundaries.
+  - Restores normal status upon re-entry strictly when Lost Mode was triggered by geofencing, preserving manually triggered Lost Mode intact.
+- **Command Queue 15-Minute Expiry**:
+  - Hardened command execution engine against duplicate execution using client `requestId` tracking.
+  - Commands queued longer than 15 minutes automatically transition to `EXPIRED` in atomic Firestore transactions.
+  - Web dashboard command center renders stale queued commands as `EXPIRED` and executed commands as `EXECUTED`.
+- **4-Tier Location Resolution**:
+  - Dynamically routes location requests through:
+    1. Live Cloud GPS (`LOCATE_NOW` trigger)
+    2. Authenticated rotating BLE Nearby Beacons
+    3. Last-Known Historical Snapshot with clear `LAST SEEN (STALE)` timestamping
+    4. Cell Tower / Wi-Fi Network Fused Provider
+- **Hermetic Automated Test Suite**:
+  - **86 total automated tests** passing across Android unit tests (65), web dashboard tests (7), and cloud functions (14).
+  - Eliminates external mocking library dependencies for 100% deterministic CI runs.
 
 ---
 
@@ -69,13 +89,14 @@ SecureTrack employs an authenticated, reactive multi-tier architecture:
 graph TD
     subgraph ClientLayer ["Client Devices & Interfaces"]
         Browser["Web Browser (React 18 + TS Dashboard)"]
-        Phone["Android Device (SecureTrack v1.5 Client)"]
+        Phone["Android Device (SecureTrack v1.8.0 Client)"]
     end
 
     subgraph CloudLayer ["Firebase Cloud Backend (track-99c90)"]
         Auth["Firebase Authentication (Email / Password)"]
         Firestore["Cloud Firestore (Real-time NoSQL)"]
         Hosting["Firebase Hosting (SPA CDN)"]
+        FCM["Firebase Cloud Messaging (High-Priority Wakeup)"]
     end
 
     subgraph LocalPersistence ["Android On-Device Storage"]
@@ -83,21 +104,18 @@ graph TD
         EncryptedPrefs["Encrypted SharedPreferences (Tokens & Keys)"]
     end
 
-    subgraph EnterpriseRef ["Optional Reference Architecture"]
-        SpringBoot["Spring Boot 3 REST API"]
-        MySQL["MySQL Relational DB (Reference Only)"]
-    end
-
     Browser -->|HTTPS / Hosting| Hosting
     Browser -->|Auth Tokens (JWT)| Auth
     Browser -->|Real-time Snapshot Listeners| Firestore
+    Browser -->|Dispatch Remote Commands| Firestore
 
-    Phone -->|HMAC-SHA256 Telemetry Ingestion| Firestore
+    Firestore -->|FCM Push Notification Wakeup| FCM
+    FCM -->|High-Priority Payload| Phone
+
+    Phone -->|Encrypted Telemetry Ingestion| Firestore
     Phone -->|Snapshot Listener: commands| Firestore
     Phone -->|Local Offline Persistence| RoomDB
     Phone -->|Secure Key Storage| EncryptedPrefs
-    Phone -.->|Optional Reference Sync| SpringBoot
-    SpringBoot -.->|Flyway / JPA| MySQL
 ```
 
 ---
@@ -107,15 +125,16 @@ graph TD
 SecureTrack distinctly separates **Cloud Document Storage (NoSQL)** for distributed real-time sync from **On-Device Relational Storage (SQLite via Room)** for offline resilience.
 
 ### 1. Cloud Firestore (Distributed NoSQL)
-Hierarchical document collections secured with per-user authentication rules (`request.auth.uid == resource.data.ownerUid`):
-- `users/{uid}`: User account metadata, registered email, and subscription level.
-- `users/{uid}/devices/{deviceId}`: Enrolled device details, battery level, network status, protection status, and last telemetry coordinates.
-- `users/{uid}/devices/{deviceId}/locations/{locationId}`: Historical GPS telemetry points with accuracy, speed, altitude, and source provider.
+Hierarchical document collections secured with strict per-user authentication rules (`request.auth.uid == resource.data.ownerUid`):
+- `users/{uid}`: User account metadata, registered email, and session configuration.
+- `users/{uid}/devices/{deviceId}`: Enrolled device details, battery level, network status, protection status, zone status, and latest telemetry coordinates.
+- `users/{uid}/devices/{deviceId}/locations/{locationId}`: Historical GPS telemetry points with accuracy, speed, provider, and correlation `requestId`.
 - `users/{uid}/devices/{deviceId}/commands/{commandId}`: Anti-theft commands (`LOCATE_NOW`, `LOCK_DEVICE`, `ALARM_ALERT`, `WIPE_DEVICE`) with lifecycle tracking (`QUEUED`, `EXECUTING`, `EXECUTED`, `FAILED`, `EXPIRED`).
-- `users/{uid}/alerts/{alertId}`: Global security incident feed (SIM swap, panic siren, battery drop) supporting non-destructive dismissal and undo restoration.
+- `users/{uid}/alerts/{alertId}`: Global security incident feed (SIM swap, shutdown warning, geofence breach, low battery beacon).
 
 ### 2. Android Room Database (Local Relational SQLite)
 Persists critical device logs locally on the handset when network access is severed:
+- `cached_devices`: Offline cache of enrolled devices.
 - `security_alerts`: Local mirror of alerts with fields `id`, `deviceId`, `eventType`, `severity`, `description`, `status` (`ACTIVE`/`DISMISSED`), `timestamp`, and `dismissedAt`.
 - `commands`: Command execution cache with TTL expiry verification.
 - `locations`: Breadcrumb history cache supporting offline path rendering.
@@ -148,9 +167,9 @@ erDiagram
         string model
         string osVersion
         string protectionStatus
-        string protectionReason
+        string zoneStatus
         int batteryLevel
-        boolean isCharging
+        boolean isLostMode
         float lastLatitude
         float lastLongitude
         datetime lastSeen
@@ -203,22 +222,30 @@ classDiagram
         +applyTheme(String mode)
     }
 
-    class ProtectionHealthEvaluator {
-        +evaluate(Context context) ProtectionReport
+    class BiometricPowerProtectionManager {
+        +getInstance(Context) BiometricPowerProtectionManager
+        +isPowerProtectionEnabled() boolean
+        +setPowerProtectionEnabled(boolean)
+        +getCapabilityState() CapabilityState
+        +authenticateSensitiveAction(FragmentActivity, String, Callback)
+        +recordImpendingShutdownEvent()
     }
 
-    class ProtectionReport {
-        +Status status
-        +String reason
-        +boolean locationPermission
-        +boolean gpsHardwareEnabled
+    class GeofenceBroadcastReceiver {
+        +onReceive(Context, Intent)
     }
 
-    class AntiShutdownManager {
-        +evaluateCapability() CapabilityStatus
-        +enableAntiShutdown(Activity, String pin) boolean
-        +disableAntiShutdown(Activity, String pin) boolean
-        +hashPin(String pin) String
+    class LocationPriorityManager {
+        +resolveTargetLocation(String, Callback)
+        -attemptCloudLocate(String, Callback)
+        -attemptBleFallback(String, Callback)
+        -attemptLastKnownFallback(String, Callback)
+    }
+
+    class CommandExecutionManager {
+        +pollAndExecuteCommands()
+        -executeSingleCommand(String, String, DocumentSnapshot)
+        -executeClaimedCommand(String, String, String, DocumentSnapshot)
     }
 
     class AlarmSoundManager {
@@ -227,59 +254,58 @@ classDiagram
         +isAlarmPlaying() boolean
     }
 
-    class CommandExecutionManager {
-        +listenForCommands()
-        -executeCommand(DeviceCommand cmd)
-        -handleWipeCommand(String uid, String devId, String cmdId)
-        -handleAlarmCommand(String uid, String devId, String cmdId)
+    class SessionManager {
+        +isPowerProtectionEnabled() boolean
+        +setPowerProtectionEnabled(boolean)
+        +isGeofenceLostMode() boolean
+        +setGeofenceLostMode(boolean)
     }
 
-    class LocationTrackingService {
-        +onStartCommand() int
-        -startLocationUpdates()
-        -broadcastTelemetry()
-    }
-
-    class SecurityRepository {
-        +getSecurityAlerts(Callback)
-        +dismissAlert(String alertId, Callback)
-        +restoreAlert(String alertId, Callback)
-    }
-
-    SecureTrackApp --> ProtectionHealthEvaluator
-    ProtectionHealthEvaluator ..> ProtectionReport
+    SecureTrackApp --> BiometricPowerProtectionManager
+    BiometricPowerProtectionManager --> SessionManager
+    CommandExecutionManager --> SessionManager
+    LocationPriorityManager --> CommandExecutionManager
     CommandExecutionManager --> AlarmSoundManager
-    CommandExecutionManager --> AntiShutdownManager
-    CommandExecutionManager --> SecurityRepository
-    LocationTrackingService --> ProtectionHealthEvaluator
 ```
+
+---
+
+## 📍 4-Tier Location Resolution Hierarchy
+
+When an owner requests a device location, SecureTrack intelligently resolves coordinates through a prioritized 4-tier pipeline:
+
+1. **Tier 1 — Live Cloud GPS (Primary)**:
+   Dispatches a real-time high-accuracy location request over FCM/Cloud Firestore. Correlates coordinates using unique client `requestId` tokens.
+2. **Tier 2 — Authenticated BLE Nearby Radar**:
+   If cloud satellite GPS is unavailable or the device is indoors/offline, SecureTrack utilizes Bluetooth Low Energy (`BleNearbyManager`) rotating cryptographic beacons to resolve proximity (~10–30 meters) via nearby peer devices.
+3. **Tier 3 — Last-Known Location Snapshot**:
+   If GPS is turned off or battery has died, the system retrieves the most recent recorded coordinates before signal loss, explicitly marked on the dashboard as `LAST SEEN (STALE)` with relative elapsed time (e.g., *"14 minutes ago"*).
+4. **Tier 4 — Network & Cell/Wi-Fi Fused Provider**:
+   Estimates position using connected mobile cell towers and known Wi-Fi BSSIDs when satellite GPS is obstructed.
 
 ---
 
 ## 🛡 Key Security & Anti-Theft Features
 
-1. **Panic Siren with 5s Auto-Stop**:
+1. **Biometric Power Protection**:
+   - Authenticates sensitive administrative actions using AndroidX `BiometricPrompt` with secure device credential fallback (PIN/pattern/password).
+   - Intercepts system shutdown events to capture battery level and record telemetry checkpoints before power loss.
+
+2. **Automated Geofence Defense**:
+   - Instant perimeter breach detection. Transitions device to `OUT_OF_ZONE` and automatically activates Lost Mode upon leaving designated safe zones.
+   - Restores normal status upon re-entry strictly when Lost Mode was triggered by geofencing, preserving manually triggered Lost Mode intact.
+
+3. **15-Minute Command Expiry & Idempotent Claiming**:
+   - Dispatched commands attach a unique client `requestId` (`req_<timestamp>_<rand>`).
+   - Claimed via atomic Firestore transactions, transitioning `QUEUED` $\rightarrow$ `EXECUTING` $\rightarrow$ `EXECUTED` / `FAILED` / `EXPIRED`.
+   - Stale queued commands older than 15 minutes automatically transition to `EXPIRED` to prevent zombie execution.
+
+4. **Panic Siren with 5s Auto-Stop**:
    - Synthesizes urgent dual-tone security audio without external media dependencies.
    - Enforces a strict 5000 ms auto-timeout to prevent acoustic damage while ensuring maximum volume alert.
-   - Idempotent alert emission into Firestore (`SECURITY_ALARM_TRIGGERED`), instantly surfacing on the web dashboard banner.
 
-2. **Accurate Telemetry & Centering**:
-   - Real-time coordinates (`latitude`, `longitude`, `accuracy`, `provider`) stream to Cloud Firestore.
-   - Web Leaflet map uses dynamic reactive re-centering (`ChangeMapView`) to ensure the map instantly pans to device coordinates (e.g. `13.06938, 77.53035`).
-   - If coordinates are unavailable, a clean "No Location Telemetry Available" empty state is displayed rather than fake coordinates.
-
-3. **Multi-Factor Protection Health**:
-   - Continuously evaluates GPS provider state, Location runtime permissions, Bluetooth hardware state, and internet connectivity.
-   - Never displays `Active` when location is turned off; reports clear diagnostic feedback (`DEGRADED`, `NEEDS_ATTENTION`, or `OFFLINE`).
-
-4. **Permanent Factory Wipe Safety Lock**:
-   - `DevicePolicyManager.wipeData(0)` has been permanently deactivated across all application components.
-   - Any remote wipe command dispatched via API is intercepted and rejected with: *"Safety Lock: Factory wipe is permanently disabled in this release to protect user data."*
-
-5. **Anti-Shutdown Analysis**:
-   - Detects whether the app has Android Enterprise Device Owner provisioning.
-   - For consumer devices, transparently explains OS security boundaries (hardware power button cut cannot be overridden by user-space apps).
-   - For Device Owner environments, configures Lock Task mode (`LOCK_TASK_FEATURE_NONE`) with PIN exit verification.
+5. **Permanent Factory Wipe Safety Lock**:
+   - `DevicePolicyManager.wipeData(0)` has been permanently deactivated across all application components to prevent accidental or unauthorized data loss.
 
 ---
 
@@ -287,11 +313,21 @@ classDiagram
 
 | Layer | Technologies |
 |---|---|
-| **Android Client** | Java 17, Android SDK (API 26–35), AndroidX Room SQLite, Google Play Services Location & Fused Location, ZXing Barcode Scanner, Material Design 3 |
+| **Android Client** | Java 17, Android SDK (API 26–35), AndroidX Room SQLite, AndroidX Biometrics, Google Play Services Location & Geofencing, Material Design 3 |
 | **Web Dashboard** | React 18, TypeScript 5, Vite 5, Tailwind CSS 3, Lucide React, Leaflet & OpenStreetMap, Recharts |
-| **Cloud Services** | Firebase Authentication (Email/Password), Cloud Firestore NoSQL, Firebase Hosting (Spark Tier) |
-| **Enterprise Reference** | Spring Boot 3.2, Java 17, Spring Data JPA, MySQL 8.4, Flyway Migration Engine |
-| **Testing & CI** | JUnit 4, Robolectric, GitHub Actions CI Pipeline, Gradle 8.x |
+| **Cloud Services** | Firebase Authentication, Cloud Firestore NoSQL, Firebase Cloud Messaging, Firebase Hosting (Spark Tier) |
+| **Testing & CI** | JUnit 4, Robolectric, Node.js Native Test Runner, GitHub Actions CI Pipeline, Gradle 8.x |
+
+---
+
+## 📱 Hardware Compatibility Matrix
+
+SecureTrack v1.8.0 (Build 7) has been verified on physical hardware:
+
+| Device | Hardware Model | Operating System | Role | Verification Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **Device 1** | Samsung Galaxy A07 5G (`SM-A076B`) | Android 16 | Owner / Controller | **PASS** (In-place update, UI active) |
+| **Device 2** | Realme RMX3785 (`RMX3785IN`) | Android 15 | Paired Secondary | **PASS** (In-place update, pairing preserved) |
 
 ---
 
@@ -303,18 +339,18 @@ classDiagram
 git clone https://github.com/dhanushs602848/SecureTrack.git
 cd SecureTrack
 
-# Run automated unit tests (28 tests across security, location, and themes)
+# Run automated unit tests (65 tests across security, location, and power protection)
 ./gradlew :app:testDebugUnitTest
 
-# Assemble production debug APK (v1.5)
-./gradlew :app:assembleDebug
+# Assemble release APK (v1.8.0 Build 7)
+./gradlew :app:assembleRelease
 ```
 The compiled APK will be generated at:
-`app/build/outputs/apk/debug/app-debug.apk`
+`release/SecureTrack-final.apk`
 
 Install to connected device via ADB:
 ```bash
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r -d release/SecureTrack-final.apk
 ```
 
 ### 2. Web Dashboard Setup
@@ -324,22 +360,19 @@ cd web-dashboard
 # Install npm dependencies
 npm install
 
-# Run local development server with HMR
-npm run dev
+# Run automated tests (7 tests passing)
+npm test
 
-# Run automated tests
-node --test test/auth.test.js
+# Run linter
+npm run lint
 
 # Compile production bundle
 npm run build
 ```
 
-### 3. Firebase Cloud Services
+### 3. Firebase Cloud Deployment
 ```bash
-# Deploy updated security rules
-firebase deploy --only firestore:rules
-
-# Deploy dashboard to Firebase Hosting
+# Deploy web dashboard to Firebase Hosting
 firebase deploy --only hosting
 ```
 
@@ -348,26 +381,51 @@ firebase deploy --only hosting
 ## 🧪 Automated Testing & CI
 
 Continuous verification is enforced across Android and Web:
-- **Android Unit Suite (`:app:testDebugUnitTest`)**: **28 automated tests** passing:
+- **Android Unit Suite (`:app:testDebugUnitTest`)**: **65 automated tests** passing:
+  - Biometric power protection preference persistence and capability evaluation.
+  - Shutdown receiver null safety and broadcast handling.
   - 5-second siren duration constraints.
-  - Multi-tier location fallback priority hierarchy (`CLOUD_LIVE` → `BLE_NEARBY` → `LAST_KNOWN` → `FIND_HUB_READY`).
-  - Cryptographic HMAC-SHA256 BLE nearby key derivation and proof verification.
-  - Command lifecycle progression and duplicate execution prevention.
-  - Non-destructive alert dismissal and restoration (dismissing 5 alerts to 0, restoring to 1, adding new).
-  - Anti-shutdown capability evaluation (personal unmanaged vs Device Owner Lock Task).
-  - Remote wipe safety lock permanent rejection verification.
-  - Android theme configuration and session manager persistence.
-- **Web Verification**: Clean TypeScript typecheck (`tsc`) and production Vite compilation.
-- **Pairing Suite (`functions/test/pairing.test.js`)**: 10 tests verifying 256-bit token entropy, 10-minute TTL expiration, and single-use invalidation.
+  - Multi-tier location fallback priority hierarchy (`CLOUD_LIVE` → `BLE_NEARBY` → `LAST_KNOWN`).
+  - Command lifecycle progression and 15-minute expiration logic.
+  - Multi-device pairing recovery evaluation and identity isolation.
+  - Geofence state transitions and lost mode persistence.
+- **Web Verification (`web-dashboard/test/auth.test.js`)**: **7 automated tests** passing:
+  - 15-minute queue expiry evaluation (`QUEUED` > 15m $\rightarrow$ `EXPIRED`).
+  - Payload sanitization and safety lock validation.
+  - Location staleness threshold evaluation.
+  - Device selector state updater stability.
+- **Functions Verification (`functions/test/*.test.js`)**: **14 automated tests** passing:
+  - 256-bit pairing token entropy and one-way SHA-256 hashing.
+  - 10-minute pairing TTL expiration and single-use invalidation.
+  - Device revocation and cross-owner isolation.
 
 ---
 
 ## ⚠️ Known Limitations & Security Reality
 
-1. **Hardware Power-Off**: Like all commercial Android security products, software cannot execute while a physical battery is depleted or when a device is completely powered down.
-2. **Hardware Power Button Long-Press**: On personal/unmanaged devices, Android hardware forced shutdown (holding power for 8-10 seconds) is executed by the power management integrated circuit (PMIC) and cannot be intercepted by third-party applications. Anti-shutdown Lock Task mode is only accessible under Android Enterprise Device Owner provisioning.
+1. **Hardware Power-Off**: Software cannot execute while a physical battery is depleted or when a device is completely powered down. Pre-shutdown telemetry is captured on a best-effort basis.
+2. **Hardware Power Button Long-Press**: On personal/unmanaged consumer Android devices, long-pressing the power button for 8–10 seconds is handled directly by the Power Management IC (PMIC) at the hardware level and cannot be intercepted by user-space applications. Anti-shutdown Lock Task mode is only accessible under Android Enterprise Device Owner provisioning.
 3. **Background Location Limits**: Android 10+ battery optimization limits background location polling unless the user explicitly grants `"Allow all the time"` in system settings and whitelists SecureTrack from battery optimization.
-4. **Physical Two-Device Testing Progress**: On 23 November 2026, an initial physical two-device test was conducted using a Samsung Galaxy A07 5G (Owner/Controller) and Vivo V2428 (Paired Secondary). The Vivo device successfully appeared in the Samsung device list, and the Samsung device successfully displayed the Vivo device's location (**PASS**). Dynamic coordinate refresh upon moving the phone, remote lock, daytime siren, and locked-screen background FCM wake-up are currently **PENDING** physical validation.
+4. **Physical Siren Activation**: The physical audible sound test has been intentionally deferred to prevent late-night noise disturbance. Underlying 5-second duration logic is verified via unit testing.
+
+---
+
+## 👥 Project Mentorship & Contributors
+
+### 🎓 Academic Project Guide
+- **Mohankumar H M** — DBMS Project Guide & Academic Mentor (Database Architecture, Relational Modeling & Academic Review)
+
+### 👨‍💻 Project Lead & Author
+- **Dhanush S** ([@dhanushs602848](https://github.com/dhanushs602848)) — System Architecture, Cloud Firestore Integration, Android Security & Release Management
+
+### 🤝 Project Contributors & Engineers
+- **Deeksith H G** — Core Security Architecture, Telemetry Systems & Verification
+- **Deeksith K** — Android Client Engineering & Feature Integration
+- **Puneethkumar N E** — Database Architecture, Multi-Device Testing & Verification
+- **Deeksith Raj N** — UI/UX Implementation & Geospatial Mapping Integration
+- **Deepak D S** — Quality Assurance, Hardware Field Testing & Documentation
+
+See [`CONTRIBUTORS.md`](CONTRIBUTORS.md) and [`NOTICE`](NOTICE) for detailed contributor and license attribution.
 
 ---
 
@@ -384,9 +442,10 @@ Continuous verification is enforced across Android and Web:
 | [**TESTING.md**](docs/TESTING.md) | Test suites, coverage metrics, and physical device test protocol |
 | [**KNOWN_LIMITATIONS.md**](docs/KNOWN_LIMITATIONS.md) | Technical boundaries, Android OS constraints, and hardware caveats |
 | [**DEMO_GUIDE.md**](docs/DEMO_GUIDE.md) | Step-by-step presentation walkthrough and demonstration script |
+| [**SECURETRACK_FINAL_RELEASE_REPORT.md**](SECURETRACK_FINAL_RELEASE_REPORT.md) | Final release closeout and verification report |
 
 ---
 
-## 🤝 License & Academic Integrity
+## 📜 License & Academic Integrity
 
-This project is developed for research, academic evaluation, and demonstration purposes. All rights reserved by the repository owner unless explicitly licensed otherwise.
+This project is licensed under the **Apache License, Version 2.0**. See the [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE) files for full details.
