@@ -47,6 +47,7 @@ export const Commands: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case 'COMPLETED':
       case 'EXECUTED':
       case 'DELIVERED':
         return 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800';
@@ -55,7 +56,11 @@ export const Commands: React.FC = () => {
       case 'EXPIRED':
         return 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700';
       case 'EXECUTING':
+      case 'CLAIMED':
         return 'bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-800';
+      case 'QUEUED':
+      case 'PENDING':
+      case 'CREATED':
       default:
         return 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800';
     }

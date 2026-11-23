@@ -169,7 +169,7 @@ export const LiveTracking: React.FC = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500 dark:text-slate-400">Speed</span>
-                <span className="font-mono">{latestLocation.speed.toFixed(1)} km/h</span>
+                <span className="font-mono">{(latestLocation.speed ?? 0).toFixed(1)} km/h</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500 dark:text-slate-400">Accuracy</span>

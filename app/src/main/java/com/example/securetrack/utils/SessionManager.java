@@ -329,6 +329,16 @@ public class SessionManager {
         prefs.edit().putBoolean(KEY_BIOMETRIC_LOCK, enabled).apply();
     }
 
+    private static final String KEY_POWER_PROTECTION = "power_protection_enabled";
+
+    public boolean isPowerProtectionEnabled() {
+        return prefs.getBoolean(KEY_POWER_PROTECTION, false);
+    }
+
+    public void setPowerProtectionEnabled(boolean enabled) {
+        prefs.edit().putBoolean(KEY_POWER_PROTECTION, enabled).apply();
+    }
+
     private static final String KEY_BLE_SHARED_SECRET = "ble_shared_secret";
     private static final String KEY_BLE_DEVICE_SECRETS_PREFIX = "ble_secret_dev_";
 

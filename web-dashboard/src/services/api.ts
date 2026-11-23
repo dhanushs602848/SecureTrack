@@ -602,12 +602,15 @@ export const commandService = {
     const uid = auth.currentUser?.uid;
     if (!uid) throw new Error('User not authenticated');
 
+    const requestId = 'req_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+
     const commandDoc = await addDoc(
       collection(db, 'users', uid, 'devices', deviceId, 'commands'),
       {
         commandType,
         command: commandType,
         targetDeviceId: deviceId,
+        requestId: requestId,
         payload: payload || '',
         status: 'QUEUED',
         transport: 'CLOUD',
@@ -623,6 +626,7 @@ export const commandService = {
       payload: payload,
       status: 'QUEUED',
       transport: 'CLOUD',
+      requestId: requestId,
       createdAt: new Date().toISOString()
     };
   },

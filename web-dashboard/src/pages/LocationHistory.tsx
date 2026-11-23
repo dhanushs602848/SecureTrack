@@ -70,7 +70,7 @@ export const LocationHistory: React.FC = () => {
                       </p>
                       <p className="text-slate-500 dark:text-slate-400 font-mono text-[11px]">{loc.latitude.toFixed(5)}, {loc.longitude.toFixed(5)}</p>
                       <div className="flex items-center gap-3 text-[11px] text-slate-400 font-mono">
-                        <span className="flex items-center gap-1"><Navigation className="w-3 h-3" /> {loc.speed.toFixed(1)} km/h</span>
+                        <span className="flex items-center gap-1"><Navigation className="w-3 h-3" /> {(loc.speed ?? 0).toFixed(1)} km/h</span>
                         <span>±{loc.accuracy?.toFixed(0) || '0'}m</span>
                       </div>
                     </div>
