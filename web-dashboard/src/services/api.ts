@@ -567,6 +567,15 @@ export const securityService = {
     });
   },
 
+  resolveAlert: async (alertId: string): Promise<void> => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) throw new Error('User not authenticated');
+    await updateDoc(doc(db, 'users', uid, 'alerts', alertId), {
+      status: 'RESOLVED',
+      resolvedAt: serverTimestamp()
+    });
+  },
+
   restoreAlert: async (alertId: string): Promise<void> => {
     const uid = auth.currentUser?.uid;
     if (!uid) throw new Error('User not authenticated');
