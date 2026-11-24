@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Shield, Lock, Mail, User, Phone, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Shield, Lock, Mail, User, Phone, Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export const Register: React.FC = () => {
@@ -11,6 +11,7 @@ export const Register: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [consentAgreed, setConsentAgreed] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -24,7 +25,7 @@ export const Register: React.FC = () => {
       return 'An account already exists with this email address. Please sign in instead.';
     }
     if (code === 'auth/weak-password') {
-      return 'Password is too weak. Please use at least 6 characters.';
+      return 'Password is too weak. Please use at least 6 characters with a combination of letters and numbers.';
     }
     if (code === 'auth/invalid-email') {
       return 'Please enter a valid email address.';
@@ -35,17 +36,25 @@ export const Register: React.FC = () => {
     return err?.message || 'Registration failed. Please try again.';
   };
 
+  const isPasswordLongEnough = password.length >= 6;
+  const doPasswordsMatch = password.length > 0 && password === confirmPassword;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (password.length < 6) {
+    if (!isPasswordLongEnough) {
       setError('Password must be at least 6 characters long.');
       return;
     }
 
-    if (password !== confirmPassword) {
+    if (!doPasswordsMatch) {
       setError('Passwords do not match. Please re-enter your password.');
+      return;
+    }
+
+    if (!consentAgreed) {
+      setError('You must review and accept the tracking consent agreement to create an account.');
       return;
     }
 
@@ -84,15 +93,19 @@ export const Register: React.FC = () => {
     <div className="min-h-screen bg-slate-50 dark:bg-[#0A0E17] flex items-center justify-center p-4 transition-colors duration-200">
       <div className="max-w-md w-full bg-white dark:bg-[#121927] rounded-3xl shadow-xl border border-slate-200 dark:border-[#223049] p-8 space-y-6">
         <div className="text-center space-y-2">
-          <div className="inline-flex p-3.5 bg-indigo-50 dark:bg-indigo-950/50 rounded-2xl text-indigo-600 dark:text-cyan-400 border border-indigo-100 dark:border-indigo-800/50 shadow-inner">
-            <Shield className="w-9 h-9" />
+          <div className="inline-flex p-3.5 bg-indigo-50 dark:bg-indigo-950/50 rounded-2xl text-indigo-600 dark:text-cyan-400 border border-indigo-100 dark:border-indigo-800/50">
+            <Shield className="w-8 h-8" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white font-mono">Create SecureTrack Account</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Track smart. Stay secure across all your devices.</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white font-mono">
+            Create SecureTrack Account
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Enterprise mobile loss prevention and device security
+          </p>
         </div>
 
         {error && (
-          <div className="p-3 bg-rose-100 dark:bg-rose-950/50 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-400 text-xs rounded-xl flex items-start gap-2">
+          <div className="p-3 bg-rose-50 dark:bg-rose-950/50 border border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs rounded-xl flex items-start gap-2">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{error}</span>
           </div>
@@ -100,7 +113,9 @@ export const Register: React.FC = () => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Full Name</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Full Name
+            </label>
             <div className="relative">
               <User className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
               <input
@@ -109,13 +124,15 @@ export const Register: React.FC = () => {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="John Doe"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-[#162032] text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 text-xs"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#162032] text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 text-xs"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Email Address</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Email Address
+            </label>
             <div className="relative">
               <Mail className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
               <input
@@ -124,13 +141,15 @@ export const Register: React.FC = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@example.com"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-[#162032] text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 text-xs"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#162032] text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 text-xs"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Phone Number (Optional)</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Emergency Phone Number (Optional)
+            </label>
             <div className="relative">
               <Phone className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
               <input
@@ -138,13 +157,15 @@ export const Register: React.FC = () => {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+1 555 0192"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-[#162032] text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 text-xs"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#162032] text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 text-xs"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Password</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Password
+            </label>
             <div className="relative">
               <Lock className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
               <input
@@ -153,21 +174,32 @@ export const Register: React.FC = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="At least 6 characters"
-                className="w-full pl-10 pr-11 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-[#162032] text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 text-xs"
+                className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#162032] text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 text-xs"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
-                className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md transition-colors"
+                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+            {password.length > 0 && (
+              <p
+                className={`text-[11px] mt-1 flex items-center gap-1 ${
+                  isPasswordLongEnough ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
+                }`}
+              >
+                {isPasswordLongEnough ? '✓ Minimum length satisfied' : '• Password must be at least 6 characters'}
+              </p>
+            )}
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Confirm Password</label>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Confirm Password
+            </label>
             <div className="relative">
               <Lock className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
               <input
@@ -176,25 +208,51 @@ export const Register: React.FC = () => {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Re-enter password"
-                className="w-full pl-10 pr-11 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-[#162032] text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 text-xs"
+                className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#162032] text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 text-xs"
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
-                className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md transition-colors"
+                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md"
               >
                 {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
+            </div>
+            {confirmPassword.length > 0 && (
+              <p
+                className={`text-[11px] mt-1 flex items-center gap-1 ${
+                  doPasswordsMatch ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                }`}
+              >
+                {doPasswordsMatch ? '✓ Passwords match' : '• Passwords do not match'}
+              </p>
+            )}
+          </div>
+
+          {/* Explicit Tracking Consent Checkbox */}
+          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#162032] border border-slate-200 dark:border-slate-800 space-y-2">
+            <div className="flex items-start gap-2.5">
+              <input
+                id="consent-checkbox"
+                type="checkbox"
+                checked={consentAgreed}
+                onChange={(e) => setConsentAgreed(e.target.checked)}
+                className="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+              />
+              <label htmlFor="consent-checkbox" className="text-xs text-slate-600 dark:text-slate-300 leading-snug">
+                I understand that SecureTrack provides real-time GPS location tracking and remote commands for enrolled devices, and agree to the{' '}
+                <span className="font-semibold text-slate-800 dark:text-white">Security &amp; Consent Terms</span>.
+              </label>
             </div>
           </div>
 
           <button
             type="submit"
             disabled={loading || googleLoading}
-            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-md transition-all disabled:opacity-50 text-xs font-mono"
+            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-xs transition-all disabled:opacity-50 text-xs font-mono"
           >
-            {loading ? 'Creating Account...' : 'Register'}
+            {loading ? 'Creating Account...' : 'Create Account'}
           </button>
         </form>
 
@@ -208,7 +266,7 @@ export const Register: React.FC = () => {
           type="button"
           onClick={handleGoogleSignUp}
           disabled={loading || googleLoading}
-          className="w-full py-2.5 px-4 bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-semibold rounded-xl hover:bg-slate-50 dark:hover:bg-[#1A263D] transition-all flex items-center justify-center gap-3 shadow-sm disabled:opacity-50 text-xs"
+          className="w-full py-2.5 px-4 bg-white dark:bg-[#162032] border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-semibold rounded-xl hover:bg-slate-50 dark:hover:bg-[#1A263D] transition-all flex items-center justify-center gap-3 shadow-xs disabled:opacity-50 text-xs"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24">
             <path

@@ -103,7 +103,7 @@ export const Login: React.FC = () => {
           <div className="inline-flex p-3.5 bg-indigo-50 dark:bg-indigo-950/50 rounded-2xl text-indigo-600 dark:text-cyan-400 border border-indigo-100 dark:border-indigo-800/50 shadow-inner">
             <Shield className="w-9 h-9" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white font-mono">Sign In to SecureTrack</h2>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white font-mono">Sign In to SecureTrack</h1>
           <p className="text-xs text-slate-500 dark:text-slate-400">Zero-trust mobile fleet telemetry &amp; security</p>
         </div>
 
