@@ -81,6 +81,20 @@ public class MainActivity extends AppCompatActivity {
         });
 
         handleNavigationIntent(getIntent());
+
+        // Predictable bottom navigation back-stack behavior: return to Home before exiting
+        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (binding != null && binding.bottomNavigation.getSelectedItemId() != R.id.navigation_home) {
+                    binding.bottomNavigation.setSelectedItemId(R.id.navigation_home);
+                } else {
+                    setEnabled(false);
+                    getOnBackPressedDispatcher().onBackPressed();
+                }
+            }
+        });
+
         checkUserRequestedExit();
         checkBiometricAuthentication();
     }
