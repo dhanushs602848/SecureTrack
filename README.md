@@ -88,7 +88,7 @@ SecureTrack is released as open-source software under the official **Apache Lice
   - Transparent defense banner on device home screen indicating the exact managing owner account.
   - Rate-limited command dispatch (Alarm 2m cooldown, Lock 1m cooldown, Location 5 req/10m cap) via atomic Firestore transactions.
   - Append-only non-repudiable audit trail (`/users/{uid}/audit_logs`) with security rules prohibiting deletion or modification.
-  - Account quota enforcement limiting active devices to 5 per owner.
+  - Account quota enforcement limiting active devices to 3 per owner.
   - Permanent safety disablement of `WIPE_DEVICE` across dashboard, backend, and Android client.
 - **Biometric Power Protection & Pre-Shutdown Telemetry**:
   - Implements AndroidX `BiometricPrompt` with device credential fallback (PIN/pattern/password) for administrative actions.
@@ -356,7 +356,7 @@ When an owner requests a device location, SecureTrack intelligently resolves coo
    - Persistent home screen banner identifying the managing owner account (`TRANSPARENT DEFENSE ACTIVE`).
    - Sticky foreground service notification with immediate "Stop Protection" affordance.
    - Command rate limiting (Alarm 2m cooldown, Lock 1m cooldown, Location 5 req/10m cap).
-   - Strict account quota: maximum 5 active devices per registered account.
+   - Strict account quota: maximum 3 active devices per registered account.
    - Immutable append-only audit trail (`/users/{uid}/audit_logs`) preventing modification or deletion of command records.
 
 2. **Biometric Power Protection**:
@@ -465,7 +465,7 @@ Continuous verification is enforced across Android, Web, and Cloud:
 - **Web Verification (`web-dashboard/test/auth.test.js`)**: **11 automated tests** passing:
   - 15-minute queue expiry evaluation (`QUEUED` > 15m $\rightarrow$ `EXPIRED`).
   - Command rate-limiting enforcement (Alarm 2m, Lock 1m, Locate 5 req/10m).
-  - Account quota enforcement (maximum 5 active devices).
+  - Account quota enforcement (maximum 3 active devices).
   - Target device ID validation and safety lock against `WIPE_DEVICE`.
   - Append-only audit log entry structure and non-repudiation.
   - Location staleness threshold evaluation and requestId correlation.
@@ -518,7 +518,8 @@ See [`CONTRIBUTORS.md`](CONTRIBUTORS.md) and [`NOTICE`](NOTICE) for detailed con
 | [**SYSTEM_ARCHITECTURE.md**](docs/SYSTEM_ARCHITECTURE.md) | Multi-tier architecture and component interaction |
 | [**DATABASE_DESIGN.md**](docs/DATABASE_DESIGN.md) | Cloud Firestore NoSQL schema, collections, and security |
 | [**ER_MODEL.md**](docs/ER_MODEL.md) | Entity-Relationship diagram and cardinality constraints |
-| [**SECURITY_AND_PRIVACY.md**](docs/SECURITY_AND_PRIVACY.md) | Threat model, zero-trust pairing, and privacy controls |
+| [**DBMS_EXAMINER_DEFENSE_GUIDE.md**](docs/DBMS_EXAMINER_DEFENSE_GUIDE.md) | **Academic Defense Master Guide**: Dual-database theory, BCNF normalization proofs, ACID vs BASE, transaction isolation, query execution plans, and top 15 viva Q&As |
+| [**SECURITY_AND_PRIVACY.md**](docs/SECURITY_AND_PRIVACY.md) | Threat model, zero-trust pairing, rate limiting, and privacy controls |
 | [**TESTING.md**](docs/TESTING.md) | Test suites, coverage metrics, and physical device test protocol |
 | [**KNOWN_LIMITATIONS.md**](docs/KNOWN_LIMITATIONS.md) | Technical boundaries, Android OS constraints, and hardware caveats |
 | [**DEMO_GUIDE.md**](docs/DEMO_GUIDE.md) | Step-by-step presentation walkthrough and demonstration script |

@@ -310,6 +310,12 @@ export const Settings: React.FC = () => {
             </span>
           </div>
           <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800">
+            <span className="font-medium">Device Account Quota</span>
+            <span className="font-mono text-slate-800 dark:text-slate-200 font-semibold">
+              Maximum 3 Active Devices per Account
+            </span>
+          </div>
+          <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800">
             <span className="font-medium">Command Expiration Limit</span>
             <span className="font-mono text-amber-600 dark:text-amber-400 font-semibold">
               15-Minute Queue Expiry Guard

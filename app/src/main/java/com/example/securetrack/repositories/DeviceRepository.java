@@ -381,47 +381,69 @@ public class DeviceRepository {
         }
         final String email = userEmail;
 
-        byte[] bytes = new byte[32];
-        new SecureRandom().nextBytes(bytes);
-        StringBuilder sb = new StringBuilder();
-        for (byte b : bytes) {
-            sb.append(String.format("%02x", b));
-        }
-        String rawToken = sb.toString();
-        String tokenHash = hashToken(rawToken);
+        final int MAX_ACTIVE_DEVICES = 3;
 
-        Date expiresAt = new Date(System.currentTimeMillis() + 10 * 60 * 1000);
+        // Verify active device quota before generating an invitation
+        db.collection("users").document(uid).collection("devices").get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    long activeCount = 0;
+                    for (com.google.firebase.firestore.DocumentSnapshot doc : queryDocumentSnapshots) {
+                        String status = doc.getString("status");
+                        if (!"REVOKED".equals(status)) {
+                            activeCount++;
+                        }
+                    }
+                    if (activeCount >= MAX_ACTIVE_DEVICES) {
+                        callback.onError("You have reached the maximum of 3 active devices. Revoke an existing device to connect another.");
+                        return;
+                    }
 
-        Map<String, Object> map = new HashMap<>();
-        map.put("ownerUid", uid);
-        map.put("ownerEmail", email);
-        map.put("status", "PENDING_CLAIM");
-        map.put("createdAt", FieldValue.serverTimestamp());
-        map.put("expiresAt", new Timestamp(expiresAt));
-        map.put("claimedByUid", null);
-        map.put("claimedDeviceId", null);
-        map.put("deviceInfo", null);
-        map.put("approvedAt", null);
+                    byte[] bytes = new byte[32];
+                    new SecureRandom().nextBytes(bytes);
+                    StringBuilder sb = new StringBuilder();
+                    for (byte b : bytes) {
+                        sb.append(String.format("%02x", b));
+                    }
+                    String rawToken = sb.toString();
+                    String tokenHash = hashToken(rawToken);
 
-        String qrPayload = "{\"scheme\":\"securetrack\",\"action\":\"pair\",\"token\":\"" + rawToken + "\",\"ownerUid\":\"" + uid + "\"}";
+                    Date expiresAt = new Date(System.currentTimeMillis() + 10 * 60 * 1000);
 
-        db.collection("pairing_invitations").document(tokenHash)
-                .set(map)
-                .addOnSuccessListener(aVoid -> {
-                    PairingInvitation inv = new PairingInvitation(
-                            rawToken,
-                            tokenHash,
-                            uid,
-                            email,
-                            "PENDING_CLAIM",
-                            expiresAt,
-                            qrPayload
-                    );
-                    callback.onSuccess(inv);
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("ownerUid", uid);
+                    map.put("ownerEmail", email);
+                    map.put("status", "PENDING_CLAIM");
+                    map.put("createdAt", FieldValue.serverTimestamp());
+                    map.put("expiresAt", new Timestamp(expiresAt));
+                    map.put("claimedByUid", null);
+                    map.put("claimedDeviceId", null);
+                    map.put("deviceInfo", null);
+                    map.put("approvedAt", null);
+
+                    String qrPayload = "{\"scheme\":\"securetrack\",\"action\":\"pair\",\"token\":\"" + rawToken + "\",\"ownerUid\":\"" + uid + "\"}";
+
+                    db.collection("pairing_invitations").document(tokenHash)
+                            .set(map)
+                            .addOnSuccessListener(aVoid -> {
+                                PairingInvitation inv = new PairingInvitation(
+                                        rawToken,
+                                        tokenHash,
+                                        uid,
+                                        email,
+                                        "PENDING_CLAIM",
+                                        expiresAt,
+                                        qrPayload
+                                );
+                                callback.onSuccess(inv);
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "Failed to create pairing invitation", e);
+                                callback.onError("Failed to create pairing invitation: " + e.getMessage());
+                            });
                 })
                 .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to create pairing invitation", e);
-                    callback.onError("Failed to create pairing invitation: " + e.getMessage());
+                    Log.e(TAG, "Failed to verify device quota", e);
+                    callback.onError("Failed to verify device quota: " + e.getMessage());
                 });
     }
 
@@ -472,50 +494,72 @@ public class DeviceRepository {
         String deviceId = invitation.getClaimedDeviceId();
         Map<String, Object> devInfo = invitation.getDeviceInfo();
 
-        Map<String, Object> deviceMap = new HashMap<>();
-        deviceMap.put("id", deviceId);
-        deviceMap.put("ownerUid", uid);
-        deviceMap.put("deviceAuthUid", invitation.getClaimedByUid());
-        deviceMap.put("deviceName", devInfo != null && devInfo.get("deviceName") != null ? devInfo.get("deviceName") : "Paired Android Device");
-        deviceMap.put("model", devInfo != null && devInfo.get("model") != null ? devInfo.get("model") : "Android");
-        deviceMap.put("androidVersion", devInfo != null && devInfo.get("androidVersion") != null ? devInfo.get("androidVersion") : "14");
-        deviceMap.put("batteryLevel", devInfo != null && devInfo.get("batteryLevel") instanceof Number ? ((Number) devInfo.get("batteryLevel")).intValue() : 100);
-        deviceMap.put("status", "ONLINE");
-        deviceMap.put("paired", true);
-        deviceMap.put("protectionEnabled", true);
-        deviceMap.put("installationId", deviceId);
-        deviceMap.put("lastSeen", FieldValue.serverTimestamp());
-        deviceMap.put("locationStatus", "ENABLED");
-        deviceMap.put("trackingStatus", "ACTIVE");
-        deviceMap.put("networkStatus", "CONNECTED");
+        final int MAX_ACTIVE_DEVICES = 3;
 
-        // Generate cryptographically secure 256-bit high-entropy BLE shared secret
-        byte[] secretBytes = new byte[32];
-        new java.security.SecureRandom().nextBytes(secretBytes);
-        StringBuilder sb = new StringBuilder();
-        for (byte b : secretBytes) {
-            sb.append(String.format("%02x", b));
-        }
-        String bleSharedSecret = sb.toString();
-        deviceMap.put("bleSharedSecret", bleSharedSecret);
-        sessionManager.saveBleDeviceSecret(deviceId, bleSharedSecret);
+        // Verify active device quota before approving device claim (concurrency & pending invitation protection)
+        db.collection("users").document(uid).collection("devices").get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    long activeCount = 0;
+                    for (com.google.firebase.firestore.DocumentSnapshot doc : queryDocumentSnapshots) {
+                        String status = doc.getString("status");
+                        if (!"REVOKED".equals(status) && !deviceId.equals(doc.getId())) {
+                            activeCount++;
+                        }
+                    }
+                    if (activeCount >= MAX_ACTIVE_DEVICES) {
+                        callback.onError("You have reached the maximum of 3 active devices. Revoke an existing device to connect another.");
+                        return;
+                    }
 
-        WriteBatch batch = db.batch();
-        DocumentReference devRef = db.collection("users").document(uid).collection("devices").document(deviceId);
-        batch.set(devRef, deviceMap, SetOptions.merge());
+                    Map<String, Object> deviceMap = new HashMap<>();
+                    deviceMap.put("id", deviceId);
+                    deviceMap.put("ownerUid", uid);
+                    deviceMap.put("deviceAuthUid", invitation.getClaimedByUid());
+                    deviceMap.put("deviceName", devInfo != null && devInfo.get("deviceName") != null ? devInfo.get("deviceName") : "Paired Android Device");
+                    deviceMap.put("model", devInfo != null && devInfo.get("model") != null ? devInfo.get("model") : "Android");
+                    deviceMap.put("androidVersion", devInfo != null && devInfo.get("androidVersion") != null ? devInfo.get("androidVersion") : "14");
+                    deviceMap.put("batteryLevel", devInfo != null && devInfo.get("batteryLevel") instanceof Number ? ((Number) devInfo.get("batteryLevel")).intValue() : 100);
+                    deviceMap.put("status", "ONLINE");
+                    deviceMap.put("paired", true);
+                    deviceMap.put("protectionEnabled", true);
+                    deviceMap.put("installationId", deviceId);
+                    deviceMap.put("lastSeen", FieldValue.serverTimestamp());
+                    deviceMap.put("locationStatus", "ENABLED");
+                    deviceMap.put("trackingStatus", "ACTIVE");
+                    deviceMap.put("networkStatus", "CONNECTED");
 
-        DocumentReference invRef = db.collection("pairing_invitations").document(invitation.getTokenHash());
-        Map<String, Object> invUpdate = new HashMap<>();
-        invUpdate.put("status", "APPROVED");
-        invUpdate.put("approvedAt", FieldValue.serverTimestamp());
-        invUpdate.put("bleSharedSecret", bleSharedSecret);
-        batch.update(invRef, invUpdate);
+                    // Generate cryptographically secure 256-bit high-entropy BLE shared secret
+                    byte[] secretBytes = new byte[32];
+                    new java.security.SecureRandom().nextBytes(secretBytes);
+                    StringBuilder sb = new StringBuilder();
+                    for (byte b : secretBytes) {
+                        sb.append(String.format("%02x", b));
+                    }
+                    String bleSharedSecret = sb.toString();
+                    deviceMap.put("bleSharedSecret", bleSharedSecret);
+                    sessionManager.saveBleDeviceSecret(deviceId, bleSharedSecret);
 
-        batch.commit()
-                .addOnSuccessListener(aVoid -> callback.onSuccess(null))
+                    WriteBatch batch = db.batch();
+                    DocumentReference devRef = db.collection("users").document(uid).collection("devices").document(deviceId);
+                    batch.set(devRef, deviceMap, SetOptions.merge());
+
+                    DocumentReference invRef = db.collection("pairing_invitations").document(invitation.getTokenHash());
+                    Map<String, Object> invUpdate = new HashMap<>();
+                    invUpdate.put("status", "APPROVED");
+                    invUpdate.put("approvedAt", FieldValue.serverTimestamp());
+                    invUpdate.put("bleSharedSecret", bleSharedSecret);
+                    batch.update(invRef, invUpdate);
+
+                    batch.commit()
+                            .addOnSuccessListener(aVoid -> callback.onSuccess(null))
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "Failed to approve device claim", e);
+                                callback.onError("Failed to approve device: " + e.getMessage());
+                            });
+                })
                 .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to approve device claim", e);
-                    callback.onError("Failed to approve device: " + e.getMessage());
+                    Log.e(TAG, "Failed to verify device quota", e);
+                    callback.onError("Failed to verify device quota: " + e.getMessage());
                 });
     }
 

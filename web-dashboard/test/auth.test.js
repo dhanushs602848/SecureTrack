@@ -270,35 +270,109 @@ test('SecureTrack Web Dashboard Auth & Command Integrity Suite', async (t) => {
     assert.equal(afterWindow.locateCount, 1);
   });
 
-  await t.test('Anti-misuse: Device quota enforcement (max 5 active devices)', () => {
-    const MAX_DEVICES_PER_ACCOUNT = 5;
+  await t.test('Anti-misuse: Device quota enforcement (max 3 active devices)', async () => {
+    const MAX_DEVICES_PER_ACCOUNT = 3;
+    const EXACT_QUOTA_ERROR = 'You have reached the maximum of 3 active devices. Revoke an existing device to connect another.';
 
-    function checkDeviceQuota(existingDevices) {
-      const activeDevices = existingDevices.filter(d => d.status !== 'REVOKED');
+    function checkDeviceQuota(existingDevices, newDeviceId = null) {
+      const activeDevices = existingDevices.filter(d => d.status !== 'REVOKED' && d.id !== newDeviceId);
       if (activeDevices.length >= MAX_DEVICES_PER_ACCOUNT) {
-        throw new Error(`Account device limit reached (Maximum ${MAX_DEVICES_PER_ACCOUNT} devices).`);
+        throw new Error(EXACT_QUOTA_ERROR);
       }
       return true;
     }
 
-    const underLimit = [
-      { id: 'dev-1', status: 'ONLINE' },
-      { id: 'dev-2', status: 'ONLINE' },
-      { id: 'dev-3', status: 'REVOKED' } // revoked doesn't count towards active
+    // 1 active device allowed
+    const oneDevice = [
+      { id: 'dev-1', status: 'ONLINE' }
     ];
-    assert.equal(checkDeviceQuota(underLimit), true);
+    assert.equal(checkDeviceQuota(oneDevice), true);
 
-    const atLimit = [
+    // 2 active devices allowed
+    const twoDevices = [
+      { id: 'dev-1', status: 'ONLINE' },
+      { id: 'dev-2', status: 'ONLINE' }
+    ];
+    assert.equal(checkDeviceQuota(twoDevices), true);
+
+    // 3 active devices allowed (2 existing + new device 3)
+    assert.equal(checkDeviceQuota(twoDevices, 'dev-3'), true);
+
+    // Fourth active device is rejected
+    const threeDevices = [
       { id: 'dev-1', status: 'ONLINE' },
       { id: 'dev-2', status: 'ONLINE' },
-      { id: 'dev-3', status: 'ONLINE' },
-      { id: 'dev-4', status: 'ONLINE' },
-      { id: 'dev-5', status: 'ONLINE' }
+      { id: 'dev-3', status: 'ONLINE' }
     ];
     assert.throws(
-      () => checkDeviceQuota(atLimit),
-      /Account device limit reached/
+      () => checkDeviceQuota(threeDevices, 'dev-4'),
+      (err) => {
+        assert.equal(err.message, EXACT_QUOTA_ERROR);
+        return true;
+      }
     );
+
+    // Revoked devices do not count towards active quota
+    const withRevoked = [
+      { id: 'dev-1', status: 'ONLINE' },
+      { id: 'dev-2', status: 'REVOKED' },
+      { id: 'dev-3', status: 'REVOKED' },
+      { id: 'dev-4', status: 'REVOKED' },
+      { id: 'dev-5', status: 'ONLINE' } // only 2 active (dev-1, dev-5)
+    ];
+    assert.equal(checkDeviceQuota(withRevoked, 'dev-6'), true); // 3rd active device allowed
+
+    // Re-enrolling or updating an already active device does not increment quota
+    assert.equal(checkDeviceQuota(threeDevices, 'dev-1'), true);
+
+    // Concurrent pairing approvals cannot exceed the limit
+    class MockFirestoreTransactionManager {
+      constructor(initialDevices) {
+        this.devices = [...initialDevices];
+        this.isLocked = false;
+      }
+
+      async approveClaimConcurrent(deviceId, deviceInfo) {
+        // Mutex / transactional OCC check
+        while (this.isLocked) {
+          await new Promise(r => setTimeout(r, 5));
+        }
+        this.isLocked = true;
+        try {
+          const activeCount = this.devices.filter(d => d.status !== 'REVOKED' && d.id !== deviceId).length;
+          if (activeCount >= MAX_DEVICES_PER_ACCOUNT) {
+            throw new Error(EXACT_QUOTA_ERROR);
+          }
+          await new Promise(r => setTimeout(r, 10));
+          this.devices.push({ id: deviceId, status: 'ONLINE', ...deviceInfo });
+          return { success: true, deviceId };
+        } finally {
+          this.isLocked = false;
+        }
+      }
+    }
+
+    const txManager = new MockFirestoreTransactionManager([
+      { id: 'dev-1', status: 'ONLINE' },
+      { id: 'dev-2', status: 'ONLINE' }
+    ]);
+
+    // Attempt two simultaneous approvals for device-3 and device-4
+    const results = await Promise.allSettled([
+      txManager.approveClaimConcurrent('dev-3', { name: 'Device 3' }),
+      txManager.approveClaimConcurrent('dev-4', { name: 'Device 4' })
+    ]);
+
+    const fulfilled = results.filter(r => r.status === 'fulfilled');
+    const rejected = results.filter(r => r.status === 'rejected');
+
+    assert.equal(fulfilled.length, 1, 'Only one concurrent approval can succeed when at 2 devices');
+    assert.equal(rejected.length, 1, 'The competing concurrent approval must be rejected');
+    assert.equal(rejected[0].reason.message, EXACT_QUOTA_ERROR);
+
+    // Final active device count must strictly be 3
+    const finalActive = txManager.devices.filter(d => d.status !== 'REVOKED').length;
+    assert.equal(finalActive, 3, 'Total active devices must never exceed 3');
   });
 
   await t.test('Anti-misuse: Target device ID validation and safety lock', () => {

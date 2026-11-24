@@ -124,6 +124,17 @@ exports.createDevicePairingCode = functions
     const ownerUid = context.auth.uid;
     const now = Date.now();
 
+    // Check device limit (max 3 active devices per account)
+    const MAX_ACTIVE_DEVICES = 3;
+    const devicesSnap = await db.collection('users').doc(ownerUid).collection('devices').get();
+    const activeDevices = devicesSnap.docs.filter((d) => d.data().status !== 'REVOKED');
+    if (activeDevices.length >= MAX_ACTIVE_DEVICES) {
+      throw new functions.https.HttpsError(
+        'resource-exhausted',
+        'You have reached the maximum of 3 active devices. Revoke an existing device to connect another.'
+      );
+    }
+
     // Check active codes limit (max 5 active codes per user)
     const recentCodes = await db.collection('pairing_codes')
       .where('ownerUid', '==', ownerUid)
@@ -266,6 +277,21 @@ exports.claimDevicePairingCode = functions
 
       ownerUid = codeData.ownerUid;
 
+      // Concurrency-safe device quota enforcement inside the transaction (Max 3 active devices)
+      const MAX_ACTIVE_DEVICES = 3;
+      const devicesSnap = await transaction.get(
+        db.collection('users').doc(ownerUid).collection('devices')
+      );
+      const activeDevices = devicesSnap.docs.filter(
+        (d) => d.data().status !== 'REVOKED' && d.id !== deviceId
+      );
+      if (activeDevices.length >= MAX_ACTIVE_DEVICES) {
+        throw new functions.https.HttpsError(
+          'resource-exhausted',
+          'You have reached the maximum of 3 active devices. Revoke an existing device to connect another.'
+        );
+      }
+
       // Atomically claim the single-use code
       transaction.update(codeRef, {
         status: 'CLAIMED',
@@ -315,6 +341,111 @@ exports.claimDevicePairingCode = functions
       deviceId: deviceId,
       customToken: customToken
     };
+  });
+
+/**
+ * Callable: Server-side approval of a pairing invitation with concurrency-safe device quota check.
+ * App Check enforced.
+ */
+exports.approvePairingInvitation = functions
+  .runWith({ enforceAppCheck: true })
+  .https.onCall(async (data, context) => {
+    if (!context.auth || !context.auth.uid) {
+      throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated.');
+    }
+
+    const { tokenHash } = data || {};
+    if (!tokenHash || typeof tokenHash !== 'string') {
+      throw new functions.https.HttpsError('invalid-argument', 'Valid token hash is required.');
+    }
+
+    const ownerUid = context.auth.uid;
+    const invRef = db.collection('pairing_invitations').doc(tokenHash.trim());
+    const MAX_ACTIVE_DEVICES = 3;
+
+    let deviceId = null;
+
+    await db.runTransaction(async (transaction) => {
+      const invDoc = await transaction.get(invRef);
+      if (!invDoc.exists) {
+        throw new functions.https.HttpsError('not-found', 'Pairing invitation not found.');
+      }
+
+      const invData = invDoc.data();
+      if (invData.ownerUid !== ownerUid) {
+        throw new functions.https.HttpsError('permission-denied', 'Unauthorized to approve this pairing request.');
+      }
+
+      if (invData.status !== 'PENDING_APPROVAL') {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          `Invitation is ${invData.status ? invData.status.toLowerCase() : 'invalid'} and cannot be approved.`
+        );
+      }
+
+      deviceId = invData.claimedDeviceId;
+      if (!deviceId) {
+        throw new functions.https.HttpsError('failed-precondition', 'Missing claimed device ID.');
+      }
+
+      // Check device quota inside the transaction: count non-REVOKED devices
+      const devicesSnap = await transaction.get(
+        db.collection('users').doc(ownerUid).collection('devices')
+      );
+      const activeDevices = devicesSnap.docs.filter(
+        (d) => d.data().status !== 'REVOKED' && d.id !== deviceId
+      );
+      if (activeDevices.length >= MAX_ACTIVE_DEVICES) {
+        throw new functions.https.HttpsError(
+          'resource-exhausted',
+          'You have reached the maximum of 3 active devices. Revoke an existing device to connect another.'
+        );
+      }
+
+      // Generate 256-bit cryptographically secure shared secret
+      const bleSharedSecret = crypto.randomBytes(32).toString('hex');
+
+      // 1. Register device under users/{ownerUid}/devices/{deviceId}
+      const devRef = db.collection('users').doc(ownerUid).collection('devices').doc(deviceId);
+      transaction.set(devRef, {
+        id: deviceId,
+        ownerUid: ownerUid,
+        deviceAuthUid: invData.claimedByUid,
+        deviceName: invData.deviceInfo?.deviceName || 'Paired Android Device',
+        model: invData.deviceInfo?.model || 'Android Phone',
+        androidVersion: invData.deviceInfo?.androidVersion || '14',
+        batteryLevel: typeof invData.deviceInfo?.batteryLevel === 'number' ? invData.deviceInfo.batteryLevel : 100,
+        status: 'ONLINE',
+        paired: true,
+        protectionEnabled: true,
+        installationId: deviceId,
+        bleSharedSecret: bleSharedSecret,
+        lastSeen: admin.firestore.FieldValue.serverTimestamp(),
+        locationStatus: 'ENABLED',
+        trackingStatus: 'ACTIVE',
+        networkStatus: 'CONNECTED'
+      }, { merge: true });
+
+      // 2. Mark invitation APPROVED
+      transaction.update(invRef, {
+        status: 'APPROVED',
+        approvedAt: admin.firestore.FieldValue.serverTimestamp(),
+        bleSharedSecret: bleSharedSecret
+      });
+
+      // 3. Append audit log
+      const auditRef = db.collection('users').doc(ownerUid).collection('audit_logs').doc();
+      transaction.set(auditRef, {
+        ownerUid: ownerUid,
+        action: 'DEVICE_APPROVED',
+        targetDeviceId: deviceId,
+        deviceName: invData.deviceInfo?.deviceName || 'Paired Android Device',
+        initiatedFrom: 'SERVER_CONSOLE',
+        timestamp: admin.firestore.FieldValue.serverTimestamp()
+      });
+    });
+
+    return { success: true, deviceId: deviceId };
   });
 
 /**

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { LocationMap } from '../components/LocationMap';
 import { locationService, deviceService } from '../services/api';
 import { LocationRecord, Device } from '../types';
-import { Clock, MapPin, Navigation, Filter, Calendar } from 'lucide-react';
+import { Clock, MapPin, Navigation, Filter, Calendar, Download } from 'lucide-react';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Skeleton } from '../components/ui/Skeleton';
 
@@ -78,6 +78,47 @@ export const LocationHistory: React.FC = () => {
     () => devices.find((d) => d.id === selectedDeviceId),
     [devices, selectedDeviceId]
   );
+
+  const exportForensicCsv = () => {
+    if (filteredHistory.length === 0) return;
+    const devName = selectedDevice?.deviceName || 'Device';
+    const headers = [
+      'Fix_Number',
+      'Device_ID',
+      'Device_Name',
+      'Timestamp_ISO',
+      'Local_DateTime',
+      'Latitude',
+      'Longitude',
+      'Accuracy_Meters',
+      'Speed_Kmh',
+      'Altitude_Meters',
+      'Source_Provider'
+    ];
+    const rows = filteredHistory.map((loc, i) => [
+      i + 1,
+      `"${loc.deviceId || selectedDeviceId}"`,
+      `"${devName.replace(/"/g, '""')}"`,
+      `"${loc.timestamp}"`,
+      `"${new Date(loc.timestamp).toLocaleString().replace(/"/g, '""')}"`,
+      loc.latitude,
+      loc.longitude,
+      (loc.accuracy ?? 0).toFixed(1),
+      (loc.speed ?? 0).toFixed(1),
+      (loc.altitude ?? 0).toFixed(1),
+      `"${loc.source || 'GPS'}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    link.setAttribute('download', `SecureTrack_Forensic_Location_${selectedDeviceId || 'device'}_${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="space-y-4 flex flex-col h-[calc(100vh-6.5rem)] max-w-7xl mx-auto transition-colors duration-200">
@@ -178,15 +219,28 @@ export const LocationHistory: React.FC = () => {
           </button>
         </div>
 
-        {selectedRecordIndex !== null && (
+        <div className="flex items-center gap-3">
+          {selectedRecordIndex !== null && (
+            <button
+              type="button"
+              onClick={() => setSelectedRecordIndex(null)}
+              className="text-xs text-indigo-600 dark:text-cyan-400 hover:underline font-medium"
+            >
+              Reset Selection
+            </button>
+          )}
+
           <button
             type="button"
-            onClick={() => setSelectedRecordIndex(null)}
-            className="text-xs text-indigo-600 dark:text-cyan-400 hover:underline font-medium"
+            onClick={exportForensicCsv}
+            disabled={filteredHistory.length === 0}
+            className="px-3.5 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-emerald-300 dark:border-emerald-800 rounded-xl transition-colors flex items-center gap-1.5 disabled:opacity-40 shadow-xs"
+            title="Export forensic location breadcrumbs to CSV"
           >
-            Reset Selection (Show Full Path)
+            <Download className="w-3.5 h-3.5" />
+            Export Forensic CSV ({filteredHistory.length})
           </button>
-        )}
+        </div>
       </div>
 
       {/* Main Split Layout: Timeline List & Map */}

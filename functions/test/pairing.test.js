@@ -462,4 +462,105 @@ test('SecureTrack Spark-Compatible 256-Bit Pairing & Security Suite', async (t) 
     assert.throws(() => simulateAuditLogRule('update', ownerUid, ownerUid), /Audit logs are strictly append-only/);
     assert.throws(() => simulateAuditLogRule('delete', ownerUid, ownerUid), /Audit logs are strictly append-only/);
   });
+
+  await t.test('Anti-misuse Server-Side Quota Enforcement: Strict maximum of 3 active devices per owner', async () => {
+    const MAX_ACTIVE_DEVICES = 3;
+    const EXACT_QUOTA_ERROR = 'You have reached the maximum of 3 active devices. Revoke an existing device to connect another.';
+
+    function simulateServerQuotaCheck(existingDevices, targetDeviceId) {
+      const activeDevices = existingDevices.filter(d => d.status !== 'REVOKED' && d.id !== targetDeviceId);
+      if (activeDevices.length >= MAX_ACTIVE_DEVICES) {
+        const err = new Error(EXACT_QUOTA_ERROR);
+        err.code = 'resource-exhausted';
+        throw err;
+      }
+      return true;
+    }
+
+    // 1 device allowed
+    assert.equal(simulateServerQuotaCheck([{ id: 'phone-1', status: 'ONLINE' }], 'phone-2'), true);
+
+    // 2 devices allowed
+    assert.equal(simulateServerQuotaCheck([
+      { id: 'phone-1', status: 'ONLINE' },
+      { id: 'phone-2', status: 'ONLINE' }
+    ], 'phone-3'), true);
+
+    // 3 devices allowed (account with 3 devices re-evaluating or re-pairing existing device)
+    assert.equal(simulateServerQuotaCheck([
+      { id: 'phone-1', status: 'ONLINE' },
+      { id: 'phone-2', status: 'ONLINE' },
+      { id: 'phone-3', status: 'ONLINE' }
+    ], 'phone-2'), true);
+
+    // 4th active device rejected
+    assert.throws(
+      () => simulateServerQuotaCheck([
+        { id: 'phone-1', status: 'ONLINE' },
+        { id: 'phone-2', status: 'ONLINE' },
+        { id: 'phone-3', status: 'ONLINE' }
+      ], 'phone-4'),
+      (err) => {
+        assert.equal(err.code, 'resource-exhausted');
+        assert.equal(err.message, EXACT_QUOTA_ERROR);
+        return true;
+      }
+    );
+
+    // Revoked devices do not count towards active quota
+    assert.equal(simulateServerQuotaCheck([
+      { id: 'phone-1', status: 'ONLINE' },
+      { id: 'phone-2', status: 'REVOKED' },
+      { id: 'phone-3', status: 'REVOKED' }
+    ], 'phone-4'), true);
+
+    // Concurrency-safe simulated transaction execution
+    class ServerTransactionSimulation {
+      constructor(initialDevices) {
+        this.devices = [...initialDevices];
+        this.busy = false;
+      }
+
+      async runTransactionApprove(newDeviceId) {
+        while (this.busy) {
+          await new Promise(r => setTimeout(r, 5));
+        }
+        this.busy = true;
+        try {
+          const activeCount = this.devices.filter(d => d.status !== 'REVOKED' && d.id !== newDeviceId).length;
+          if (activeCount >= MAX_ACTIVE_DEVICES) {
+            const err = new Error(EXACT_QUOTA_ERROR);
+            err.code = 'resource-exhausted';
+            throw err;
+          }
+          await new Promise(r => setTimeout(r, 10));
+          this.devices.push({ id: newDeviceId, status: 'ONLINE' });
+          return { success: true, deviceId: newDeviceId };
+        } finally {
+          this.busy = false;
+        }
+      }
+    }
+
+    const sim = new ServerTransactionSimulation([
+      { id: 'dev-alpha', status: 'ONLINE' },
+      { id: 'dev-beta', status: 'ONLINE' }
+    ]);
+
+    // Simultaneous claims for dev-gamma and dev-delta
+    const outcomes = await Promise.allSettled([
+      sim.runTransactionApprove('dev-gamma'),
+      sim.runTransactionApprove('dev-delta')
+    ]);
+
+    const successes = outcomes.filter(o => o.status === 'fulfilled');
+    const failures = outcomes.filter(o => o.status === 'rejected');
+
+    assert.equal(successes.length, 1, 'Only one concurrent approval succeeds when starting at 2 devices');
+    assert.equal(failures.length, 1, 'The competing concurrent approval is rejected');
+    assert.equal(failures[0].reason.message, EXACT_QUOTA_ERROR);
+
+    const activeTotal = sim.devices.filter(d => d.status !== 'REVOKED').length;
+    assert.equal(activeTotal, 3, 'Active device count must remain capped at exactly 3');
+  });
 });

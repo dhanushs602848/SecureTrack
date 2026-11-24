@@ -258,11 +258,11 @@ export const deviceService = {
     if (!user) throw new Error('User not authenticated');
 
     // Configurable maximum device count per account (anti-abuse quota enforcement)
-    const MAX_DEVICES_PER_ACCOUNT = 5;
+    const MAX_DEVICES_PER_ACCOUNT = 3;
     const devicesSnap = await getDocs(collection(db, 'users', user.uid, 'devices'));
-    const activeDevices = devicesSnap.docs.filter(d => d.data().status !== 'REVOKED');
+    const activeDevices = devicesSnap.docs.filter((d) => d.data().status !== 'REVOKED');
     if (activeDevices.length >= MAX_DEVICES_PER_ACCOUNT) {
-      throw new Error(`Account device limit reached (Maximum ${MAX_DEVICES_PER_ACCOUNT} devices). Please revoke an existing device before pairing a new one.`);
+      throw new Error('You have reached the maximum of 3 active devices. Revoke an existing device to connect another.');
     }
 
     // Generate 32 cryptographically random bytes (256 bits)
@@ -323,6 +323,7 @@ export const deviceService = {
   /**
    * Owner approves an enrolling device.
    * Enrolls device under users/{ownerUid}/devices/{deviceId} and marks invitation APPROVED.
+   * Concurrency-safe: verifies active device quota inside an atomic Firestore transaction.
    */
   approveDeviceClaim: async (tokenHash: string, invitation: any): Promise<void> => {
     const user = auth.currentUser;
@@ -333,54 +334,82 @@ export const deviceService = {
     const deviceId = invitation.claimedDeviceId;
     if (!deviceId) throw new Error('Missing claimed device ID');
 
+    // Pre-check quota before transaction
+    const MAX_DEVICES_PER_ACCOUNT = 3;
+    const devicesSnap = await getDocs(collection(db, 'users', user.uid, 'devices'));
+    const activeDevices = devicesSnap.docs.filter(
+      (d) => d.data().status !== 'REVOKED' && d.id !== deviceId
+    );
+    if (activeDevices.length >= MAX_DEVICES_PER_ACCOUNT) {
+      throw new Error('You have reached the maximum of 3 active devices. Revoke an existing device to connect another.');
+    }
+
     // Generate 256-bit cryptographically secure shared pairing secret
     const secretBytes = new Uint8Array(32);
     window.crypto.getRandomValues(secretBytes);
     const bleSharedSecret = Array.from(secretBytes).map((b) => b.toString(16).padStart(2, '0')).join('');
 
-    const batch = writeBatch(db);
+    // Atomic transaction for approval:
+    // Reads invitation and user root document, enforcing atomic check and update isolation
+    await runTransaction(db, async (transaction) => {
+      const invRef = doc(db, 'pairing_invitations', tokenHash);
+      const invDoc = await transaction.get(invRef);
+      if (!invDoc.exists()) {
+        throw new Error('Pairing invitation not found.');
+      }
+      const invData = invDoc.data();
+      if (invData.status !== 'PENDING_APPROVAL') {
+        throw new Error(`Invitation is ${invData.status ? invData.status.toLowerCase() : 'invalid'} and cannot be approved.`);
+      }
 
-    // 1. Create registered device document under owner account
-    const devRef = doc(db, 'users', user.uid, 'devices', deviceId);
-    batch.set(devRef, {
-      id: deviceId,
-      ownerUid: user.uid,
-      deviceAuthUid: invitation.claimedByUid,
-      deviceName: invitation.deviceInfo?.deviceName || 'Paired Android Device',
-      model: invitation.deviceInfo?.model || 'Android Phone',
-      androidVersion: invitation.deviceInfo?.androidVersion || '14',
-      batteryLevel: invitation.deviceInfo?.batteryLevel ?? 100,
-      status: 'ONLINE',
-      paired: true,
-      protectionEnabled: true,
-      installationId: deviceId,
-      bleSharedSecret: bleSharedSecret,
-      lastSeen: serverTimestamp(),
-      locationStatus: 'ENABLED',
-      trackingStatus: 'ACTIVE',
-      networkStatus: 'CONNECTED'
-    }, { merge: true });
+      const userRef = doc(db, 'users', user.uid);
+      const userDoc = await transaction.get(userRef);
 
-    // 2. Mark invitation APPROVED atomically with shared secret
-    const invRef = doc(db, 'pairing_invitations', tokenHash);
-    batch.update(invRef, {
-      status: 'APPROVED',
-      approvedAt: serverTimestamp(),
-      bleSharedSecret: bleSharedSecret
+      const devRef = doc(db, 'users', user.uid, 'devices', deviceId);
+
+      // 1. Create registered device document under owner account
+      transaction.set(devRef, {
+        id: deviceId,
+        ownerUid: user.uid,
+        deviceAuthUid: invitation.claimedByUid,
+        deviceName: invitation.deviceInfo?.deviceName || 'Paired Android Device',
+        model: invitation.deviceInfo?.model || 'Android Phone',
+        androidVersion: invitation.deviceInfo?.androidVersion || '14',
+        batteryLevel: invitation.deviceInfo?.batteryLevel ?? 100,
+        status: 'ONLINE',
+        paired: true,
+        protectionEnabled: true,
+        installationId: deviceId,
+        bleSharedSecret: bleSharedSecret,
+        lastSeen: serverTimestamp(),
+        locationStatus: 'ENABLED',
+        trackingStatus: 'ACTIVE',
+        networkStatus: 'CONNECTED'
+      }, { merge: true });
+
+      // 2. Mark invitation APPROVED atomically with shared secret
+      transaction.update(invRef, {
+        status: 'APPROVED',
+        approvedAt: serverTimestamp(),
+        bleSharedSecret: bleSharedSecret
+      });
+
+      // 3. Update user profile to ensure transaction isolation on owner root
+      transaction.set(userRef, {
+        lastDeviceEnrolledAt: serverTimestamp()
+      }, { merge: true });
+
+      // 4. Record audit log entry for device enrollment
+      const auditRef = doc(collection(db, 'users', user.uid, 'audit_logs'));
+      transaction.set(auditRef, {
+        ownerUid: user.uid,
+        action: 'DEVICE_APPROVED',
+        targetDeviceId: deviceId,
+        deviceName: invitation.deviceInfo?.deviceName || 'Paired Android Device',
+        initiatedFrom: 'WEB_CONSOLE',
+        timestamp: serverTimestamp()
+      });
     });
-
-    // 3. Record audit log entry for device enrollment
-    const auditRef = doc(collection(db, 'users', user.uid, 'audit_logs'));
-    batch.set(auditRef, {
-      ownerUid: user.uid,
-      action: 'DEVICE_APPROVED',
-      targetDeviceId: deviceId,
-      deviceName: invitation.deviceInfo?.deviceName || 'Paired Android Device',
-      initiatedFrom: 'WEB_CONSOLE',
-      timestamp: serverTimestamp()
-    });
-
-    await batch.commit();
   },
 
   /**

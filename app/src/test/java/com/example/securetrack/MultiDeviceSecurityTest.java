@@ -180,6 +180,49 @@ public class MultiDeviceSecurityTest {
         assertTrue(command.getResult().contains("40.71280"));
     }
 
+    @Test
+    public void testMaxActiveDevicesQuotaEnforcement() {
+        final int MAX_ACTIVE_DEVICES = 3;
+        final String EXACT_ERROR = "You have reached the maximum of 3 active devices. Revoke an existing device to connect another.";
+        assertNotNull(EXACT_ERROR);
+
+        java.util.List<Device> registeredDevices = new java.util.ArrayList<>();
+
+        // Helper method matching DeviceRepository quota check
+        java.util.function.BiPredicate<java.util.List<Device>, String> canAddDevice = (devices, targetDeviceId) -> {
+            long activeCount = 0;
+            for (Device dev : devices) {
+                if (!"REVOKED".equals(dev.getStatus()) && !dev.getId().equals(targetDeviceId)) {
+                    activeCount++;
+                }
+            }
+            return activeCount < MAX_ACTIVE_DEVICES;
+        };
+
+        // 1 active device -> allowed
+        registeredDevices.add(new Device("d1", "Phone 1", "M1", "14", 100, "ONLINE", true, "d1"));
+        assertTrue("1 active device allows pairing another", canAddDevice.test(registeredDevices, "d2"));
+
+        // 2 active devices -> allowed
+        registeredDevices.add(new Device("d2", "Phone 2", "M2", "14", 80, "ONLINE", true, "d2"));
+        assertTrue("2 active devices allows pairing a third", canAddDevice.test(registeredDevices, "d3"));
+
+        // 3 active devices -> adding a fourth must be rejected
+        registeredDevices.add(new Device("d3", "Phone 3", "M3", "14", 60, "ONLINE", true, "d3"));
+        assertFalse("4th active device must be rejected by quota check", canAddDevice.test(registeredDevices, "d4"));
+
+        // Re-pairing / updating an existing active device (e.g. d2) does NOT increment count -> allowed
+        assertTrue("Updating an existing active device must not be rejected", canAddDevice.test(registeredDevices, "d2"));
+
+        // Revoking a device frees quota:
+        registeredDevices.get(1).setStatus("REVOKED"); // d2 revoked -> now 2 active (d1, d3)
+        assertTrue("Revoking a device allows connecting a new device", canAddDevice.test(registeredDevices, "d4"));
+
+        // Adding 4th device after revocation -> now at 3 active (d1, d3, d4) + 1 revoked (d2)
+        registeredDevices.add(new Device("d4", "Phone 4", "M4", "14", 95, "ONLINE", true, "d4"));
+        assertFalse("Reaching 3 active devices again blocks adding a 5th", canAddDevice.test(registeredDevices, "d5"));
+    }
+
     private boolean isValidImei(String imei) {
         if (imei == null || imei.length() != 15 || !imei.matches("\\d+")) {
             return false;

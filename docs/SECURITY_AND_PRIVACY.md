@@ -14,7 +14,7 @@ This document outlines the security controls, threat mitigations, cryptographic 
 | **Destructive Command Abuse** | Remote wipe permanently destroying user data | `WIPE_DEVICE` is permanently prohibited and blocked across web console, Cloud Functions, and Android execution engine. Supported commands strictly limited to `LOCATE_NOW`, `LOCK_DEVICE`, and `ALARM_ALERT`. |
 | **Cross-Tenant Telemetry Snooping** | User A reads location or status of User B's devices | Firestore Security Rules strictly enforce `request.auth.uid == resource.data.ownerUid` on all reads, writes, and collection queries. |
 | **Device Credential Hijacking / Revocation Abuse** | Stolen or rogue device continues to stream telemetry | Owner can revoke device access instantly from Web Dashboard. Revoked devices are denied Firestore telemetry writes via security rules (`resource.data.status != 'REVOKED'`). |
-| **Account Quota Exhaustion** | Abuser pairs dozens of unauthorized devices | Enforced account device quota: maximum 5 active devices per registered owner account. |
+| **Account Quota Exhaustion** | Abuser pairs dozens of unauthorized devices | Enforced account device quota: maximum 3 active devices per registered owner account. |
 | **Audit Log Tampering / Non-Repudiation** | Attacker deletes or modifies history of remote commands | Append-only audit logs under `/users/{uid}/audit_logs/{logId}`; Firestore security rules allow read and create for owner, but strictly deny update and delete (`allow update, delete: if false`). |
 
 ---
@@ -59,7 +59,7 @@ To eliminate harassment and resource abuse, remote command dispatching in the We
 | **Siren Alarm (`ALARM_ALERT`)** | 1 alert per 2 minutes (120s cooldown) | Verified in atomic transaction; siren hardware playback capped at 5.0 seconds. |
 | **Device Lock (`LOCK_DEVICE`)** | 1 lock per 1 minute (60s cooldown) | Verified in atomic transaction; sets device into secured mode. |
 | **Locate Request (`LOCATE_NOW`)** | Maximum 5 requests per 10-minute window | Rolling 10-minute sliding counter stored in `command_rate_limits/{deviceId}`. |
-| **Device Quota** | Maximum 5 active devices per account | Checked in `createPairingInvitation`; prevents account resource spam. |
+| **Device Quota** | Maximum 3 active devices per account | Checked in `createPairingInvitation`, `approveDeviceClaim`, and Cloud Functions transactions; prevents account resource spam. |
 | **Factory Wipe (`WIPE_DEVICE`)** | Permanently Disabled | Denied in web UI, Firestore rules, and Android `CommandExecutionManager`. |
 | **Command Validity Window** | 15 minutes TTL | Commands older than 15 minutes transition to `EXPIRED` and are rejected by Android execution engine. |
 | **Target Device Binding** | `targetDeviceId == deviceId` | Firestore rules reject commands where target ID does not match the subcollection path. |
