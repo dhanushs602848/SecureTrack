@@ -1,7 +1,7 @@
-graph TD
-    subgraph ClientLayer ["Client Layer"]
+flowchart TD
+    subgraph ClientLayer ["Client Layer: Interfaces & Handsets"]
         Browser["Web Operations Console<br/>(React 18 + TypeScript + Vite)"]
-        Phone["Android Smartphone Client<br/>(SecureTrack v1.8.0 / Target SDK 35)"]
+        Phone["Android Smartphone Client<br/>(SecureTrack v1.8.0 / API 26-35)"]
     end
 
     subgraph SecurityAuth ["Authentication & Security"]
@@ -9,41 +9,46 @@ graph TD
         SecurityRules["Firestore Security Rules<br/>(Per-User Data Isolation)"]
     end
 
-    subgraph CloudLayer ["Cloud Infrastructure (track-99c90)"]
-        Hosting["Firebase Hosting<br/>(SPA Delivery & Global CDN)"]
+    subgraph CloudLayer ["Firebase Cloud Backend (track-99c90)"]
+        Hosting["Firebase Hosting<br/>(Global CDN / SPA Delivery)"]
         Firestore["Cloud Firestore<br/>(Real-Time Distributed NoSQL)"]
-        Functions["Cloud Functions (Node.js 18)<br/>(onDeviceCommandCreated & Pairing API)"]
+        CloudFunctions["Cloud Functions (Node.js 18)<br/>(onDeviceCommandCreated & Token API)"]
         FCM["Firebase Cloud Messaging (FCM)<br/>(High-Priority Wake-Up Dispatch)"]
     end
 
-    subgraph LocalPersistence ["Android On-Device Storage"]
-        RoomDB["Android Room SQLite DB<br/>(Offline Cache & Incident Log)"]
+    subgraph AndroidInternal ["Android Client Engine & On-Device Storage"]
+        ForegroundService["LocationTrackingService<br/>(Persistent Foreground GPS Engine)"]
+        FCMService["SecureFirebaseMessagingService<br/>(Push Wake-Up & Pre-Execution)"]
+        CommandManager["CommandExecutionManager<br/>(15m TTL & Atomic Execution Engine)"]
+        AdminReceiver["SecureAdminReceiver<br/>(DevicePolicyManager Remote Lock)"]
+        ShutdownReceiver["ShutdownReceiver & BiometricProtection<br/>(Pre-Shutdown Telemetry Interceptor)"]
+        RoomDB["Android Room SQLite DB<br/>(Offline Cache & Alert Store)"]
         EncryptedPrefs["EncryptedSharedPreferences<br/>(AES-256 Master Key Token Store)"]
     end
 
-    subgraph AndroidInternal ["Android Client Engine"]
-        ForegroundService["LocationTrackingService<br/>(Persistent Foreground GPS Engine)"]
-        FCMService["SecureFirebaseMessagingService<br/>(Push Wake-Up & Pre-Execution)"]
-        CommandManager["CommandExecutionManager<br/>(15m TTL Expiry & Atomic Execution)"]
-        AdminReceiver["SecureAdminReceiver<br/>(DevicePolicyManager Remote Lock)"]
-    end
-
-    Browser -->|HTTPS CDN Fetch| Hosting
-    Browser -->|JWT Authentication Tokens| Auth
+    %% Web Console Connections
+    Browser -->|HTTPS Hosting Delivery| Hosting
+    Browser -->|JWT Authentication| Auth
     Browser -->|Real-Time Snapshot Listeners| Firestore
-    Browser -->|Dispatch Remote Anti-Theft Commands| Firestore
+    Browser -->|Dispatch Anti-Theft Commands| Firestore
 
-    Firestore -->|Document Trigger onCreate| Functions
-    Functions -->|High-Priority Data Message| FCM
+    %% Cloud Serverless Trigger Pipeline
+    Firestore -->|Document Trigger onCreate| CloudFunctions
+    CloudFunctions -->|High-Priority Data Payload| FCM
     FCM -->|Push Wake-Up Packet| FCMService
-    FCMService -->|Execute Queued Command| CommandManager
 
-    Phone -->|Continuous GPS Telemetry Stream| Firestore
-    Phone -->|Snapshot Listener: commands| Firestore
-    Phone -->|Atomic Status Update EXECUTED or EXPIRED| Firestore
-
-    Phone --> ForegroundService
-    Phone --> CommandManager
+    %% Android Internal Processing & Telemetry
+    FCMService -->|Route Wake-Up Intent| CommandManager
+    ForegroundService -->|Continuous GPS Telemetry| Firestore
+    CommandManager -->|Snapshot Listener & Atomic Poll| Firestore
+    CommandManager -->|Atomic Status Update EXECUTED or EXPIRED| Firestore
     CommandManager -->|Screen Lock Action| AdminReceiver
-    Phone --> RoomDB
-    Phone --> EncryptedPrefs
+
+    %% Android Device & Local Persistence
+    Phone --- ForegroundService
+    Phone --- FCMService
+    Phone --- CommandManager
+    Phone --- ShutdownReceiver
+    ForegroundService -->|Cache Offline Breadcrumbs| RoomDB
+    CommandManager -->|Cache Execution Logs| RoomDB
+    Phone -->|Secure Token Persistence| EncryptedPrefs

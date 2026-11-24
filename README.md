@@ -112,14 +112,14 @@ SecureTrack is released as open-source software under the official **Apache Lice
 SecureTrack employs an authenticated, reactive multi-tier cloud-and-device architecture:
 
 ```mermaid
-graph TD
-    subgraph ClientLayer ["Client Interfaces & Devices"]
+flowchart TD
+    subgraph ClientLayer ["Client Layer: Interfaces & Handsets"]
         Browser["Web Operations Console<br/>(React 18 + TypeScript + Vite)"]
-        Phone["Android Smartphone Client<br/>(SecureTrack v1.8.0 / Target SDK 35)"]
+        Phone["Android Smartphone Client<br/>(SecureTrack v1.8.0 / API 26-35)"]
     end
 
     subgraph CloudLayer ["Firebase Cloud Backend (track-99c90)"]
-        Hosting["Firebase Hosting<br/>(SPA Delivery & Global CDN)"]
+        Hosting["Firebase Hosting<br/>(Global CDN / SPA Delivery)"]
         Auth["Firebase Authentication<br/>(Zero-Trust Email & Password)"]
         Firestore["Cloud Firestore<br/>(Real-Time Distributed NoSQL)"]
         CloudFunctions["Cloud Functions (Node.js 18)<br/>(onDeviceCommandCreated & Token API)"]
@@ -129,31 +129,39 @@ graph TD
     subgraph AndroidInternal ["Android Client Engine & On-Device Storage"]
         ForegroundService["LocationTrackingService<br/>(Persistent Foreground GPS Engine)"]
         FCMService["SecureFirebaseMessagingService<br/>(Push Wake-Up & Pre-Execution)"]
-        CommandManager["CommandExecutionManager<br/>(15m TTL Expiry & Atomic Execution)"]
+        CommandManager["CommandExecutionManager<br/>(15m TTL & Atomic Execution Engine)"]
         AdminReceiver["SecureAdminReceiver<br/>(DevicePolicyManager Remote Lock)"]
-        RoomDB["Android Room SQLite DB<br/>(Offline Cache & Incident Log)"]
+        ShutdownReceiver["ShutdownReceiver & BiometricProtection<br/>(Pre-Shutdown Telemetry Interceptor)"]
+        RoomDB["Android Room SQLite DB<br/>(Offline Cache & Alert Store)"]
         EncryptedPrefs["EncryptedSharedPreferences<br/>(AES-256 Master Key Token Store)"]
     end
 
-    Browser -->|HTTPS / Hosting Bundle| Hosting
-    Browser -->|JWT Authentication Tokens| Auth
+    %% Web Console Connections
+    Browser -->|HTTPS Hosting Delivery| Hosting
+    Browser -->|JWT Authentication| Auth
     Browser -->|Real-Time Snapshot Listeners| Firestore
-    Browser -->|Dispatch Remote Anti-Theft Commands| Firestore
+    Browser -->|Dispatch Anti-Theft Commands| Firestore
 
-    Firestore -->|onCreate Document Trigger| CloudFunctions
-    CloudFunctions -->|High-Priority Data Message| FCM
+    %% Cloud Serverless Trigger Pipeline
+    Firestore -->|Document Trigger onCreate| CloudFunctions
+    CloudFunctions -->|High-Priority Data Payload| FCM
     FCM -->|Push Wake-Up Packet| FCMService
-    FCMService -->|Execute Queued Command| CommandManager
 
-    Phone -->|Continuous GPS Telemetry Stream| Firestore
-    Phone -->|Snapshot Listener: commands| Firestore
-    Phone -->|Atomic Status Update EXECUTED or EXPIRED| Firestore
-
-    Phone --> ForegroundService
-    Phone --> CommandManager
+    %% Android Internal Processing & Telemetry
+    FCMService -->|Route Wake-Up Intent| CommandManager
+    ForegroundService -->|Continuous GPS Telemetry| Firestore
+    CommandManager -->|Snapshot Listener & Atomic Poll| Firestore
+    CommandManager -->|Atomic Status Update EXECUTED or EXPIRED| Firestore
     CommandManager -->|Screen Lock Action| AdminReceiver
-    Phone --> RoomDB
-    Phone --> EncryptedPrefs
+
+    %% Android Device & Local Persistence
+    Phone --- ForegroundService
+    Phone --- FCMService
+    Phone --- CommandManager
+    Phone --- ShutdownReceiver
+    ForegroundService -->|Cache Offline Breadcrumbs| RoomDB
+    CommandManager -->|Cache Execution Logs| RoomDB
+    Phone -->|Secure Token Persistence| EncryptedPrefs
 ```
 
 ### 🔄 End-to-End Command Dispatch & Execution Lifecycle
