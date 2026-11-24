@@ -195,4 +195,181 @@ test('SecureTrack Web Dashboard Auth & Command Integrity Suite', async (t) => {
     assert.equal(resolveEffectiveCommandStatus(malformedTimestamp, now), 'QUEUED', 'Malformed timestamp safely falls back to current status');
     assert.equal(resolveEffectiveCommandStatus(nullTimestamp, now), 'QUEUED', 'Null timestamp safely falls back to current status');
   });
+
+  await t.test('Anti-misuse: Command rate-limiting enforcement (Alarm 2m, Lock 1m, Locate 5/10m)', () => {
+    function evaluateRateLimit(commandType, rateData, nowMs) {
+      if (commandType === 'ALARM_ALERT') {
+        const lastAlarm = rateData.lastAlarmAt || 0;
+        if (nowMs - lastAlarm < 120 * 1000) {
+          const waitSec = Math.ceil((120 * 1000 - (nowMs - lastAlarm)) / 1000);
+          throw new Error(`Rate limit: Alarm cooldown active. Please wait ${waitSec}s.`);
+        }
+      }
+
+      if (commandType === 'LOCK_DEVICE') {
+        const lastLock = rateData.lastLockAt || 0;
+        if (nowMs - lastLock < 60 * 1000) {
+          const waitSec = Math.ceil((60 * 1000 - (nowMs - lastLock)) / 1000);
+          throw new Error(`Rate limit: Lock cooldown active. Please wait ${waitSec}s.`);
+        }
+      }
+
+      if (commandType === 'LOCATE_NOW') {
+        const windowStart = rateData.locateWindowStart || 0;
+        let locateCount = rateData.locateCount || 0;
+
+        if (nowMs - windowStart > 10 * 60 * 1000) {
+          return { ...rateData, locateWindowStart: nowMs, locateCount: 1, lastLocateAt: nowMs };
+        } else {
+          if (locateCount >= 5) {
+            const waitSec = Math.ceil((10 * 60 * 1000 - (nowMs - windowStart)) / 1000);
+            throw new Error(`Rate limit: Maximum 5 location requests per 10 minutes exceeded. Please wait ${waitSec}s.`);
+          }
+          return { ...rateData, locateCount: locateCount + 1, lastLocateAt: nowMs };
+        }
+      }
+
+      return { ...rateData };
+    }
+
+    const t0 = 1000000;
+
+    // 1. Alarm cooldown: 1 alarm every 2 minutes (120,000 ms)
+    assert.doesNotThrow(() => evaluateRateLimit('ALARM_ALERT', { lastAlarmAt: 0 }, t0));
+    assert.throws(
+      () => evaluateRateLimit('ALARM_ALERT', { lastAlarmAt: t0 - 30 * 1000 }, t0),
+      /Alarm cooldown active/
+    );
+    assert.doesNotThrow(
+      () => evaluateRateLimit('ALARM_ALERT', { lastAlarmAt: t0 - 121 * 1000 }, t0)
+    );
+
+    // 2. Lock cooldown: 1 lock every 1 minute (60,000 ms)
+    assert.doesNotThrow(() => evaluateRateLimit('LOCK_DEVICE', { lastLockAt: 0 }, t0));
+    assert.throws(
+      () => evaluateRateLimit('LOCK_DEVICE', { lastLockAt: t0 - 45 * 1000 }, t0),
+      /Lock cooldown active/
+    );
+    assert.doesNotThrow(
+      () => evaluateRateLimit('LOCK_DEVICE', { lastLockAt: t0 - 65 * 1000 }, t0)
+    );
+
+    // 3. Location rate limit: max 5 requests per 10m
+    let state = { locateWindowStart: t0, locateCount: 0 };
+    for (let i = 0; i < 5; i++) {
+      state = evaluateRateLimit('LOCATE_NOW', state, t0 + i * 1000);
+      assert.equal(state.locateCount, i + 1);
+    }
+    // 6th request within window must fail
+    assert.throws(
+      () => evaluateRateLimit('LOCATE_NOW', state, t0 + 6000),
+      /Maximum 5 location requests per 10 minutes exceeded/
+    );
+    // After 10m window expires, reset and allow
+    const afterWindow = evaluateRateLimit('LOCATE_NOW', state, t0 + 11 * 60 * 1000);
+    assert.equal(afterWindow.locateCount, 1);
+  });
+
+  await t.test('Anti-misuse: Device quota enforcement (max 5 active devices)', () => {
+    const MAX_DEVICES_PER_ACCOUNT = 5;
+
+    function checkDeviceQuota(existingDevices) {
+      const activeDevices = existingDevices.filter(d => d.status !== 'REVOKED');
+      if (activeDevices.length >= MAX_DEVICES_PER_ACCOUNT) {
+        throw new Error(`Account device limit reached (Maximum ${MAX_DEVICES_PER_ACCOUNT} devices).`);
+      }
+      return true;
+    }
+
+    const underLimit = [
+      { id: 'dev-1', status: 'ONLINE' },
+      { id: 'dev-2', status: 'ONLINE' },
+      { id: 'dev-3', status: 'REVOKED' } // revoked doesn't count towards active
+    ];
+    assert.equal(checkDeviceQuota(underLimit), true);
+
+    const atLimit = [
+      { id: 'dev-1', status: 'ONLINE' },
+      { id: 'dev-2', status: 'ONLINE' },
+      { id: 'dev-3', status: 'ONLINE' },
+      { id: 'dev-4', status: 'ONLINE' },
+      { id: 'dev-5', status: 'ONLINE' }
+    ];
+    assert.throws(
+      () => checkDeviceQuota(atLimit),
+      /Account device limit reached/
+    );
+  });
+
+  await t.test('Anti-misuse: Target device ID validation and safety lock', () => {
+    function validateCommandDispatch(targetDeviceId, pathDeviceId, commandType) {
+      if (!targetDeviceId || !pathDeviceId || targetDeviceId !== pathDeviceId) {
+        throw new Error('Target device ID mismatch or missing');
+      }
+      if (commandType === 'WIPE_DEVICE') {
+        throw new Error('Safety Lock: Remote factory wipe is permanently disabled');
+      }
+      const allowed = ['LOCATE_NOW', 'LOCK_DEVICE', 'ALARM_ALERT'];
+      if (!allowed.includes(commandType)) {
+        throw new Error(`Unsupported command type: ${commandType}`);
+      }
+      return true;
+    }
+
+    assert.equal(validateCommandDispatch('device-123', 'device-123', 'LOCATE_NOW'), true);
+    assert.throws(
+      () => validateCommandDispatch('device-123', 'device-456', 'LOCATE_NOW'),
+      /Target device ID mismatch/
+    );
+    assert.throws(
+      () => validateCommandDispatch('', 'device-123', 'LOCATE_NOW'),
+      /Target device ID mismatch/
+    );
+    assert.throws(
+      () => validateCommandDispatch('device-123', 'device-123', 'WIPE_DEVICE'),
+      /Safety Lock: Remote factory wipe is permanently disabled/
+    );
+  });
+
+  await t.test('Anti-misuse: Append-only audit log entry structure and non-repudiation', () => {
+    function createAuditRecord(ownerUid, action, targetDeviceId, details) {
+      const allowedActions = [
+        'COMMAND_LOCATE_NOW',
+        'COMMAND_LOCK_DEVICE',
+        'COMMAND_ALARM_ALERT',
+        'DEVICE_APPROVED',
+        'DEVICE_REVOKED'
+      ];
+      if (!allowedActions.includes(action)) {
+        throw new Error(`Invalid audit action: ${action}`);
+      }
+      if (!ownerUid || !targetDeviceId) {
+        throw new Error('Audit record requires authenticated owner and target device');
+      }
+      return {
+        ownerUid,
+        action,
+        targetDeviceId,
+        initiatedFrom: 'WEB_CONSOLE',
+        timestamp: Date.now(),
+        ...details
+      };
+    }
+
+    const commandAudit = createAuditRecord('owner-1', 'COMMAND_LOCK_DEVICE', 'phone-s22', { requestId: 'req-01' });
+    assert.equal(commandAudit.action, 'COMMAND_LOCK_DEVICE');
+    assert.equal(commandAudit.targetDeviceId, 'phone-s22');
+    assert.equal(commandAudit.initiatedFrom, 'WEB_CONSOLE');
+
+    const enrollAudit = createAuditRecord('owner-1', 'DEVICE_APPROVED', 'phone-vivo', { deviceName: 'Vivo V23' });
+    assert.equal(enrollAudit.action, 'DEVICE_APPROVED');
+
+    const revokeAudit = createAuditRecord('owner-1', 'DEVICE_REVOKED', 'phone-vivo');
+    assert.equal(revokeAudit.action, 'DEVICE_REVOKED');
+
+    assert.throws(
+      () => createAuditRecord('owner-1', 'UNAUTHORIZED_ACTION', 'phone-1'),
+      /Invalid audit action/
+    );
+  });
 });

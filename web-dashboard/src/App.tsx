@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { ToastProvider } from './context/ToastContext';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { RealtimeAlertBanner } from './components/RealtimeAlertBanner';
@@ -22,7 +23,7 @@ const LoadingFallback: React.FC = () => (
   <div className="flex-1 min-h-[400px] flex items-center justify-center">
     <div className="flex flex-col items-center gap-3">
       <div className="w-8 h-8 border-2 border-indigo-600 dark:border-cyan-400 border-t-transparent rounded-full animate-spin" />
-      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 tracking-wider">LOADING SECURETRACK...</span>
+      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 tracking-wider font-mono">LOADING SECURETRACK...</span>
     </div>
   </div>
 );
@@ -36,7 +37,7 @@ const ProtectedLayout: React.FC = () => {
       <div className="min-h-screen bg-slate-50 dark:bg-[#0A0E17] flex items-center justify-center text-indigo-600 dark:text-cyan-400 font-bold">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-2 border-indigo-600 dark:border-cyan-400 border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs font-semibold tracking-wider text-slate-500 dark:text-slate-400">INITIALIZING SECURITY SESSION...</span>
+          <span className="text-xs font-semibold tracking-wider text-slate-500 dark:text-slate-400 font-mono">INITIALIZING SECURITY SESSION...</span>
         </div>
       </div>
     );
@@ -80,17 +81,19 @@ const ProtectedLayout: React.FC = () => {
 export const App: React.FC = () => {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <BrowserRouter>
-          <Suspense fallback={<LoadingFallback />}>
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/*" element={<ProtectedLayout />} />
-            </Routes>
-          </Suspense>
-        </BrowserRouter>
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <Suspense fallback={<LoadingFallback />}>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/*" element={<ProtectedLayout />} />
+              </Routes>
+            </Suspense>
+          </BrowserRouter>
+        </AuthProvider>
+      </ToastProvider>
     </ThemeProvider>
   );
 };

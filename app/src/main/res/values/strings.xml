@@ -75,6 +75,9 @@
     <string name="imei1_hint">IMEI 1</string>
     <string name="imei2_hint">IMEI 2 (Optional)</string>
     <string name="imei_consent_text">I explicitly consent to storing my IMEI numbers securely for potential device recovery purposes.</string>
+    <string name="enrolment_consent_title">Device Enrolment &amp; Tracking Consent</string>
+    <string name="enrolment_consent_desc">Enrolling this device grants the account owner visibility into real-time GPS location, battery levels, network status, and remote anti-theft commands (Lock, Alarm, Locate). Covert or unconsented tracking is strictly prohibited.</string>
+    <string name="enrolment_consent_checkbox">I explicitly consent to enrolling this phone for security tracking under this account.</string>
 
     <!-- Tracking -->
     <string name="live_tracking">Live Location Tracking</string>

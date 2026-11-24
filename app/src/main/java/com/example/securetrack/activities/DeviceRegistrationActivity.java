@@ -126,6 +126,11 @@ public class DeviceRegistrationActivity extends AppCompatActivity {
             return;
         }
 
+        if (binding.cbPrimaryEnrolmentConsent != null && !binding.cbPrimaryEnrolmentConsent.isChecked()) {
+            Toast.makeText(this, "You must review and accept the tracking consent agreement to proceed.", Toast.LENGTH_LONG).show();
+            return;
+        }
+
         binding.btnCompleteRegistration.setEnabled(false);
         Device newDevice = new Device(
                 name,
@@ -314,6 +319,11 @@ public class DeviceRegistrationActivity extends AppCompatActivity {
         String token = binding.etManualToken.getText() != null ? binding.etManualToken.getText().toString().trim() : "";
         if (TextUtils.isEmpty(token) || token.length() < 32) {
             Toast.makeText(this, "Please enter or scan a valid 256-bit pairing token", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (binding.cbSecondaryEnrolmentConsent != null && !binding.cbSecondaryEnrolmentConsent.isChecked()) {
+            Toast.makeText(this, "You must review and accept the tracking consent agreement to pair this phone.", Toast.LENGTH_LONG).show();
             return;
         }
 

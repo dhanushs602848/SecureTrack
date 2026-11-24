@@ -42,6 +42,17 @@ public class HomeFragment extends Fragment {
         binding.tvUserName.setText("Hello, " + sessionManager.getUserName());
         binding.tvAppVersionSubtitle.setText("SecureTrack " + com.example.securetrack.BuildConfig.VERSION_NAME + " • Fleet Defense Active");
 
+        // Display enrolled owner identity clearly (Anti-Stalking transparency)
+        String ownerEmail = sessionManager.getUserEmail();
+        String ownerUid = sessionManager.getOwnerUid();
+        if (ownerEmail != null && !ownerEmail.isEmpty()) {
+            binding.tvEnrolledAccountIdentity.setText("Linked to: " + ownerEmail);
+        } else if (ownerUid != null && !ownerUid.isEmpty()) {
+            binding.tvEnrolledAccountIdentity.setText("Owner UID: " + ownerUid);
+        } else {
+            binding.tvEnrolledAccountIdentity.setText("Unpaired Handset • Local Mode Only");
+        }
+
         // Observe active alert count reactively from Room source of truth
         securityRepository.getActiveAlertCountLiveData().observe(getViewLifecycleOwner(), count -> {
             if (binding != null) {

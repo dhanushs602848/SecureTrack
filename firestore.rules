@@ -69,8 +69,13 @@ service cloud.firestore {
 
         match /commands/{commandId} {
           allow read: if isHumanOwner(userId) || isAuthorizedDevice(userId, deviceId);
-          // ONLY human owner can create or delete commands
-          allow create: if isHumanOwner(userId);
+          // ONLY human owner can create commands, and MUST target this specific device with allowed non-destructive types
+          allow create: if isHumanOwner(userId) &&
+                        request.resource.data.targetDeviceId == deviceId &&
+                        request.resource.data.commandType in ['LOCATE_NOW', 'LOCK_DEVICE', 'ALARM_ALERT'] &&
+                        request.resource.data.command in ['LOCATE_NOW', 'LOCK_DEVICE', 'ALARM_ALERT'] &&
+                        request.resource.data.commandType != 'WIPE_DEVICE' &&
+                        request.resource.data.command != 'WIPE_DEVICE';
           allow delete: if isHumanOwner(userId);
 
           // Update: Owner can update, or active device can ONLY update execution status/result fields
@@ -87,6 +92,16 @@ service cloud.firestore {
             (!('payload' in resource.data) || request.resource.data.payload == resource.data.payload)
           );
         }
+      }
+
+      match /audit_logs/{logId} {
+        // Append-only audit trail: Owner can read and append, but CANNOT update or delete
+        allow read: if isHumanOwner(userId);
+        allow create: if isHumanOwner(userId) &&
+                      request.resource.data.ownerUid == userId &&
+                      request.resource.data.action is string &&
+                      request.resource.data.timestamp is timestamp;
+        allow update, delete: if false;
       }
 
       match /private_recovery/{deviceId} {

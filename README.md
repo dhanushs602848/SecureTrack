@@ -64,7 +64,7 @@ SecureTrack was conceived and engineered as an advanced final-year project in **
 Most conventional tracking applications rely on passive user-space polling and fragile centralized servers. SecureTrack re-architects mobile security around three core principles:
 1. **Zero-Trust Telemetry & Verification**: Every telemetry packet and anti-theft command is cryptographically authenticated and scoped strictly to the verified owner UID under strict Cloud Firestore Security Rules.
 2. **Dual-Database Architecture (Cloud NoSQL + Local SQLite)**: Distributed real-time synchronization via Google Cloud Firestore is coupled with on-device persistence via Android Room (SQLite) and AES-256 EncryptedSharedPreferences, ensuring resilience against network loss or tampering.
-3. **Deterministic Incident Response**: Anti-theft commands (`LOCATE_NOW`, `LOCK_DEVICE`, `ALARM_ALERT`, and guarded `WIPE_DEVICE`) are backed by atomic Firestore claiming, a strict **15-minute queue expiration window (TTL)** to eliminate stale command replay, and a strict **5.0-second safety cutoff** on audible sirens.
+3. **Deterministic Incident Response & Anti-Misuse**: Anti-theft commands (`LOCATE_NOW`, `LOCK_DEVICE`, and `ALARM_ALERT`, with permanent safety lock disablement on destructive wipe) are backed by atomic Firestore claiming, rate-limiting cooldowns, a strict **15-minute queue expiration window (TTL)** to eliminate stale command replay, and a strict **5.0-second safety cutoff** on audible sirens.
 
 ### 👥 Project Leadership & Academic Guidance
 - **Academic Guide / DBMS Mentor**: **Mohankumar H M** — DBMS Project Guide & Academic Mentor (Database Architecture, Relational Modeling & Academic Review)
@@ -83,6 +83,13 @@ SecureTrack is released as open-source software under the official **Apache Lice
 
 ## 🚀 Release 1.8.0 (Build 7) Highlights
 
+- **Anti-Misuse & Transparency Safeguards**:
+  - Mandatory informed consent checkbox during Android device registration and secondary pairing.
+  - Transparent defense banner on device home screen indicating the exact managing owner account.
+  - Rate-limited command dispatch (Alarm 2m cooldown, Lock 1m cooldown, Location 5 req/10m cap) via atomic Firestore transactions.
+  - Append-only non-repudiable audit trail (`/users/{uid}/audit_logs`) with security rules prohibiting deletion or modification.
+  - Account quota enforcement limiting active devices to 5 per owner.
+  - Permanent safety disablement of `WIPE_DEVICE` across dashboard, backend, and Android client.
 - **Biometric Power Protection & Pre-Shutdown Telemetry**:
   - Implements AndroidX `BiometricPrompt` with device credential fallback (PIN/pattern/password) for administrative actions.
   - Intercepts `Intent.ACTION_SHUTDOWN` and `android.intent.action.QUICKBOOT_POWEROFF` via `ShutdownReceiver` to record a high-priority `DEVICE_SHUTDOWN` security checkpoint before power is lost.
@@ -102,7 +109,7 @@ SecureTrack is released as open-source software under the official **Apache Lice
     3. Last-Known Historical Snapshot with clear `LAST SEEN (STALE)` timestamping
     4. Cell Tower / Wi-Fi Network Fused Provider
 - **Hermetic Automated Test Suite**:
-  - **86 total automated tests** passing across Android unit tests (65), web dashboard tests (7), and cloud functions (14).
+  - **91 total automated tests** passing across Android unit tests (65), web dashboard tests (11), and cloud functions (15).
   - Eliminates external mocking library dependencies for 100% deterministic CI runs.
 
 ---
@@ -165,14 +172,14 @@ flowchart TD
 ```
 
 ### 🔄 End-to-End Command Dispatch & Execution Lifecycle
-1. **Operator Command Dispatch**: The security operator triggers an anti-theft action (`LOCATE_NOW`, `LOCK_DEVICE`, `ALARM_ALERT`, or guarded `WIPE_DEVICE`) from the Web Console. A command record is written to `users/{uid}/devices/{deviceId}/commands/{commandId}` with state `QUEUED` and timestamp `createdAt`.
+1. **Operator Command Dispatch**: The security operator triggers an anti-theft action (`LOCATE_NOW`, `LOCK_DEVICE`, or `ALARM_ALERT`) from the Web Console. An atomic transaction validates command rate limits (Alarm cooldown: 2m, Lock cooldown: 1m, Locate cap: 5 per 10m) and records an immutable audit log entry before writing the command record to `users/{uid}/devices/{deviceId}/commands/{commandId}` with state `QUEUED`, `targetDeviceId`, and 15-minute `expiresAt`.
 2. **Cloud Functions Wake-Up**: The Firebase Cloud Function `onDeviceCommandCreated` triggers instantaneously on document creation, fetches the target device's registered FCM registration token, and dispatches a high-priority push data payload through FCM.
-3. **Android Wake-Up & Atomic Claim**: `SecureFirebaseMessagingService` receives the wake-up intent and routes execution to `CommandExecutionManager`. The manager validates the **15-minute queue expiry window** (`currentTime - queuedAt <= 15 minutes`). If expired, it atomically writes status `EXPIRED` to Firestore and terminates. If valid, it atomically transitions state to `EXECUTING` with client `requestId` deduplication.
+3. **Android Wake-Up & Atomic Claim**: `SecureFirebaseMessagingService` receives the wake-up intent and routes execution to `CommandExecutionManager`. The manager validates the **15-minute queue expiry window** (`currentTime - queuedAt <= 15 minutes`) and matches `targetDeviceId`. If expired, it atomically writes status `EXPIRED` to Firestore and terminates. If valid, it atomically transitions state to `EXECUTING` with client `requestId` deduplication.
 4. **Action Execution**:
    - `LOCATE_NOW`: Forces high-accuracy GPS fix via `FusedLocationProviderClient` and synchronizes fresh location record to `locations/{locationId}`.
    - `LOCK_DEVICE`: Invokes `DevicePolicyManager.lockNow()` via `SecureAdminReceiver`.
    - `ALARM_ALERT`: Triggers audio siren via `AlarmSoundManager` with a strict **5.0-second maximum duration cutoff**.
-   - `WIPE_DEVICE`: Protected by fail-closed safety confirmation locks; requires administrative master confirmation.
+   - `WIPE_DEVICE`: Permanently disabled by safety locks across all layers to prevent accidental or malicious destruction of user data.
 5. **Final Status Reconciliation**: The handset updates the command status in Firestore to `EXECUTED` (or `FAILED` with diagnostics). Both Web Console and local Room SQLite cache mirror the verified outcome in real-time.
 
 ---
@@ -344,24 +351,32 @@ When an owner requests a device location, SecureTrack intelligently resolves coo
 
 ## 🛡 Key Security & Anti-Theft Features
 
-1. **Biometric Power Protection**:
+1. **Anti-Misuse, Consent & Transparent Defense**:
+   - Mandatory informed consent checkbox during primary registration and secondary pairing.
+   - Persistent home screen banner identifying the managing owner account (`TRANSPARENT DEFENSE ACTIVE`).
+   - Sticky foreground service notification with immediate "Stop Protection" affordance.
+   - Command rate limiting (Alarm 2m cooldown, Lock 1m cooldown, Location 5 req/10m cap).
+   - Strict account quota: maximum 5 active devices per registered account.
+   - Immutable append-only audit trail (`/users/{uid}/audit_logs`) preventing modification or deletion of command records.
+
+2. **Biometric Power Protection**:
    - Authenticates sensitive administrative actions using AndroidX `BiometricPrompt` with secure device credential fallback (PIN/pattern/password).
    - Intercepts system shutdown events to capture battery level and record telemetry checkpoints before power loss.
 
-2. **Automated Geofence Defense**:
+3. **Automated Geofence Defense**:
    - Instant perimeter breach detection. Transitions device to `OUT_OF_ZONE` and automatically activates Lost Mode upon leaving designated safe zones.
    - Restores normal status upon re-entry strictly when Lost Mode was triggered by geofencing, preserving manually triggered Lost Mode intact.
 
-3. **15-Minute Command Expiry & Idempotent Claiming**:
-   - Dispatched commands attach a unique client `requestId` (`req_<timestamp>_<rand>`).
+4. **15-Minute Command Expiry & Idempotent Claiming**:
+   - Dispatched commands attach a unique client `requestId` (`req_<timestamp>_<rand>`) and exact `targetDeviceId`.
    - Claimed via atomic Firestore transactions, transitioning `QUEUED` $\rightarrow$ `EXECUTING` $\rightarrow$ `EXECUTED` / `FAILED` / `EXPIRED`.
    - Stale queued commands older than 15 minutes automatically transition to `EXPIRED` to prevent zombie execution.
 
-4. **Panic Siren with 5s Auto-Stop**:
+5. **Panic Siren with 5s Auto-Stop**:
    - Synthesizes urgent dual-tone security audio without external media dependencies.
    - Enforces a strict 5000 ms auto-timeout to prevent acoustic damage while ensuring maximum volume alert.
 
-5. **Permanent Factory Wipe Safety Lock**:
+6. **Permanent Factory Wipe Safety Lock**:
    - `DevicePolicyManager.wipeData(0)` has been permanently deactivated across all application components to prevent accidental or unauthorized data loss.
 
 ---
@@ -385,7 +400,7 @@ SecureTrack is architected for modern Android hardware spanning API level 26 (An
 | :--- | :--- | :--- | :--- |
 | **Owner / Controller Handset** | Android 10 – 16 (API 29–36) | Security Dashboard, Device Admin, BiometricPrompt | **PASS** (65 automated unit tests) |
 | **Enrolled Target Handset** | Android 8.0 – 15 (API 26–35) | Background Geofence, BLE Peripheral, Pre-Shutdown Receiver | **PASS** (Hermetic test suites) |
-| **Web Operations Center** | Chrome / Firefox / Safari | Vite SPA, Cloud Firestore, Leaflet Map View | **PASS** (7 automated unit tests) |
+| **Web Operations Center** | Chrome / Firefox / Safari | Vite SPA, Cloud Firestore, Leaflet Map View | **PASS** (11 automated unit tests) |
 
 ---
 
@@ -418,7 +433,7 @@ cd web-dashboard
 # Install npm dependencies
 npm install
 
-# Run automated tests (7 tests passing)
+# Run automated tests (11 tests passing)
 npm test
 
 # Run linter
@@ -438,7 +453,7 @@ firebase deploy --only hosting
 
 ## 🧪 Automated Testing & CI
 
-Continuous verification is enforced across Android and Web:
+Continuous verification is enforced across Android, Web, and Cloud:
 - **Android Unit Suite (`:app:testDebugUnitTest`)**: **65 automated tests** passing:
   - Biometric power protection preference persistence and capability evaluation.
   - Shutdown receiver null safety and broadcast handling.
@@ -447,12 +462,19 @@ Continuous verification is enforced across Android and Web:
   - Command lifecycle progression and 15-minute expiration logic.
   - Multi-device pairing recovery evaluation and identity isolation.
   - Geofence state transitions and lost mode persistence.
-- **Web Verification (`web-dashboard/test/auth.test.js`)**: **7 automated tests** passing:
+- **Web Verification (`web-dashboard/test/auth.test.js`)**: **11 automated tests** passing:
   - 15-minute queue expiry evaluation (`QUEUED` > 15m $\rightarrow$ `EXPIRED`).
-  - Payload sanitization and safety lock validation.
-  - Location staleness threshold evaluation.
-  - Device selector state updater stability.
-- **Functions Verification (`functions/test/*.test.js`)**: **14 automated tests** passing:
+  - Command rate-limiting enforcement (Alarm 2m, Lock 1m, Locate 5 req/10m).
+  - Account quota enforcement (maximum 5 active devices).
+  - Target device ID validation and safety lock against `WIPE_DEVICE`.
+  - Append-only audit log entry structure and non-repudiation.
+  - Location staleness threshold evaluation and requestId correlation.
+  - Device selector state updater stability across real-time snapshots.
+- **Functions Verification (`functions/test/*.test.js`)**: **15 automated tests** passing:
+  - 256-bit pairing token entropy and one-way SHA-256 hashing.
+  - 10-minute pairing TTL expiration and single-use invalidation.
+  - Device revocation and cross-owner isolation.
+  - Anti-misuse Firestore security rules simulation (exact targetDeviceId, WIPE_DEVICE denial, append-only audit trail).
   - 256-bit pairing token entropy and one-way SHA-256 hashing.
   - 10-minute pairing TTL expiration and single-use invalidation.
   - Device revocation and cross-owner isolation.

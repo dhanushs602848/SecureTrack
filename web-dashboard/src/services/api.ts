@@ -17,6 +17,8 @@ import {
   updateDoc,
   deleteDoc,
   writeBatch,
+  runTransaction,
+  Transaction,
   query,
   orderBy,
   limit,
@@ -255,6 +257,14 @@ export const deviceService = {
     const user = auth.currentUser;
     if (!user) throw new Error('User not authenticated');
 
+    // Configurable maximum device count per account (anti-abuse quota enforcement)
+    const MAX_DEVICES_PER_ACCOUNT = 5;
+    const devicesSnap = await getDocs(collection(db, 'users', user.uid, 'devices'));
+    const activeDevices = devicesSnap.docs.filter(d => d.data().status !== 'REVOKED');
+    if (activeDevices.length >= MAX_DEVICES_PER_ACCOUNT) {
+      throw new Error(`Account device limit reached (Maximum ${MAX_DEVICES_PER_ACCOUNT} devices). Please revoke an existing device before pairing a new one.`);
+    }
+
     // Generate 32 cryptographically random bytes (256 bits)
     const bytes = new Uint8Array(32);
     window.crypto.getRandomValues(bytes);
@@ -359,6 +369,17 @@ export const deviceService = {
       bleSharedSecret: bleSharedSecret
     });
 
+    // 3. Record audit log entry for device enrollment
+    const auditRef = doc(collection(db, 'users', user.uid, 'audit_logs'));
+    batch.set(auditRef, {
+      ownerUid: user.uid,
+      action: 'DEVICE_APPROVED',
+      targetDeviceId: deviceId,
+      deviceName: invitation.deviceInfo?.deviceName || 'Paired Android Device',
+      initiatedFrom: 'WEB_CONSOLE',
+      timestamp: serverTimestamp()
+    });
+
     await batch.commit();
   },
 
@@ -383,12 +404,26 @@ export const deviceService = {
 
     try {
       const deviceRef = doc(db, 'users', uid, 'devices', deviceId);
-      await updateDoc(deviceRef, {
+      const batch = writeBatch(db);
+
+      batch.update(deviceRef, {
         status: 'REVOKED',
         protectionEnabled: false,
         trackingStatus: 'STOPPED',
         revokedAt: serverTimestamp()
       });
+
+      // Record audit log entry for device revocation
+      const auditRef = doc(collection(db, 'users', uid, 'audit_logs'));
+      batch.set(auditRef, {
+        ownerUid: uid,
+        action: 'DEVICE_REVOKED',
+        targetDeviceId: deviceId,
+        initiatedFrom: 'WEB_CONSOLE',
+        timestamp: serverTimestamp()
+      });
+
+      await batch.commit();
     } catch (err: any) {
       console.error('Firestore revokePairedDevice failed:', {
         code: err?.code,
@@ -603,12 +638,83 @@ export const commandService = {
     const uid = auth.currentUser?.uid;
     if (!uid) throw new Error('User not authenticated');
 
-    const requestId = 'req_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
-    const expiresAtDate = new Date(Date.now() + 15 * 60 * 1000);
+    // Anti-misuse safety guard: WIPE_DEVICE permanently blocked
+    if (commandType === 'WIPE_DEVICE') {
+      throw new Error('Safety Lock: Remote factory wipe is permanently disabled to protect user data.');
+    }
 
-    const commandDoc = await addDoc(
-      collection(db, 'users', uid, 'devices', deviceId, 'commands'),
-      {
+    const allowedTypes = ['LOCATE_NOW', 'LOCK_DEVICE', 'ALARM_ALERT'];
+    if (!allowedTypes.includes(commandType)) {
+      throw new Error(`Unsupported command type: ${commandType}`);
+    }
+
+    // Server-enforced rate limiting & audit logging via atomic Firestore transaction
+    const rateLimitDocRef = doc(db, 'users', uid, 'command_rate_limits', deviceId);
+    const commandCollectionRef = collection(db, 'users', uid, 'devices', deviceId, 'commands');
+    const newCommandDocRef = doc(commandCollectionRef);
+    const auditDocRef = doc(collection(db, 'users', uid, 'audit_logs'));
+
+    const now = Date.now();
+    const requestId = 'req_' + now + '_' + Math.random().toString(36).substring(2, 9);
+    const expiresAtDate = new Date(now + 15 * 60 * 1000);
+
+    await runTransaction(db, async (transaction: Transaction) => {
+      const rateDoc = await transaction.get(rateLimitDocRef);
+      const rateData = rateDoc.exists() ? rateDoc.data() : {};
+
+      // 1. Alarm cooldown: 1 alarm every 2 minutes (120,000 ms)
+      if (commandType === 'ALARM_ALERT') {
+        const lastAlarm = rateData.lastAlarmAt ? convertTimestampToMillis(rateData.lastAlarmAt) : 0;
+        if (now - lastAlarm < 120 * 1000) {
+          const waitSec = Math.ceil((120 * 1000 - (now - lastAlarm)) / 1000);
+          throw new Error(`Rate limit: Alarm cooldown active. Please wait ${waitSec}s before sounding the alarm again.`);
+        }
+      }
+
+      // 2. Lock cooldown: 1 lock every 1 minute (60,000 ms)
+      if (commandType === 'LOCK_DEVICE') {
+        const lastLock = rateData.lastLockAt ? convertTimestampToMillis(rateData.lastLockAt) : 0;
+        if (now - lastLock < 60 * 1000) {
+          const waitSec = Math.ceil((60 * 1000 - (now - lastLock)) / 1000);
+          throw new Error(`Rate limit: Lock cooldown active. Please wait ${waitSec}s before sending another lock command.`);
+        }
+      }
+
+      // 3. Location rate limit: max 5 requests per 10 minutes (600,000 ms)
+      if (commandType === 'LOCATE_NOW') {
+        const windowStart = rateData.locateWindowStart ? convertTimestampToMillis(rateData.locateWindowStart) : 0;
+        let locateCount = rateData.locateCount || 0;
+
+        if (now - windowStart > 10 * 60 * 1000) {
+          // Reset 10-minute window
+          transaction.set(rateLimitDocRef, {
+            ...rateData,
+            locateWindowStart: serverTimestamp(),
+            locateCount: 1,
+            lastLocateAt: serverTimestamp()
+          }, { merge: true });
+        } else {
+          if (locateCount >= 5) {
+            const waitSec = Math.ceil((10 * 60 * 1000 - (now - windowStart)) / 1000);
+            throw new Error(`Rate limit: Maximum 5 location requests per 10 minutes exceeded. Please wait ${waitSec}s.`);
+          }
+          transaction.set(rateLimitDocRef, {
+            ...rateData,
+            locateCount: locateCount + 1,
+            lastLocateAt: serverTimestamp()
+          }, { merge: true });
+        }
+      }
+
+      // Update specific timestamps for alarm and lock
+      if (commandType === 'ALARM_ALERT') {
+        transaction.set(rateLimitDocRef, { ...rateData, lastAlarmAt: serverTimestamp() }, { merge: true });
+      } else if (commandType === 'LOCK_DEVICE') {
+        transaction.set(rateLimitDocRef, { ...rateData, lastLockAt: serverTimestamp() }, { merge: true });
+      }
+
+      // Create command document with exact targetDeviceId
+      transaction.set(newCommandDocRef, {
         commandType,
         command: commandType,
         targetDeviceId: deviceId,
@@ -619,11 +725,22 @@ export const commandService = {
         result: '',
         createdAt: serverTimestamp(),
         expiresAt: Timestamp.fromDate(expiresAtDate)
-      }
-    );
+      });
+
+      // Record immutable audit log entry
+      transaction.set(auditDocRef, {
+        ownerUid: uid,
+        action: `COMMAND_${commandType}`,
+        targetDeviceId: deviceId,
+        commandId: newCommandDocRef.id,
+        requestId: requestId,
+        initiatedFrom: 'WEB_CONSOLE',
+        timestamp: serverTimestamp()
+      });
+    });
 
     return {
-      id: commandDoc.id,
+      id: newCommandDocRef.id,
       deviceId: deviceId,
       commandType: commandType,
       payload: payload,
@@ -634,6 +751,47 @@ export const commandService = {
       expiresAt: expiresAtDate.toISOString()
     };
   },
+};
+
+/**
+ * Helper to parse Firestore timestamp, Date or number into epoch millis
+ */
+function convertTimestampToMillis(ts: any): number {
+  if (!ts) return 0;
+  if (typeof ts === 'number') return ts;
+  if (ts.toMillis && typeof ts.toMillis === 'function') return ts.toMillis();
+  if (ts.seconds !== undefined) return ts.seconds * 1000;
+  const d = new Date(ts).getTime();
+  return isNaN(d) ? 0 : d;
+}
+
+export const auditService = {
+  subscribeToAuditLogs: (callback: (logs: any[]) => void) => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) { callback([]); return () => {}; }
+
+    const q = query(
+      collection(db, 'users', uid, 'audit_logs'),
+      orderBy('timestamp', 'desc'),
+      limit(50)
+    );
+
+    return onSnapshot(q, (snapshot) => {
+      const logs: any[] = [];
+      snapshot.forEach((d) => {
+        const data = d.data();
+        logs.push({
+          id: d.id,
+          action: data.action,
+          targetDeviceId: data.targetDeviceId,
+          commandId: data.commandId,
+          initiatedFrom: data.initiatedFrom,
+          timestamp: convertTimestamp(data.timestamp)
+        });
+      });
+      callback(logs);
+    });
+  }
 };
 
 export const safeZoneService = {

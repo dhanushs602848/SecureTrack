@@ -381,4 +381,85 @@ test('SecureTrack Spark-Compatible 256-Bit Pairing & Security Suite', async (t) 
     assert.ok(formatted.includes('permission-denied'), 'Must contain exact error code');
     assert.ok(formatted.includes('Missing or insufficient permissions'), 'Must contain actionable message');
   });
+
+  await t.test('Anti-misuse Security Rules Simulation: targetDeviceId validation, WIPE_DEVICE denial, and append-only audit trail', () => {
+    const ownerUid = 'owner-alice';
+    const attackerUid = 'attacker-eve';
+    const deviceId = 'phone-pixel';
+
+    // 1. Command Security Rules Simulator
+    function simulateCommandCreateRule(authUid, pathOwnerUid, pathDeviceId, commandDoc) {
+      if (!authUid || authUid !== pathOwnerUid) {
+        throw new Error('permission-denied: Only device owner can create commands');
+      }
+      const cmdType = commandDoc.commandType || commandDoc.command;
+      const allowedTypes = ['LOCATE_NOW', 'LOCK_DEVICE', 'ALARM_ALERT'];
+      if (!allowedTypes.includes(cmdType)) {
+        throw new Error(`permission-denied: Command type ${cmdType} not allowed`);
+      }
+      if (cmdType === 'WIPE_DEVICE') {
+        throw new Error('permission-denied: WIPE_DEVICE permanently prohibited');
+      }
+      if (commandDoc.targetDeviceId !== pathDeviceId) {
+        throw new Error('permission-denied: targetDeviceId must match path deviceId');
+      }
+      return true;
+    }
+
+    // Valid command
+    assert.equal(
+      simulateCommandCreateRule(ownerUid, ownerUid, deviceId, {
+        commandType: 'LOCATE_NOW',
+        targetDeviceId: deviceId
+      }),
+      true
+    );
+
+    // Attacker cannot dispatch command
+    assert.throws(
+      () => simulateCommandCreateRule(attackerUid, ownerUid, deviceId, {
+        commandType: 'LOCATE_NOW',
+        targetDeviceId: deviceId
+      }),
+      /Only device owner can create commands/
+    );
+
+    // Target device ID mismatch
+    assert.throws(
+      () => simulateCommandCreateRule(ownerUid, ownerUid, deviceId, {
+        commandType: 'LOCATE_NOW',
+        targetDeviceId: 'different-device'
+      }),
+      /targetDeviceId must match path deviceId/
+    );
+
+    // WIPE_DEVICE denied
+    assert.throws(
+      () => simulateCommandCreateRule(ownerUid, ownerUid, deviceId, {
+        commandType: 'WIPE_DEVICE',
+        targetDeviceId: deviceId
+      }),
+      /not allowed/
+    );
+
+    // 2. Audit Trail Rules Simulator (Read/Create: owner only; Update/Delete: false)
+    function simulateAuditLogRule(op, authUid, pathOwnerUid) {
+      if (op === 'read' || op === 'create') {
+        if (!authUid || authUid !== pathOwnerUid) {
+          throw new Error('permission-denied: Only owner can access audit trail');
+        }
+        return true;
+      }
+      if (op === 'update' || op === 'delete') {
+        throw new Error('permission-denied: Audit logs are strictly append-only (updates and deletions prohibited)');
+      }
+      throw new Error('invalid-operation');
+    }
+
+    assert.equal(simulateAuditLogRule('read', ownerUid, ownerUid), true);
+    assert.equal(simulateAuditLogRule('create', ownerUid, ownerUid), true);
+    assert.throws(() => simulateAuditLogRule('read', attackerUid, ownerUid), /permission-denied/);
+    assert.throws(() => simulateAuditLogRule('update', ownerUid, ownerUid), /Audit logs are strictly append-only/);
+    assert.throws(() => simulateAuditLogRule('delete', ownerUid, ownerUid), /Audit logs are strictly append-only/);
+  });
 });
