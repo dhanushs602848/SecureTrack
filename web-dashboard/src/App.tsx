@@ -48,18 +48,18 @@ const ProtectedLayout: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#0A0E17] text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#0A0E17] text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200 overflow-x-hidden">
       <Navbar
         mobileMenuOpen={mobileMenuOpen}
         onToggleMobileMenu={() => setMobileMenuOpen(prev => !prev)}
       />
       <RealtimeAlertBanner />
-      <div className="flex flex-1 relative">
+      <div className="flex flex-1 relative min-w-0">
         <Sidebar
           isOpen={mobileMenuOpen}
           onClose={() => setMobileMenuOpen(false)}
         />
-        <main className="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto w-full">
+        <main className="flex-1 p-3.5 sm:p-6 md:p-8 overflow-y-auto overflow-x-hidden w-full min-w-0">
           <Suspense fallback={<LoadingFallback />}>
             <Routes>
               <Route path="/" element={<Overview />} />

@@ -26,7 +26,7 @@ export const Settings: React.FC = () => {
   const { theme, setTheme, resolvedTheme } = useTheme();
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto transition-colors duration-200">
+    <div className="space-y-8 max-w-4xl mx-auto w-full min-w-0 transition-colors duration-200">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
           System &amp; Account Settings
@@ -96,7 +96,7 @@ export const Settings: React.FC = () => {
         aria-labelledby="section-appearance-title"
         className="bg-white dark:bg-[#121927] p-6 rounded-3xl border border-slate-200 dark:border-[#223049] shadow-sm space-y-4"
       >
-        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             <Sun className="w-5 h-5 text-amber-500" />
             <div>
@@ -297,33 +297,33 @@ export const Settings: React.FC = () => {
         </div>
 
         <div className="space-y-3 text-xs text-slate-600 dark:text-slate-300">
-          <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2 border-b border-slate-100 dark:border-slate-800 gap-1">
             <span className="font-medium">Device Pairing Cryptography</span>
-            <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
+            <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold break-words">
               256-Bit SHA-256 Tokens (Single-Use, 10m TTL)
             </span>
           </div>
-          <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2 border-b border-slate-100 dark:border-slate-800 gap-1">
             <span className="font-medium">Cloud Database &amp; Security Rules</span>
-            <span className="font-mono text-slate-800 dark:text-slate-200 font-semibold">
+            <span className="font-mono text-slate-800 dark:text-slate-200 font-semibold break-words">
               Google Cloud Firestore (Strict Path Isolation)
             </span>
           </div>
-          <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2 border-b border-slate-100 dark:border-slate-800 gap-1">
             <span className="font-medium">Device Account Quota</span>
-            <span className="font-mono text-slate-800 dark:text-slate-200 font-semibold">
+            <span className="font-mono text-slate-800 dark:text-slate-200 font-semibold break-words">
               Maximum 3 Active Devices per Account
             </span>
           </div>
-          <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2 border-b border-slate-100 dark:border-slate-800 gap-1">
             <span className="font-medium">Command Expiration Limit</span>
-            <span className="font-mono text-amber-600 dark:text-amber-400 font-semibold">
+            <span className="font-mono text-amber-600 dark:text-amber-400 font-semibold break-words">
               15-Minute Queue Expiry Guard
             </span>
           </div>
-          <div className="flex items-center justify-between py-2">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2 gap-1">
             <span className="font-medium">Command Rate-Limiting</span>
-            <span className="font-mono text-slate-800 dark:text-slate-200 font-semibold">
+            <span className="font-mono text-slate-800 dark:text-slate-200 font-semibold break-words">
               Alarm: 2m Cooldown • Lock: 1m Cooldown • Locate: 5 / 10m
             </span>
           </div>

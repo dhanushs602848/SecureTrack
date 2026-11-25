@@ -128,29 +128,29 @@ export const Overview: React.FC = () => {
   const isDark = resolvedTheme === 'dark';
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto transition-colors duration-200">
+    <div className="space-y-6 max-w-7xl mx-auto transition-colors duration-200 min-w-0">
       {/* Header and Quick Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
             Security Overview
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Real-time status of protected Android devices and defense telemetry
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
           <button
             type="button"
             onClick={() => setShowReleaseModal(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-[#162032] hover:bg-slate-50 dark:hover:bg-[#1d2a42] text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 shadow-xs transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-[#162032] hover:bg-slate-50 dark:hover:bg-[#1d2a42] text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 shadow-xs transition-colors shrink-0"
           >
             <Info className="w-3.5 h-3.5 text-indigo-600 dark:text-cyan-400" />
             Release &amp; App Build
           </button>
           <Link
             to="/devices"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-colors"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-colors shrink-0"
           >
             <Plus className="w-3.5 h-3.5" />
             Pair Device
@@ -159,18 +159,18 @@ export const Overview: React.FC = () => {
       </div>
 
       {/* 4 Core Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Total Devices */}
-        <div className="bg-white dark:bg-[#121927] p-5 rounded-2xl border border-slate-200 dark:border-[#223049] shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60 rounded-xl flex items-center justify-center">
-            <Smartphone className="w-6 h-6" />
+        <div className="bg-white dark:bg-[#121927] p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-[#223049] shadow-sm flex items-center gap-3.5 sm:gap-4 min-w-0">
+          <div className="w-11 h-11 sm:w-12 sm:h-12 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800/60 rounded-xl flex items-center justify-center shrink-0">
+            <Smartphone className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
-          <div>
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">TOTAL DEVICES</p>
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white font-mono mt-0.5">
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">TOTAL DEVICES</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-mono mt-0.5">
               {activeDevices.length}
             </h2>
-            <span className="text-[11px] text-slate-500">
+            <span className="text-[11px] text-slate-500 block truncate">
               {devices.length - activeDevices.length > 0
                 ? `${devices.length - activeDevices.length} revoked`
                 : 'Enrolled under account'}
@@ -179,16 +179,16 @@ export const Overview: React.FC = () => {
         </div>
 
         {/* Online Devices */}
-        <div className="bg-white dark:bg-[#121927] p-5 rounded-2xl border border-slate-200 dark:border-[#223049] shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 rounded-xl flex items-center justify-center">
-            <Wifi className="w-6 h-6" />
+        <div className="bg-white dark:bg-[#121927] p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-[#223049] shadow-sm flex items-center gap-3.5 sm:gap-4 min-w-0">
+          <div className="w-11 h-11 sm:w-12 sm:h-12 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 rounded-xl flex items-center justify-center shrink-0">
+            <Wifi className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
-          <div>
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">ONLINE NOW</p>
-            <h2 className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">ONLINE NOW</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">
               {onlineDevices}
             </h2>
-            <span className="text-[11px] text-slate-500">
+            <span className="text-[11px] text-slate-500 block truncate">
               {activeDevices.length > 0
                 ? `${Math.round((onlineDevices / activeDevices.length) * 100)}% active connectivity`
                 : 'No devices connected'}
@@ -197,22 +197,22 @@ export const Overview: React.FC = () => {
         </div>
 
         {/* Verified Protection Status (Never assumes 0 alerts = protected) */}
-        <div className="bg-white dark:bg-[#121927] p-5 rounded-2xl border border-slate-200 dark:border-[#223049] shadow-sm flex items-center gap-4">
+        <div className="bg-white dark:bg-[#121927] p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-[#223049] shadow-sm flex items-center gap-3.5 sm:gap-4 min-w-0">
           <div
-            className={`w-12 h-12 rounded-xl flex items-center justify-center border ${
+            className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center border shrink-0 ${
               activeDevices.length > 0 && fullyProtectedCount === activeDevices.length
                 ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60'
                 : 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/60'
             }`}
           >
-            <ShieldCheck className="w-6 h-6" />
+            <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
-          <div>
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">PROTECTION HEALTH</p>
-            <h2 className="text-2xl font-bold font-mono mt-0.5 text-slate-900 dark:text-white">
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">PROTECTION HEALTH</p>
+            <h2 className="text-xl sm:text-2xl font-bold font-mono mt-0.5 text-slate-900 dark:text-white">
               {fullyProtectedCount} / {activeDevices.length}
             </h2>
-            <span className="text-[11px] text-slate-500">
+            <span className="text-[11px] text-slate-500 block truncate">
               {activeDevices.length === 0
                 ? 'No active endpoints'
                 : fullyProtectedCount === activeDevices.length
@@ -223,26 +223,26 @@ export const Overview: React.FC = () => {
         </div>
 
         {/* Active Security Alerts */}
-        <div className="bg-white dark:bg-[#121927] p-5 rounded-2xl border border-slate-200 dark:border-[#223049] shadow-sm flex items-center gap-4">
+        <div className="bg-white dark:bg-[#121927] p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-[#223049] shadow-sm flex items-center gap-3.5 sm:gap-4 min-w-0">
           <div
-            className={`w-12 h-12 rounded-xl flex items-center justify-center border ${
+            className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center border shrink-0 ${
               activeAlerts.length === 0
                 ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60'
                 : 'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800/60'
             }`}
           >
-            <ShieldAlert className="w-6 h-6" />
+            <ShieldAlert className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
-          <div>
-            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">ACTIVE ALERTS</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">ACTIVE ALERTS</p>
             <h2
-              className={`text-2xl font-bold font-mono mt-0.5 ${
+              className={`text-xl sm:text-2xl font-bold font-mono mt-0.5 ${
                 activeAlerts.length === 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
               }`}
             >
               {activeAlerts.length}
             </h2>
-            <span className="text-[11px] text-slate-500">
+            <span className="text-[11px] text-slate-500 block truncate">
               {activeAlerts.length === 0 ? 'Zero unaddressed threats' : `${criticalAlerts} critical / high priority`}
             </span>
           </div>
@@ -250,53 +250,53 @@ export const Overview: React.FC = () => {
       </div>
 
       {/* Quick Navigation Shortcuts */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <Link
           to="/tracking"
-          className="p-4 bg-white dark:bg-[#121927] hover:bg-slate-50 dark:hover:bg-[#162032] rounded-2xl border border-slate-200 dark:border-[#223049] shadow-xs flex items-center justify-between group transition-all"
+          className="p-3.5 sm:p-4 bg-white dark:bg-[#121927] hover:bg-slate-50 dark:hover:bg-[#162032] rounded-2xl border border-slate-200 dark:border-[#223049] shadow-xs flex items-center justify-between group transition-all min-w-0"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-cyan-50 dark:bg-cyan-950/50 text-cyan-600 dark:text-cyan-400 flex items-center justify-center">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-cyan-50 dark:bg-cyan-950/50 text-cyan-600 dark:text-cyan-400 flex items-center justify-center shrink-0">
               <MapPin className="w-4 h-4" />
             </div>
-            <div>
-              <h3 className="text-xs font-bold text-slate-900 dark:text-white">Live Endpoint Tracking</h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">View real-time map &amp; GPS fixes</p>
+            <div className="min-w-0">
+              <h3 className="text-xs font-bold text-slate-900 dark:text-white truncate">Live Endpoint Tracking</h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">View real-time map &amp; GPS fixes</p>
             </div>
           </div>
-          <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" />
+          <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform shrink-0 ml-2" />
         </Link>
 
         <Link
           to="/commands"
-          className="p-4 bg-white dark:bg-[#121927] hover:bg-slate-50 dark:hover:bg-[#162032] rounded-2xl border border-slate-200 dark:border-[#223049] shadow-xs flex items-center justify-between group transition-all"
+          className="p-3.5 sm:p-4 bg-white dark:bg-[#121927] hover:bg-slate-50 dark:hover:bg-[#162032] rounded-2xl border border-slate-200 dark:border-[#223049] shadow-xs flex items-center justify-between group transition-all min-w-0"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
               <Terminal className="w-4 h-4" />
             </div>
-            <div>
-              <h3 className="text-xs font-bold text-slate-900 dark:text-white">Remote Commands</h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">Dispatch lock, alarm &amp; locate</p>
+            <div className="min-w-0">
+              <h3 className="text-xs font-bold text-slate-900 dark:text-white truncate">Remote Commands</h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">Dispatch lock, alarm &amp; locate</p>
             </div>
           </div>
-          <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" />
+          <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform shrink-0 ml-2" />
         </Link>
 
         <Link
           to="/security"
-          className="p-4 bg-white dark:bg-[#121927] hover:bg-slate-50 dark:hover:bg-[#162032] rounded-2xl border border-slate-200 dark:border-[#223049] shadow-xs flex items-center justify-between group transition-all"
+          className="p-3.5 sm:p-4 bg-white dark:bg-[#121927] hover:bg-slate-50 dark:hover:bg-[#162032] rounded-2xl border border-slate-200 dark:border-[#223049] shadow-xs flex items-center justify-between group transition-all min-w-0"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
               <ShieldAlert className="w-4 h-4" />
             </div>
-            <div>
-              <h3 className="text-xs font-bold text-slate-900 dark:text-white">Security Center</h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">Audit logs &amp; security alarms</p>
+            <div className="min-w-0">
+              <h3 className="text-xs font-bold text-slate-900 dark:text-white truncate">Security Center</h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">Audit logs &amp; security alarms</p>
             </div>
           </div>
-          <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" />
+          <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform shrink-0 ml-2" />
         </Link>
       </div>
 
@@ -453,14 +453,14 @@ export const Overview: React.FC = () => {
             if (e.target === e.currentTarget) setShowReleaseModal(false);
           }}
         >
-          <div className="bg-white dark:bg-[#121927] border border-slate-200 dark:border-[#223049] rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-cyan-400 flex items-center justify-center border border-indigo-200 dark:border-indigo-800">
+          <div className="bg-white dark:bg-[#121927] border border-slate-200 dark:border-[#223049] rounded-3xl p-5 sm:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-cyan-400 flex items-center justify-center border border-indigo-200 dark:border-indigo-800 shrink-0">
                   <Smartphone className="w-5 h-5" />
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white font-mono">
+                <div className="min-w-0">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white font-mono truncate">
                     SecureTrack Android Client
                   </h3>
                   <p className="text-xs text-slate-500">Version 1.8.0 • Fleet Protection</p>
@@ -469,7 +469,7 @@ export const Overview: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowReleaseModal(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 shrink-0"
                 aria-label="Close modal"
               >
                 ✕
@@ -480,32 +480,32 @@ export const Overview: React.FC = () => {
               Install SecureTrack on your Android handset to enable continuous location telemetry, anti-shutdown defense, and remote recovery.
             </p>
 
-            <div className="bg-slate-50 dark:bg-[#162032] p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2 text-xs">
-              <div className="flex justify-between">
+            <div className="bg-slate-50 dark:bg-[#162032] p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2.5 text-xs">
+              <div className="flex flex-col xs:flex-row xs:justify-between xs:items-center gap-1">
                 <span className="text-slate-500">Source Repository</span>
                 <a
                   href="https://github.com/dhanushs602848/SecureTrack"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-indigo-600 dark:text-cyan-400 hover:underline font-semibold inline-flex items-center gap-1 font-mono"
+                  className="text-indigo-600 dark:text-cyan-400 hover:underline font-semibold inline-flex items-center gap-1 font-mono break-all"
                 >
-                  GitHub Repository <ExternalLink className="w-3 h-3" />
+                  GitHub Repository <ExternalLink className="w-3 h-3 shrink-0" />
                 </a>
               </div>
-              <div className="flex justify-between">
+              <div className="flex flex-col xs:flex-row xs:justify-between xs:items-center gap-1">
                 <span className="text-slate-500">APK Releases</span>
                 <a
                   href="https://github.com/dhanushs602848/SecureTrack/releases"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-indigo-600 dark:text-cyan-400 hover:underline font-semibold inline-flex items-center gap-1 font-mono"
+                  className="text-indigo-600 dark:text-cyan-400 hover:underline font-semibold inline-flex items-center gap-1 font-mono break-all"
                 >
-                  Official Releases <ExternalLink className="w-3 h-3" />
+                  Official Releases <ExternalLink className="w-3 h-3 shrink-0" />
                 </a>
               </div>
-              <div className="flex justify-between">
+              <div className="flex flex-col xs:flex-row xs:justify-between xs:items-center gap-1">
                 <span className="text-slate-500">Build Command</span>
-                <code className="font-mono text-[11px] text-slate-800 dark:text-slate-200 bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                <code className="font-mono text-[11px] text-slate-800 dark:text-slate-200 bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded break-all">
                   ./gradlew assembleDebug
                 </code>
               </div>

@@ -121,11 +121,11 @@ export const LocationHistory: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4 flex flex-col h-[calc(100vh-6.5rem)] max-w-7xl mx-auto transition-colors duration-200">
+    <div className="space-y-4 flex flex-col min-h-[calc(100vh-6.5rem)] max-w-7xl mx-auto transition-colors duration-200 min-w-0">
       {/* Header and Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 shrink-0 min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
             Location History &amp; Breadcrumb Trail
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -133,7 +133,7 @@ export const LocationHistory: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <label htmlFor="device-history-select" className="sr-only">
             Select Device
           </label>
@@ -156,9 +156,9 @@ export const LocationHistory: React.FC = () => {
       </div>
 
       {/* Filter Chips Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
-        <div className="flex items-center gap-1.5 bg-white dark:bg-[#121927] border border-slate-200 dark:border-[#223049] p-1 rounded-xl text-xs">
-          <span className="px-2 text-slate-400 flex items-center gap-1 text-[11px]">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 shrink-0 min-w-0">
+        <div className="flex items-center gap-1 sm:gap-1.5 bg-white dark:bg-[#121927] border border-slate-200 dark:border-[#223049] p-1 rounded-xl text-xs overflow-x-auto max-w-full">
+          <span className="px-1.5 sm:px-2 text-slate-400 flex items-center gap-1 text-[11px] shrink-0">
             <Filter className="w-3 h-3" /> Filter:
           </span>
           <button
@@ -167,7 +167,7 @@ export const LocationHistory: React.FC = () => {
               setTimeFilter('ALL');
               setSelectedRecordIndex(null);
             }}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+            className={`px-2.5 sm:px-3 py-1.5 rounded-lg font-medium transition-colors shrink-0 text-xs ${
               timeFilter === 'ALL'
                 ? 'bg-indigo-600 text-white font-semibold'
                 : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -181,7 +181,7 @@ export const LocationHistory: React.FC = () => {
               setTimeFilter('TODAY');
               setSelectedRecordIndex(null);
             }}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+            className={`px-2.5 sm:px-3 py-1.5 rounded-lg font-medium transition-colors shrink-0 text-xs ${
               timeFilter === 'TODAY'
                 ? 'bg-indigo-600 text-white font-semibold'
                 : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -195,13 +195,13 @@ export const LocationHistory: React.FC = () => {
               setTimeFilter('24H');
               setSelectedRecordIndex(null);
             }}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+            className={`px-2.5 sm:px-3 py-1.5 rounded-lg font-medium transition-colors shrink-0 text-xs ${
               timeFilter === '24H'
                 ? 'bg-indigo-600 text-white font-semibold'
                 : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
           >
-            Last 24 Hours
+            Last 24h
           </button>
           <button
             type="button"
@@ -209,17 +209,17 @@ export const LocationHistory: React.FC = () => {
               setTimeFilter('7D');
               setSelectedRecordIndex(null);
             }}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+            className={`px-2.5 sm:px-3 py-1.5 rounded-lg font-medium transition-colors shrink-0 text-xs ${
               timeFilter === '7D'
                 ? 'bg-indigo-600 text-white font-semibold'
                 : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
           >
-            Last 7 Days
+            Last 7d
           </button>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {selectedRecordIndex !== null && (
             <button
               type="button"
@@ -234,7 +234,7 @@ export const LocationHistory: React.FC = () => {
             type="button"
             onClick={exportForensicCsv}
             disabled={filteredHistory.length === 0}
-            className="px-3.5 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-emerald-300 dark:border-emerald-800 rounded-xl transition-colors flex items-center gap-1.5 disabled:opacity-40 shadow-xs"
+            className="px-3.5 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-emerald-300 dark:border-emerald-800 rounded-xl transition-colors flex items-center gap-1.5 disabled:opacity-40 shadow-xs shrink-0"
             title="Export forensic location breadcrumbs to CSV"
           >
             <Download className="w-3.5 h-3.5" />
@@ -244,9 +244,9 @@ export const LocationHistory: React.FC = () => {
       </div>
 
       {/* Main Split Layout: Timeline List & Map */}
-      <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
+      <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-[500px]">
         {/* Timeline Panel */}
-        <div className="lg:w-1/3 bg-white dark:bg-[#121927] rounded-3xl shadow-sm border border-slate-200 dark:border-[#223049] overflow-y-auto flex flex-col">
+        <div className="h-64 sm:h-72 lg:h-auto lg:w-1/3 bg-white dark:bg-[#121927] rounded-3xl shadow-sm border border-slate-200 dark:border-[#223049] overflow-hidden flex flex-col">
           <div className="p-4 border-b border-slate-200 dark:border-[#223049] bg-slate-50 dark:bg-[#162032] sticky top-0 z-10 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-indigo-600 dark:text-cyan-400" />

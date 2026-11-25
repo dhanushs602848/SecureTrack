@@ -118,7 +118,7 @@ export const LostPhoneRecovery: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto transition-colors duration-200">
+    <div className="space-y-6 max-w-4xl mx-auto w-full min-w-0 transition-colors duration-200">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
@@ -272,19 +272,19 @@ export const LostPhoneRecovery: React.FC = () => {
 
                   {isRevealed ? (
                     <div className="bg-indigo-50/70 dark:bg-[#151f33] p-4 rounded-2xl border border-indigo-200 dark:border-indigo-800/80 space-y-2.5 animate-fade-in text-xs">
-                      <div className="flex justify-between items-center">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
                         <span className="font-semibold text-slate-700 dark:text-slate-300">
                           IMEI Slot 1:
                         </span>
-                        <span className="font-mono font-bold text-slate-900 dark:text-cyan-400 select-all bg-white dark:bg-[#0A0E17] px-2 py-0.5 rounded border border-indigo-100 dark:border-slate-800">
+                        <span className="font-mono font-bold text-slate-900 dark:text-cyan-400 select-all bg-white dark:bg-[#0A0E17] px-2 py-0.5 rounded border border-indigo-100 dark:border-slate-800 break-all">
                           {recoveryInfo?.imei1 || 'Not registered on device'}
                         </span>
                       </div>
-                      <div className="flex justify-between items-center">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
                         <span className="font-semibold text-slate-700 dark:text-slate-300">
                           IMEI Slot 2:
                         </span>
-                        <span className="font-mono font-bold text-slate-900 dark:text-cyan-400 select-all bg-white dark:bg-[#0A0E17] px-2 py-0.5 rounded border border-indigo-100 dark:border-slate-800">
+                        <span className="font-mono font-bold text-slate-900 dark:text-cyan-400 select-all bg-white dark:bg-[#0A0E17] px-2 py-0.5 rounded border border-indigo-100 dark:border-slate-800 break-all">
                           {recoveryInfo?.imei2 || 'Not registered on device'}
                         </span>
                       </div>
@@ -328,7 +328,7 @@ export const LostPhoneRecovery: React.FC = () => {
             if (e.target === e.currentTarget && !reauthLoading) setShowReauthModal(false);
           }}
         >
-          <div className="bg-white dark:bg-[#121927] p-6 rounded-3xl shadow-2xl max-w-md w-full border border-slate-200 dark:border-[#223049] space-y-4 text-left">
+          <div className="bg-white dark:bg-[#121927] p-6 rounded-3xl shadow-2xl max-w-md w-full border border-slate-200 dark:border-[#223049] space-y-4 text-left max-h-[90vh] overflow-y-auto">
             <div>
               <h2 className="text-lg font-bold text-slate-900 dark:text-white font-mono">
                 Security Re-Authentication

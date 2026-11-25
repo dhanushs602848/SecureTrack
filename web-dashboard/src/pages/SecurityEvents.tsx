@@ -199,16 +199,16 @@ export const SecurityEvents: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto transition-colors duration-200">
+    <div className="space-y-6 max-w-5xl mx-auto transition-colors duration-200 min-w-0">
       {/* Header and Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 min-w-0">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
               Security Center &amp; Alerts
             </h1>
             <span
-              className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
+              className={`text-xs font-bold px-2.5 py-0.5 rounded-full border shrink-0 ${
                 activeEvents.length === 0
                   ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
                   : 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-800'
@@ -222,7 +222,7 @@ export const SecurityEvents: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <label htmlFor="device-security-select" className="sr-only">
             Select Device
           </label>
@@ -245,12 +245,12 @@ export const SecurityEvents: React.FC = () => {
       </div>
 
       {/* View Mode Bar: Device Threats vs Non-Repudiation Audit Trail */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-[#223049] pb-3">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 border-b border-slate-200 dark:border-[#223049] pb-3">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
             onClick={() => setViewMode('ALERTS')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
               viewMode === 'ALERTS'
                 ? 'bg-indigo-600 text-white shadow-xs'
                 : 'bg-white dark:bg-[#121927] text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-[#223049] hover:bg-slate-50 dark:hover:bg-slate-800'
@@ -262,7 +262,7 @@ export const SecurityEvents: React.FC = () => {
           <button
             type="button"
             onClick={() => setViewMode('AUDIT_TRAIL')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+            className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
               viewMode === 'AUDIT_TRAIL'
                 ? 'bg-indigo-600 text-white shadow-xs'
                 : 'bg-white dark:bg-[#121927] text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-[#223049] hover:bg-slate-50 dark:hover:bg-slate-800'
@@ -278,7 +278,7 @@ export const SecurityEvents: React.FC = () => {
             type="button"
             onClick={exportAuditLogJson}
             disabled={auditLogs.length === 0}
-            className="px-3.5 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 border border-emerald-300 dark:border-emerald-800 rounded-xl transition-colors flex items-center gap-1.5 disabled:opacity-40 shadow-xs"
+            className="px-3.5 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 border border-emerald-300 dark:border-emerald-800 rounded-xl transition-colors flex items-center gap-1.5 disabled:opacity-40 shadow-xs shrink-0"
             title="Download immutable audit trail JSON for forensic evaluation"
           >
             <Download className="w-3.5 h-3.5" />

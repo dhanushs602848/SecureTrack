@@ -250,12 +250,12 @@ export const Devices: React.FC = () => {
           </div>
 
           {/* Stepper Visualizer */}
-          <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 text-center text-[11px] font-medium text-slate-500">
-            <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 font-semibold">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5 sm:gap-2 text-center text-[10px] sm:text-[11px] font-medium text-slate-500">
+            <div className="p-1.5 sm:p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 font-semibold truncate">
               1. Invite Ready ✓
             </div>
             <div
-              className={`p-2 rounded-xl border ${
+              className={`p-1.5 sm:p-2 rounded-xl border truncate ${
                 currentPairingStep >= 2
                   ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-cyan-300 border-indigo-200 dark:border-indigo-800 font-semibold'
                   : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800'
@@ -264,7 +264,7 @@ export const Devices: React.FC = () => {
               2. Scan QR Code
             </div>
             <div
-              className={`p-2 rounded-xl border ${
+              className={`p-1.5 sm:p-2 rounded-xl border truncate ${
                 currentPairingStep >= 3
                   ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-cyan-300 border-indigo-200 dark:border-indigo-800 font-semibold'
                   : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800'
@@ -273,7 +273,7 @@ export const Devices: React.FC = () => {
               3. Handset Request
             </div>
             <div
-              className={`p-2 rounded-xl border ${
+              className={`p-1.5 sm:p-2 rounded-xl border truncate ${
                 currentPairingStep >= 4
                   ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800 font-semibold'
                   : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800'
@@ -281,36 +281,36 @@ export const Devices: React.FC = () => {
             >
               4. Review Device
             </div>
-            <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
+            <div className="p-1.5 sm:p-2 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 truncate">
               5. Approve / Deny
             </div>
-            <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
+            <div className="p-1.5 sm:p-2 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 truncate">
               6. Enrolled
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 dark:bg-[#0A0E17] p-5 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 bg-slate-50 dark:bg-[#0A0E17] p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800">
             {/* Step 2: QR Code */}
-            <div className="flex flex-col items-center justify-center p-6 bg-white dark:bg-[#121927] rounded-2xl border border-slate-200 dark:border-[#223049] space-y-3">
-              <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-xs">
-                <QRCodeSVG value={qrPayload} size={180} level="H" includeMargin={true} />
+            <div className="flex flex-col items-center justify-center p-4 sm:p-6 bg-white dark:bg-[#121927] rounded-2xl border border-slate-200 dark:border-[#223049] space-y-3">
+              <div className="p-2.5 sm:p-3 bg-white rounded-2xl border border-slate-200 shadow-xs max-w-full overflow-hidden">
+                <QRCodeSVG value={qrPayload} size={160} level="H" includeMargin={true} />
               </div>
-              <p className="text-xs text-slate-600 dark:text-slate-300 font-medium text-center max-w-xs">
+              <p className="text-xs text-slate-600 dark:text-slate-300 font-medium text-center max-w-xs leading-relaxed">
                 Open SecureTrack on the target phone and tap <strong>"Pair as Tracked Device"</strong> to scan this code.
               </p>
             </div>
 
             {/* Step 3 & 4: Token Masking & Pending Approval */}
-            <div className="flex flex-col justify-between space-y-4">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
+            <div className="flex flex-col justify-between space-y-4 min-w-0">
+              <div className="space-y-3 min-w-0">
+                <div className="flex items-center justify-between gap-2">
                   <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                     Manual 256-Bit Pairing Token
                   </label>
                   <button
                     type="button"
                     onClick={() => setRevealToken(!revealToken)}
-                    className="text-xs text-indigo-600 dark:text-cyan-400 hover:underline flex items-center gap-1 font-medium"
+                    className="text-xs text-indigo-600 dark:text-cyan-400 hover:underline flex items-center gap-1 font-medium shrink-0"
                   >
                     {revealToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     <span>{revealToken ? 'Hide Token' : 'Reveal Token'}</span>
@@ -321,17 +321,17 @@ export const Devices: React.FC = () => {
                   {revealToken ? pairingToken : '••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••'}
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                   <button
                     type="button"
                     onClick={handleCopyToken}
-                    className="flex items-center gap-2 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition-all shadow-xs"
+                    className="flex items-center gap-2 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition-all shadow-xs shrink-0"
                   >
                     {copied ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
                     <span>{copied ? 'Copied!' : 'Copy Token'}</span>
                   </button>
                   <span className="text-[11px] text-slate-500">
-                    Use if the device camera is unavailable
+                    Use if device camera is unavailable
                   </span>
                 </div>
               </div>
@@ -371,12 +371,12 @@ export const Devices: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 pt-1">
+                  <div className="flex items-center gap-2 sm:gap-3 pt-1 flex-wrap sm:flex-nowrap">
                     <button
                       type="button"
                       onClick={handleApproveDevice}
                       disabled={actionLoading}
-                      className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5"
+                      className="w-full sm:flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5"
                     >
                       <CheckCircle2 className="w-4 h-4" />
                       Approve &amp; Enroll
@@ -385,7 +385,7 @@ export const Devices: React.FC = () => {
                       type="button"
                       onClick={handleRejectDevice}
                       disabled={actionLoading}
-                      className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5"
+                      className="w-full sm:flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5"
                     >
                       <XCircle className="w-4 h-4" />
                       Reject Request
@@ -405,7 +405,7 @@ export const Devices: React.FC = () => {
 
       {/* Device List or Skeletons or Empty State */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           <CardSkeleton />
           <CardSkeleton />
           <CardSkeleton />
@@ -422,7 +422,7 @@ export const Devices: React.FC = () => {
           }}
         />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {devices.map((device) => {
             const isOnline = device.status === 'ONLINE';
             const isRevoked = device.status === 'REVOKED';
@@ -432,21 +432,21 @@ export const Devices: React.FC = () => {
             return (
               <div
                 key={device.id}
-                className="bg-white dark:bg-[#121927] p-6 rounded-3xl border border-slate-200 dark:border-[#223049] shadow-sm space-y-4 hover:shadow-md transition-shadow flex flex-col justify-between"
+                className="bg-white dark:bg-[#121927] p-5 sm:p-6 rounded-3xl border border-slate-200 dark:border-[#223049] shadow-sm space-y-4 hover:shadow-md transition-shadow flex flex-col justify-between min-w-0"
               >
                 <div>
                   {/* Card Header */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h2 className="text-base font-bold text-slate-900 dark:text-white truncate">
+                  <div className="flex items-start justify-between gap-2.5 sm:gap-3">
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate">
                         {device.deviceName}
                       </h2>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                         {device.model || 'Android Phone'} • Android {device.androidVersion || '14'}
                       </p>
                     </div>
                     <span
-                      className={`px-2.5 py-1 rounded-full text-[11px] font-bold border shrink-0 ${
+                      className={`px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-bold border shrink-0 ${
                         isRevoked
                           ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-800'
                           : isOnline
@@ -463,7 +463,7 @@ export const Devices: React.FC = () => {
                     {/* Battery */}
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-                        <Battery className="w-4 h-4 text-emerald-500" />
+                        <Battery className="w-4 h-4 text-emerald-500 shrink-0" />
                         Battery Level
                       </span>
                       <span className="font-semibold text-slate-800 dark:text-slate-200 font-mono">
@@ -474,7 +474,7 @@ export const Devices: React.FC = () => {
                     {/* Location Status */}
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-                        <MapPin className="w-4 h-4 text-cyan-500" />
+                        <MapPin className="w-4 h-4 text-cyan-500 shrink-0" />
                         Location Telemetry
                       </span>
                       <span
@@ -489,7 +489,7 @@ export const Devices: React.FC = () => {
                     {/* Protection Health */}
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-                        <ShieldCheck className="w-4 h-4 text-indigo-500" />
+                        <ShieldCheck className="w-4 h-4 text-indigo-500 shrink-0" />
                         Protection Health
                       </span>
                       <span
@@ -511,7 +511,7 @@ export const Devices: React.FC = () => {
                     {/* Last Heartbeat */}
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
-                        <Clock className="w-4 h-4 text-slate-400" />
+                        <Clock className="w-4 h-4 text-slate-400 shrink-0" />
                         Last Heartbeat
                       </span>
                       <span className="font-semibold text-slate-800 dark:text-slate-200 text-[11px]">
@@ -536,22 +536,22 @@ export const Devices: React.FC = () => {
 
                 {/* Footer Actions & ID Toggle */}
                 <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center justify-between text-[11px] gap-2">
                     <button
                       type="button"
                       onClick={() => toggleDeviceId(device.id)}
-                      className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 underline font-mono"
+                      className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 underline font-mono shrink-0"
                     >
                       {isIdVisible ? 'Hide ID' : 'Show ID'}
                     </button>
                     {isIdVisible && (
-                      <span className="font-mono text-slate-500 select-all truncate max-w-[140px]" title={device.id}>
+                      <span className="font-mono text-slate-500 select-all truncate max-w-[140px] xs:max-w-[200px]" title={device.id}>
                         {device.id}
                       </span>
                     )}
                   </div>
 
-                  <div className="flex items-center justify-end gap-3 pt-1">
+                  <div className="flex items-center justify-end gap-2 sm:gap-3 pt-1 flex-wrap">
                     {!isRevoked && (
                       <button
                         type="button"

@@ -18,13 +18,19 @@
             android:id="@+id/tv_tracking_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_alignParentStart="true"
+            android:layout_toStartOf="@id/layout_tracking_actions"
+            android:layout_marginEnd="8dp"
             android:layout_centerVertical="true"
+            android:ellipsize="end"
+            android:maxLines="1"
             android:text="Controller Dashboard"
             android:textColor="@color/text_primary"
             android:textSize="20sp"
             android:textStyle="bold" />
 
         <LinearLayout
+            android:id="@+id/layout_tracking_actions"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_alignParentEnd="true"
@@ -219,6 +225,8 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
                 android:text="Battery: 85%"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
@@ -228,6 +236,8 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
                 android:text="Accuracy: ±10m"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
@@ -238,6 +248,8 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:gravity="end"
+                android:ellipsize="end"
+                android:maxLines="1"
                 android:text="Updated: Just now"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
@@ -269,6 +281,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_alignParentStart="true"
+                android:layout_toStartOf="@id/switch_background_tracking"
+                android:layout_marginEnd="8dp"
                 android:layout_centerVertical="true"
                 android:text="Local Phone Background Protection"
                 android:textColor="@color/text_primary"

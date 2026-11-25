@@ -27,6 +27,8 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_alignParentStart="true"
+                    android:layout_toStartOf="@id/tv_system_shield_pill"
+                    android:layout_marginEnd="8dp"
                     android:layout_centerVertical="true"
                     android:orientation="vertical">
 
@@ -34,6 +36,8 @@
                         android:id="@+id/tv_user_name"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
                         android:text="Hello, Operator"
                         android:textColor="@color/text_primary"
                         android:textSize="24sp"
@@ -44,6 +48,8 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
                         android:text="SecureTrack • Fleet Defense Active"
                         android:textColor="@color/text_secondary"
                         android:textSize="13sp" />
@@ -107,9 +113,11 @@
 
                         <TextView
                             android:id="@+id/tv_enrolled_account_identity"
-                            android:layout_width="wrap_content"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="1dp"
+                            android:ellipsize="end"
+                            android:maxLines="2"
                             android:text="Linked to: Checking account…"
                             android:textColor="@color/text_primary"
                             android:textSize="12sp"

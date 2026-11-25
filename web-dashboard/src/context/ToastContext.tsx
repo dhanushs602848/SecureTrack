@@ -83,7 +83,7 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       <div
         aria-live="polite"
         aria-atomic="true"
-        className="fixed bottom-5 right-5 z-[9999] flex flex-col gap-2 max-w-sm w-full pointer-events-none p-2 sm:p-0"
+        className="fixed bottom-4 right-4 left-4 sm:left-auto sm:right-5 sm:bottom-5 z-[9999] flex flex-col gap-2 max-w-sm pointer-events-none"
       >
         {toasts.map((toast) => {
           const { bg, icon } = getToastStyles(toast.type);

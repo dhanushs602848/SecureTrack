@@ -162,11 +162,11 @@ export const Commands: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto transition-colors duration-200">
+    <div className="space-y-6 max-w-5xl mx-auto transition-colors duration-200 min-w-0">
       {/* Header and Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
             Remote Device Commands
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -174,7 +174,7 @@ export const Commands: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <label htmlFor="device-command-select" className="sr-only">
             Select Target Device
           </label>
@@ -198,18 +198,18 @@ export const Commands: React.FC = () => {
 
       {/* Target Device Identification Banner */}
       {selectedDevice && (
-        <div className="p-4 bg-white dark:bg-[#121927] rounded-2xl border border-slate-200 dark:border-[#223049] shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-3">
+        <div className="p-3.5 sm:p-4 bg-white dark:bg-[#121927] rounded-2xl border border-slate-200 dark:border-[#223049] shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs min-w-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
             <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-cyan-400 flex items-center justify-center border border-indigo-200 dark:border-indigo-800 shrink-0">
               <Smartphone className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-slate-900 dark:text-white text-sm">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-slate-900 dark:text-white text-sm truncate">
                   {selectedDevice.deviceName}
                 </span>
                 <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${
                     selectedDevice.status === 'ONLINE'
                       ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700'
@@ -218,13 +218,13 @@ export const Commands: React.FC = () => {
                   {selectedDevice.status}
                 </span>
               </div>
-              <p className="text-slate-500 text-[11px] mt-0.5">
+              <p className="text-slate-500 text-[11px] mt-0.5 truncate">
                 Target Handset: {selectedDevice.model || 'Android'} • Android {selectedDevice.androidVersion || '14'}
               </p>
             </div>
           </div>
 
-          <div className="text-right text-[11px] text-slate-500 font-mono">
+          <div className="text-left sm:text-right text-[11px] text-slate-500 font-mono shrink-0">
             <span>Last Heartbeat: </span>
             <strong className="text-slate-700 dark:text-slate-300">
               {selectedDevice.lastSeen
@@ -236,20 +236,20 @@ export const Commands: React.FC = () => {
       )}
 
       {/* Redesigned Command Cards (Wipe Data card completely removed as factory wipe is disabled) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         {/* Locate Now Card */}
         <button
           type="button"
           onClick={() => requestCommandDispatch('LOCATE_NOW')}
           disabled={!selectedDeviceId || actionLoading}
-          className="p-5 bg-white dark:bg-[#121927] border border-slate-200 dark:border-[#223049] hover:border-cyan-500 rounded-2xl shadow-xs transition-all flex flex-col justify-between text-left group disabled:opacity-50"
+          className="p-4 sm:p-5 bg-white dark:bg-[#121927] border border-slate-200 dark:border-[#223049] hover:border-cyan-500 rounded-2xl shadow-xs transition-all flex flex-col justify-between text-left group disabled:opacity-50 min-h-[140px]"
         >
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <div className="w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-950/50 text-cyan-600 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-800 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-950/50 text-cyan-600 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-800 flex items-center justify-center shrink-0">
                 <MapPin className="w-5 h-5" />
               </div>
-              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shrink-0">
                 LOW RISK
               </span>
             </div>
@@ -271,14 +271,14 @@ export const Commands: React.FC = () => {
           type="button"
           onClick={() => requestCommandDispatch('LOCK_DEVICE')}
           disabled={!selectedDeviceId || actionLoading}
-          className="p-5 bg-white dark:bg-[#121927] border border-slate-200 dark:border-[#223049] hover:border-indigo-500 rounded-2xl shadow-xs transition-all flex flex-col justify-between text-left group disabled:opacity-50"
+          className="p-4 sm:p-5 bg-white dark:bg-[#121927] border border-slate-200 dark:border-[#223049] hover:border-indigo-500 rounded-2xl shadow-xs transition-all flex flex-col justify-between text-left group disabled:opacity-50 min-h-[140px]"
         >
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center shrink-0">
                 <Lock className="w-5 h-5" />
               </div>
-              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 shrink-0">
                 MEDIUM RISK
               </span>
             </div>
@@ -300,14 +300,14 @@ export const Commands: React.FC = () => {
           type="button"
           onClick={() => requestCommandDispatch('ALARM_ALERT')}
           disabled={!selectedDeviceId || actionLoading}
-          className="p-5 bg-white dark:bg-[#121927] border border-slate-200 dark:border-[#223049] hover:border-amber-500 rounded-2xl shadow-xs transition-all flex flex-col justify-between text-left group disabled:opacity-50"
+          className="p-4 sm:p-5 bg-white dark:bg-[#121927] border border-slate-200 dark:border-[#223049] hover:border-amber-500 rounded-2xl shadow-xs transition-all flex flex-col justify-between text-left group disabled:opacity-50 min-h-[140px]"
         >
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 flex items-center justify-center shrink-0">
                 <Volume2 className="w-5 h-5" />
               </div>
-              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 shrink-0">
                 AUDIBLE ALERT
               </span>
             </div>

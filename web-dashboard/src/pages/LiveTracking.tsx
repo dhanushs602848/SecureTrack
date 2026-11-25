@@ -106,11 +106,11 @@ export const LiveTracking: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4 flex flex-col h-[calc(100vh-6.5rem)] max-w-7xl mx-auto transition-colors duration-200">
+    <div className="space-y-4 flex flex-col min-h-[calc(100vh-6.5rem)] max-w-7xl mx-auto transition-colors duration-200 min-w-0">
       {/* Top Header & Device Selection */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 shrink-0 min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
             Live Endpoint Tracking
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -118,7 +118,7 @@ export const LiveTracking: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap sm:flex-nowrap">
           <label htmlFor="device-select" className="sr-only">
             Select Device to Track
           </label>
@@ -126,7 +126,7 @@ export const LiveTracking: React.FC = () => {
             id="device-select"
             value={selectedDeviceId}
             onChange={(e) => setSelectedDeviceId(e.target.value)}
-            className="w-full sm:w-72 bg-white dark:bg-[#121927] border border-slate-300 dark:border-[#223049] text-slate-900 dark:text-slate-200 text-xs rounded-xl focus:ring-2 focus:ring-cyan-500 p-2.5 shadow-xs"
+            className="flex-1 sm:w-72 bg-white dark:bg-[#121927] border border-slate-300 dark:border-[#223049] text-slate-900 dark:text-slate-200 text-xs rounded-xl focus:ring-2 focus:ring-cyan-500 p-2.5 shadow-xs"
           >
             <option value="" disabled>
               Select a device to track
@@ -142,7 +142,7 @@ export const LiveTracking: React.FC = () => {
             type="button"
             onClick={handleLocateNow}
             disabled={!selectedDeviceId || isLocating}
-            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors shrink-0"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors shrink-0"
             title="Dispatch immediate real-time GPS location refresh command"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLocating ? 'animate-spin' : ''}`} />
@@ -153,22 +153,22 @@ export const LiveTracking: React.FC = () => {
 
       {/* Selected Device Context Bar */}
       {selectedDevice && (
-        <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-white dark:bg-[#121927] rounded-2xl border border-slate-200 dark:border-[#223049] text-xs shadow-xs shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-cyan-400 flex items-center justify-center border border-indigo-200 dark:border-indigo-800">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-white dark:bg-[#121927] rounded-2xl border border-slate-200 dark:border-[#223049] text-xs shadow-xs shrink-0 min-w-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-cyan-400 flex items-center justify-center border border-indigo-200 dark:border-indigo-800 shrink-0">
               <Smartphone className="w-4 h-4" />
             </div>
-            <div>
-              <span className="font-bold text-slate-900 dark:text-white">
+            <div className="min-w-0">
+              <span className="font-bold text-slate-900 dark:text-white truncate block sm:inline">
                 {selectedDevice.deviceName}
               </span>
-              <span className="text-slate-500 dark:text-slate-400 ml-2">
+              <span className="text-slate-500 dark:text-slate-400 sm:ml-2 text-[11px] block sm:inline truncate">
                 {selectedDevice.model || 'Android'} • Android {selectedDevice.androidVersion || '14'}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
             <span className="flex items-center gap-1 text-slate-600 dark:text-slate-300">
               <Battery className="w-3.5 h-3.5 text-emerald-500" />
               {selectedDevice.batteryLevel ?? 'N/A'}%
@@ -186,7 +186,7 @@ export const LiveTracking: React.FC = () => {
       {locateStatusMsg && (
         <div className="p-3 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 text-indigo-900 dark:text-indigo-200 rounded-xl text-xs flex items-center gap-2 shrink-0 animate-fade-in">
           <Activity className="w-4 h-4 text-indigo-600 dark:text-cyan-400 animate-spin shrink-0" />
-          <span>{locateStatusMsg}</span>
+          <span className="truncate">{locateStatusMsg}</span>
         </div>
       )}
 
@@ -194,30 +194,32 @@ export const LiveTracking: React.FC = () => {
       {isLocationDisabled && (
         <div className="p-3.5 bg-amber-50 dark:bg-[#201910] border border-amber-300 dark:border-amber-700/80 rounded-2xl flex items-center gap-3 text-amber-900 dark:text-amber-200 text-xs shadow-xs shrink-0">
           <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
-          <div>
+          <div className="leading-relaxed">
             <strong className="font-bold">Location Disabled on Handset:</strong> The device user or system has turned off Location Services. Displaying last verified coordinates recorded before it was turned off.
           </div>
         </div>
       )}
 
       {/* Map Container & Telemetry Floating Card */}
-      <div className="flex-1 bg-white dark:bg-[#121927] rounded-3xl shadow-sm border border-slate-200 dark:border-[#223049] overflow-hidden relative min-h-[350px]">
-        <LocationMap
-          locations={
-            latestLocation
-              ? [
-                  {
-                    ...latestLocation,
-                    label: selectedDevice?.deviceName || 'Handset',
-                  },
-                ]
-              : []
-          }
-        />
+      <div className="flex-1 bg-white dark:bg-[#121927] rounded-3xl shadow-sm border border-slate-200 dark:border-[#223049] overflow-hidden relative min-h-[380px] sm:min-h-[450px] flex flex-col">
+        <div className="flex-1 w-full h-[320px] sm:h-full relative">
+          <LocationMap
+            locations={
+              latestLocation
+                ? [
+                    {
+                      ...latestLocation,
+                      label: selectedDevice?.deviceName || 'Handset',
+                    },
+                  ]
+                : []
+            }
+          />
+        </div>
 
-        {/* Telemetry Overlay Card */}
+        {/* Telemetry Overlay Card (Responsive: docks cleanly on mobile, floats on sm+) */}
         {latestLocation && (
-          <div className="absolute top-4 right-4 bg-white/95 dark:bg-[#121927]/95 backdrop-blur-md p-4 rounded-2xl shadow-xl border border-slate-200 dark:border-[#223049] max-w-xs w-full z-[400] space-y-2.5 text-xs">
+          <div className="p-4 sm:absolute sm:top-4 sm:right-4 bg-white/95 dark:bg-[#121927]/95 backdrop-blur-md rounded-2xl sm:rounded-2xl shadow-lg border-t sm:border border-slate-200 dark:border-[#223049] sm:max-w-xs w-full z-[400] space-y-2.5 text-xs">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
               <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 font-mono">
                 <Activity className="w-3.5 h-3.5 text-emerald-500" />
